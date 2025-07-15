@@ -150,28 +150,129 @@ export async function POST(request: Request) {
 
     // Use streaming or non-streaming based on settings
     if (settings.streaming) {
-      console.log("Using real-time streaming pipeline");
+      console.log("Using real-time streaming pipeline with SSE");
 
-      // Create Agent Core text stream
-      const textStream = agentCore.chatStream(
-        `
-        - User location is ${await location()}.
-        - The current time is ${await time()}.
-        ${transcript}
-        `,
-        accessToken as string,
-        clientContext,
-        abortController.signal
-      );
+      // Create SSE response stream
+      const sseStream = new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder();
 
-      // Get TTS service and create audio stream directly
-      const ttsService = getTextToSpeechService(settings.ttsEngine);
+          try {
+            // Create Agent Core text stream
+            const textStream = agentCore.chatStream(
+              `
+              - User location is ${await location()}.
+              - The current time is ${await time()}.
+              ${transcript}
+              `,
+              accessToken as string,
+              clientContext,
+              abortController.signal
+            );
 
-      console.log("Using streaming TTS with text chunks");
-      const audioStream = await ttsService.synthesizeStream(
-        textStream,
-        abortController.signal
-      );
+            // Get TTS service
+            const ttsService = getTextToSpeechService(settings.ttsEngine);
+
+            // Create a text accumulator for SSE events
+            const textChunks: string[] = [];
+
+            // Create an async generator that emits text via SSE and passes to TTS
+            async function* textWithSSE() {
+              for await (const chunk of textStream) {
+                if (abortController.signal.aborted) {
+                  break;
+                }
+
+                // Store and send text chunk via SSE
+                textChunks.push(chunk);
+                const textEvent = `event: text\ndata: ${JSON.stringify({
+                  content: chunk
+                })}\n\n`;
+                controller.enqueue(encoder.encode(textEvent));
+
+                // Pass chunk to TTS
+                yield chunk;
+              }
+            }
+
+            // Create audio stream from text
+            const audioStream = await ttsService.synthesizeStream(
+              textWithSSE(),
+              abortController.signal
+            );
+
+            // Stream audio with buffering for better performance
+            const reader = audioStream.getReader();
+            const audioBuffer: Uint8Array[] = [];
+            const BUFFER_SIZE = 16384; // 16KB buffer
+            let currentBufferSize = 0;
+            let audioChunkIndex = 0;
+
+            while (true) {
+              const { done, value } = await reader.read();
+
+              if (done) {
+                // Send any remaining buffered audio
+                if (audioBuffer.length > 0) {
+                  const combinedBuffer = new Uint8Array(currentBufferSize);
+                  let offset = 0;
+                  for (const chunk of audioBuffer) {
+                    combinedBuffer.set(chunk, offset);
+                    offset += chunk.length;
+                  }
+
+                  const audioEvent = `event: audio\ndata: ${JSON.stringify({
+                    chunk: Buffer.from(combinedBuffer).toString("base64"),
+                    index: audioChunkIndex++
+                  })}\n\n`;
+                  controller.enqueue(encoder.encode(audioEvent));
+                }
+
+                // Send complete event
+                const completeEvent = `event: complete\ndata: ${JSON.stringify({
+                  fullText: textChunks.join("")
+                })}\n\n`;
+                controller.enqueue(encoder.encode(completeEvent));
+                break;
+              }
+
+              if (value) {
+                // Buffer audio chunks
+                audioBuffer.push(new Uint8Array(value));
+                currentBufferSize += value.byteLength;
+                // Send buffered audio when buffer is full
+                if (currentBufferSize >= BUFFER_SIZE) {
+                  const combinedBuffer = new Uint8Array(currentBufferSize);
+                  let offset = 0;
+                  for (const chunk of audioBuffer) {
+                    combinedBuffer.set(chunk, offset);
+                    offset += chunk.length;
+                  }
+
+                  const audioEvent = `event: audio\ndata: ${JSON.stringify({
+                    chunk: Buffer.from(combinedBuffer).toString("base64"),
+                    index: audioChunkIndex++
+                  })}\n\n`;
+                  controller.enqueue(encoder.encode(audioEvent));
+
+                  // Clear buffer
+                  audioBuffer.length = 0;
+                  currentBufferSize = 0;
+                }
+              }
+            }
+
+            controller.close();
+          } catch (error) {
+            // Send error event
+            const errorEvent = `event: error\ndata: ${JSON.stringify({
+              message: error instanceof Error ? error.message : "Unknown error"
+            })}\n\n`;
+            controller.enqueue(encoder.encode(errorEvent));
+            controller.close();
+          }
+        }
+      });
 
       // Clean up the request from tracking since it completed successfully
       requestManager.completeRequest(accessToken);
@@ -187,11 +288,13 @@ export async function POST(request: Request) {
         );
       });
 
-      return new Response(audioStream, {
+      return new Response(sseStream, {
         headers: {
-          "Content-Type": "audio/mpeg",
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
           "X-Transcript": encodeURIComponent(transcript),
-          "X-Response": "streaming" // Indicate this is a streaming response
+          "X-Response-Type": "sse-stream"
         }
       });
     }

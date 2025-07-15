@@ -6,7 +6,8 @@ import React, {
   useEffect,
   useRef,
   useState,
-  startTransition
+  startTransition,
+  useCallback
 } from "react";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
@@ -37,6 +38,8 @@ export default function Home() {
     ttsEngine: "elevenlabs",
     streaming: false
   });
+  const [streamingMessage, setStreamingMessage] = useState<string>("");
+  const [isStreaming, setIsStreaming] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const player = usePlayer();
   const agentCoreRef = useRef<AgentCoreService | null>(null);
@@ -54,7 +57,7 @@ export default function Home() {
   const vad = useMicVAD({
     startOnLoad: isAuthenticated, // Only start VAD if authenticated
     onSpeechEnd: (audio) => {
-      if (!isAuthenticated) return; // Guard against usage when not authenticated
+      if (!isAuthenticated || streamingMessage) return; // Guard against usage when not authenticated or streaming
       player.stop();
       const wav = utils.encodeWAV(audio);
       const blob = new Blob([wav], { type: "audio/wav" });
@@ -131,14 +134,20 @@ export default function Home() {
     initAgentCore();
   }, [isAuthenticated, agentCoreInitialized]);
 
-  // Separate effect to handle VAD state changes based on authentication
+  // Separate effect to handle VAD state changes based on authentication and streaming
   useEffect(() => {
-    if (isAuthenticated && vad && !vad.loading && !vad.errored) {
+    if (
+      isAuthenticated &&
+      vad &&
+      !vad.loading &&
+      !vad.errored &&
+      !streamingMessage
+    ) {
       vad.start();
-    } else if (!isAuthenticated && vad) {
+    } else if ((!isAuthenticated || streamingMessage) && vad) {
       vad.pause();
     }
-  }, [isAuthenticated, vad]);
+  }, [isAuthenticated, streamingMessage, vad]);
 
   useEffect(() => {
     function keyDown(e: KeyboardEvent) {
@@ -201,6 +210,244 @@ export default function Home() {
     }
 
     try {
+      // Handle streaming mode with SSE
+      if (appSettings.streaming) {
+        setIsStreaming(true);
+        setStreamingMessage("");
+
+        const response = await fetch("/api", {
+          method: "POST",
+          headers,
+          body: formData,
+          signal: abortController.signal
+        });
+
+        if (!response.ok) {
+          setIsStreaming(false);
+          if (response.status === 401) {
+            await authModule.logout();
+            toast.error("Session expired. Please sign in again.");
+          } else if (response.status === 429) {
+            toast.error(t("errors.tooManyRequests"));
+          } else {
+            toast.error((await response.text()) || t("common.error"));
+          }
+          return prevMessages;
+        }
+
+        const transcript = decodeURIComponent(
+          response.headers.get("X-Transcript") || ""
+        );
+
+        if (!transcript) {
+          setIsStreaming(false);
+          toast.error("No transcript received");
+          return prevMessages;
+        }
+
+        setInput(transcript);
+
+        // Add user message immediately
+        const userMessage: Message = {
+          role: "user",
+          content: transcript
+        };
+
+        const updatedMessages = [...prevMessages, userMessage];
+
+        // Handle SSE streaming
+        return new Promise<Message[]>((resolve, reject) => {
+          const reader = response.body!.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let accumulatedText = "";
+          let finalLatency = 0;
+          let audioStreamStarted = false;
+          let audioStreamClosed = false;
+
+          // Create a ReadableStream for audio playback
+          let audioStreamController: ReadableStreamDefaultController<Uint8Array> | null =
+            null;
+          const audioStream = new ReadableStream<Uint8Array>({
+            start(controller) {
+              audioStreamController = controller;
+            }
+          });
+
+          // Track audio chunks for ordering
+          const audioChunkMap = new Map<number, Uint8Array>();
+          let nextExpectedIndex = 0;
+
+          const closeAudioStream = () => {
+            console.log("--- Closing audio stream");
+            if (audioStreamController && !audioStreamClosed) {
+              try {
+                audioStreamController.close();
+                audioStreamClosed = true;
+              } catch (error) {
+                // Stream might already be closed
+                console.warn("Audio stream close error:", error);
+              }
+            }
+          };
+
+          const processAudioChunk = (index: number, bytes: Uint8Array) => {
+            console.log("--- Processing audio chunk:", index);
+            // Store chunk
+            audioChunkMap.set(index, bytes);
+
+            // Process any consecutive chunks we have
+            while (audioChunkMap.has(nextExpectedIndex)) {
+              const chunk = audioChunkMap.get(nextExpectedIndex)!;
+
+              // Start audio playback on first chunk
+              if (!audioStreamStarted && audioStreamController) {
+                audioStreamStarted = true;
+                player.play(audioStream, () => {
+                  // Audio playback completed
+                  const isFirefox = navigator.userAgent.includes("Firefox");
+                  if (isFirefox && vad) {
+                    vad.start();
+                  }
+                });
+              }
+
+              // Feed chunk to audio stream
+              if (audioStreamController && !audioStreamClosed) {
+                audioStreamController.enqueue(chunk);
+              }
+
+              // Clean up and move to next
+              audioChunkMap.delete(nextExpectedIndex);
+              nextExpectedIndex++;
+            }
+          };
+
+          const processSSE = async () => {
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+
+                // Process complete events from buffer
+                let eventType = "";
+                let eventData = "";
+
+                while (buffer.includes("\n\n")) {
+                  const eventEnd = buffer.indexOf("\n\n");
+                  const eventText = buffer.substring(0, eventEnd);
+                  buffer = buffer.substring(eventEnd + 2);
+
+                  const eventLines = eventText.split("\n");
+
+                  for (const line of eventLines) {
+                    if (line.startsWith("event:")) {
+                      eventType = line.substring(6).trim();
+                    } else if (line.startsWith("data:")) {
+                      eventData = line.substring(5).trim();
+                    }
+                  }
+
+                  // Process the complete event
+                  if (eventType && eventData) {
+                    try {
+                      const data = JSON.parse(eventData);
+                      switch (eventType) {
+                        case "text":
+                          accumulatedText += data.content;
+                          setStreamingMessage(accumulatedText);
+                          break;
+
+                        case "audio":
+                          // Decode base64 audio chunk
+                          const binaryString = atob(data.chunk);
+                          const bytes = new Uint8Array(binaryString.length);
+                          for (let j = 0; j < binaryString.length; j++) {
+                            bytes[j] = binaryString.charCodeAt(j);
+                          }
+                          processAudioChunk(data.index || 0, bytes);
+                          break;
+
+                        case "complete":
+                          finalLatency = Date.now() - submittedAt;
+                          accumulatedText = data.fullText;
+                          // Reset streaming state when text is complete
+                          setIsStreaming(false);
+                          setStreamingMessage("");
+
+                          // Close audio stream after a small delay to ensure all chunks are processed
+                          setTimeout(() => {
+                            closeAudioStream();
+                          }, 100);
+                          break;
+
+                        case "error":
+                          // Close audio stream on error
+                          closeAudioStream();
+                          throw new Error(data.message);
+                      }
+                    } catch (error) {
+                      console.error(
+                        "Error parsing SSE data:",
+                        error,
+                        "eventType:",
+                        eventType,
+                        "raw data:",
+                        eventData
+                      );
+                    }
+                  }
+
+                  // Reset for next event
+                  eventType = "";
+                  eventData = "";
+                }
+              }
+
+              // After processing all SSE events, resolve with final messages
+              const assistantMessage: Message = {
+                role: "assistant",
+                content: accumulatedText,
+                latency: finalLatency
+              };
+
+              resolve([...updatedMessages, assistantMessage]);
+            } catch (error) {
+              currentRequestRef.current = null;
+              if (error instanceof Error && error.name === "AbortError") {
+                console.log("SSE stream was cancelled");
+                resolve(prevMessages);
+              } else {
+                console.error("SSE stream error:", error);
+                reject(error);
+              }
+            } finally {
+              // Clean up only if not already done
+              if (isStreaming) {
+                setIsStreaming(false);
+                setStreamingMessage("");
+              }
+              currentRequestRef.current = null;
+
+              // Close audio stream if not already closed
+              closeAudioStream();
+
+              // Resume VAD after streaming completes (for Firefox)
+              const isFirefox = navigator.userAgent.includes("Firefox");
+              if (isFirefox && vad) {
+                setTimeout(() => vad.start(), 100);
+              }
+            }
+          };
+
+          processSSE();
+        });
+      }
+
+      // Non-streaming path (original implementation)
       const response = await fetch("/api", {
         method: "POST",
         headers,
@@ -339,10 +586,10 @@ export default function Home() {
         <button
           type="submit"
           className="p-4 mr-1 text-neutral-700 hover:text-black dark:text-neutral-300 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={isPending || !isAuthenticated}
+          disabled={isPending || !isAuthenticated || isStreaming}
           aria-label="Submit"
         >
-          {isPending ? <LoadingIcon /> : <EnterIcon />}
+          {isPending || isStreaming ? <LoadingIcon /> : <EnterIcon />}
         </button>
       </form>
 
@@ -358,39 +605,49 @@ export default function Home() {
 
         {!authLoading && !isAuthenticated && <p>{t("auth.pleaseSignIn")}</p>}
 
-        {!authLoading && isAuthenticated && messages.length > 0 && (
-          <p>
-            {messages.at(-1)?.content}
-            <span className="text-xs font-mono text-neutral-300 dark:text-neutral-700">
-              {" "}
-              ({messages.at(-1)?.latency}ms)
-            </span>
-          </p>
+        {!authLoading && isAuthenticated && streamingMessage && (
+          <p>{streamingMessage}</p>
         )}
 
-        {!authLoading && isAuthenticated && messages.length === 0 && (
-          <>
+        {!authLoading &&
+          isAuthenticated &&
+          messages.length > 0 &&
+          !streamingMessage && (
             <p>
-              A fast, open-source voice assistant powered by{" "}
-              <A href="https://groq.com">Groq</A>,{" "}
-              <A href="https://cartesia.ai">Cartesia</A>,{" "}
-              <A href="https://www.vad.ricky0123.com/">VAD</A>, and{" "}
-              <A href="https://vercel.com">Vercel</A>.{" "}
-              <A href="https://github.com/samwang0723/friday" target="_blank">
-                Learn more
-              </A>
-              .
+              {messages.at(-1)?.content}
+              <span className="text-xs font-mono text-neutral-300 dark:text-neutral-700">
+                {" "}
+                ({messages.at(-1)?.latency}ms)
+              </span>
             </p>
+          )}
 
-            {vad.loading ? (
-              <p>{t("assistant.loadingSpeech")}</p>
-            ) : vad.errored ? (
-              <p>{t("assistant.speechDetectionFailed")}</p>
-            ) : (
-              <p>{t("assistant.startTalking")}</p>
-            )}
-          </>
-        )}
+        {!authLoading &&
+          isAuthenticated &&
+          messages.length === 0 &&
+          !streamingMessage && (
+            <>
+              <p>
+                A fast, open-source voice assistant powered by{" "}
+                <A href="https://groq.com">Groq</A>,{" "}
+                <A href="https://cartesia.ai">Cartesia</A>,{" "}
+                <A href="https://www.vad.ricky0123.com/">VAD</A>, and{" "}
+                <A href="https://vercel.com">Vercel</A>.{" "}
+                <A href="https://github.com/samwang0723/friday" target="_blank">
+                  Learn more
+                </A>
+                .
+              </p>
+
+              {vad.loading ? (
+                <p>{t("assistant.loadingSpeech")}</p>
+              ) : vad.errored ? (
+                <p>{t("assistant.speechDetectionFailed")}</p>
+              ) : (
+                <p>{t("assistant.startTalking")}</p>
+              )}
+            </>
+          )}
       </div>
 
       <div
@@ -402,8 +659,10 @@ export default function Home() {
               isAuthenticated &&
               !vad.loading &&
               !vad.errored &&
-              !vad.userSpeaking,
-            "opacity-100 scale-110": isAuthenticated && vad.userSpeaking
+              !vad.userSpeaking &&
+              !streamingMessage,
+            "opacity-100 scale-110":
+              isAuthenticated && (vad.userSpeaking || streamingMessage)
           }
         )}
       />
