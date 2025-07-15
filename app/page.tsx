@@ -166,6 +166,9 @@ export default function Home() {
       currentRequestRef.current.abort();
     }
 
+    // Stop any ongoing audio playback
+    player.stop();
+
     // Create new AbortController for this request
     const abortController = new AbortController();
     currentRequestRef.current = abortController;

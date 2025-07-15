@@ -97,6 +97,16 @@ export function usePlayer() {
     isProcessing.current = false;
 
     // Stop current playback
+    if (source.current) {
+      try {
+        source.current.stop();
+        source.current.disconnect();
+      } catch (e) {
+        // Ignore errors if source is already stopped
+      }
+      source.current = null;
+    }
+
     audioContext.current?.close();
     audioContext.current = null;
     setIsPlaying(false);
