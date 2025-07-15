@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import authModule from "@/lib/auth";
 
 interface GoogleLoginButtonProps {
@@ -13,6 +14,7 @@ export default function GoogleLoginButton({
   disabled = false,
   className = ""
 }: GoogleLoginButtonProps) {
+  const t = useTranslations("auth");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleGoogleLogin = async () => {
@@ -23,7 +25,7 @@ export default function GoogleLoginButton({
       await authModule.loginWithGoogle();
     } catch (error) {
       console.error("Google login failed:", error);
-      toast.error("Login failed. Please try again.");
+      toast.error(t("loginFailed"));
     } finally {
       setIsLoading(false);
     }
@@ -57,7 +59,7 @@ export default function GoogleLoginButton({
           d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
         />
       </svg>
-      {isLoading ? "Signing in..." : "Sign in with Google"}
+      {isLoading ? t("signingIn") : t("signIn")}
     </button>
   );
 }

@@ -1,0 +1,55 @@
+{
+  "common": {
+    "loading": "Chargement...",
+    "error": "Une erreur s'est produite",
+    "retry": "Réessayer",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "close": "Fermer"
+  },
+  "auth": {
+    "signIn": "Se connecter avec Google",
+    "signingIn": "Connexion en cours...",
+    "loginFailed": "Échec de la connexion. Veuillez réessayer.",
+    "signOut": "Se déconnecter",
+    "signedOut": "Déconnexion réussie",
+    "signOutError": "Échec de la déconnexion. Veuillez réessayer.",
+    "sessionExpired": "Session expirée. Veuillez vous reconnecter.",
+    "authError": "Erreur d'authentification. Veuillez actualiser la page.",
+    "checkingAuth": "Vérification de l'authentification...",
+    "pleaseSignIn": "Veuillez vous connecter avec Google pour utiliser l'assistant vocal.",
+    "loginToContinue": "Veuillez vous connecter pour continuer"
+  },
+  "assistant": {
+    "placeholder": "Demandez-moi n'importe quoi",
+    "placeholderNotAuth": "Veuillez vous connecter pour continuer",
+    "submit": "Envoyer",
+    "startTalking": "Commencez à parler pour discuter.",
+    "loadingSpeech": "Chargement de la détection vocale...",
+    "speechDetectionFailed": "Échec du chargement de la détection vocale.",
+    "description": "Un assistant vocal rapide et open-source alimenté par {groq}, {cartesia}, {vad}, et {vercel}. {learnMore}.",
+    "learnMore": "En savoir plus",
+    "latency": "({latency}ms)"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "language": "Langue",
+    "languageDescription": "Choisissez votre langue préférée",
+    "speechToText": "Moteur de reconnaissance vocale",
+    "speechToTextDescription": "Choisissez votre moteur STT préféré",
+    "textToSpeech": "Moteur de synthèse vocale",
+    "textToSpeechDescription": "Choisissez votre moteur TTS préféré",
+    "streaming": "Audio en streaming",
+    "streamingDescription": "Lire l'audio au fur et à mesure de sa génération",
+    "auth": {
+      "signOut": "Se déconnecter"
+    }
+  },
+  "errors": {
+    "tooManyRequests": "Trop de requêtes. Veuillez réessayer plus tard.",
+    "requestFailed": "Échec de la requête. Veuillez réessayer.",
+    "initChatFailed": "Échec de l'initialisation de la session de chat",
+    "invalidAudio": "Audio invalide",
+    "requestCancelled": "La requête a été annulée"
+  }
+}

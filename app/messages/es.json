@@ -1,0 +1,55 @@
+{
+  "common": {
+    "loading": "Cargando...",
+    "error": "Ocurrió un error",
+    "retry": "Intentar de nuevo",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "close": "Cerrar"
+  },
+  "auth": {
+    "signIn": "Iniciar sesión con Google",
+    "signingIn": "Iniciando sesión...",
+    "loginFailed": "Error al iniciar sesión. Por favor intenta de nuevo.",
+    "signOut": "Cerrar sesión",
+    "signedOut": "Sesión cerrada exitosamente",
+    "signOutError": "Error al cerrar sesión. Por favor intenta de nuevo.",
+    "sessionExpired": "Sesión expirada. Por favor inicia sesión de nuevo.",
+    "authError": "Error de autenticación. Por favor recarga la página.",
+    "checkingAuth": "Verificando autenticación...",
+    "pleaseSignIn": "Por favor inicia sesión con Google para usar el asistente de voz.",
+    "loginToContinue": "Por favor inicia sesión para continuar"
+  },
+  "assistant": {
+    "placeholder": "Pregúntame cualquier cosa",
+    "placeholderNotAuth": "Por favor inicia sesión para continuar",
+    "submit": "Enviar",
+    "startTalking": "Empieza a hablar para chatear.",
+    "loadingSpeech": "Cargando detección de voz...",
+    "speechDetectionFailed": "Error al cargar la detección de voz.",
+    "description": "Un asistente de voz rápido y de código abierto impulsado por {groq}, {cartesia}, {vad} y {vercel}. {learnMore}.",
+    "learnMore": "Saber más",
+    "latency": "({latency}ms)"
+  },
+  "settings": {
+    "title": "Configuración",
+    "language": "Idioma",
+    "languageDescription": "Elige tu idioma preferido",
+    "speechToText": "Motor de Voz a Texto",
+    "speechToTextDescription": "Elige tu motor de voz a texto preferido",
+    "textToSpeech": "Motor de Texto a Voz",
+    "textToSpeechDescription": "Elige tu motor de texto a voz preferido",
+    "streaming": "Audio en Transmisión",
+    "streamingDescription": "Reproduce audio mientras se genera",
+    "auth": {
+      "signOut": "Cerrar sesión"
+    }
+  },
+  "errors": {
+    "tooManyRequests": "Demasiadas solicitudes. Por favor intenta más tarde.",
+    "requestFailed": "La solicitud falló. Por favor intenta de nuevo.",
+    "initChatFailed": "Error al inicializar la sesión de chat",
+    "invalidAudio": "Audio inválido",
+    "requestCancelled": "Solicitud cancelada"
+  }
+}

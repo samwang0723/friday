@@ -1,0 +1,55 @@
+{
+  "common": {
+    "loading": "載入中...",
+    "error": "發生錯誤",
+    "retry": "重試",
+    "cancel": "取消",
+    "save": "儲存",
+    "close": "關閉"
+  },
+  "auth": {
+    "signIn": "使用 Google 登入",
+    "signingIn": "正在登入...",
+    "loginFailed": "登入失敗，請重試。",
+    "signOut": "登出",
+    "signedOut": "登出成功",
+    "signOutError": "登出失敗，請重試。",
+    "sessionExpired": "會話已過期，請重新登入。",
+    "authError": "認證錯誤，請重新整理頁面。",
+    "checkingAuth": "正在檢查認證狀態...",
+    "pleaseSignIn": "請使用 Google 登入以使用語音助手。",
+    "loginToContinue": "請登入以繼續"
+  },
+  "assistant": {
+    "placeholder": "問我任何問題",
+    "placeholderNotAuth": "請登入以繼續",
+    "submit": "提交",
+    "startTalking": "開始說話聊天。",
+    "loadingSpeech": "正在載入語音識別...",
+    "speechDetectionFailed": "語音識別載入失敗。",
+    "description": "一個由 {groq}、{cartesia}、{vad} 和 {vercel} 驅動的快速開源語音助手。{learnMore}。",
+    "learnMore": "了解更多",
+    "latency": "({latency}毫秒)"
+  },
+  "settings": {
+    "title": "設定",
+    "language": "語言",
+    "languageDescription": "選擇您偏好的語言",
+    "speechToText": "語音轉文字引擎",
+    "speechToTextDescription": "選擇您偏好的語音轉文字引擎",
+    "textToSpeech": "文字轉語音引擎",
+    "textToSpeechDescription": "選擇您偏好的文字轉語音引擎",
+    "streaming": "串流音訊",
+    "streamingDescription": "在生成時播放音訊",
+    "auth": {
+      "signOut": "登出"
+    }
+  },
+  "errors": {
+    "tooManyRequests": "請求過多，請稍後重試。",
+    "requestFailed": "請求失敗，請重試。",
+    "initChatFailed": "初始化聊天會話失敗",
+    "invalidAudio": "無效音訊",
+    "requestCancelled": "請求已取消"
+  }
+}

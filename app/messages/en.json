@@ -1,0 +1,55 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Try again",
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close"
+  },
+  "auth": {
+    "signIn": "Sign in with Google",
+    "signingIn": "Signing in...",
+    "loginFailed": "Login failed. Please try again.",
+    "signOut": "Sign out",
+    "signedOut": "Signed out successfully",
+    "signOutError": "Failed to sign out. Please try again.",
+    "sessionExpired": "Session expired. Please sign in again.",
+    "authError": "Authentication error. Please refresh the page.",
+    "checkingAuth": "Checking authentication...",
+    "pleaseSignIn": "Please sign in with Google to use the voice assistant.",
+    "loginToContinue": "Please login to continue"
+  },
+  "assistant": {
+    "placeholder": "Ask me anything",
+    "placeholderNotAuth": "Please login to continue",
+    "submit": "Submit",
+    "startTalking": "Start talking to chat.",
+    "loadingSpeech": "Loading speech detection...",
+    "speechDetectionFailed": "Failed to load speech detection.",
+    "description": "A fast, open-source voice assistant powered by {groq}, {cartesia}, {vad}, and {vercel}. {learnMore}.",
+    "learnMore": "Learn more",
+    "latency": "({latency}ms)"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "languageDescription": "Choose your preferred language",
+    "speechToText": "Speech to Text Engine",
+    "speechToTextDescription": "Choose your preferred STT engine",
+    "textToSpeech": "Text to Speech Engine",
+    "textToSpeechDescription": "Choose your preferred TTS engine",
+    "streaming": "Streaming Audio",
+    "streamingDescription": "Play audio as it's generated",
+    "auth": {
+      "signOut": "Sign out"
+    }
+  },
+  "errors": {
+    "tooManyRequests": "Too many requests. Please try again later.",
+    "requestFailed": "Request failed. Please try again.",
+    "initChatFailed": "Failed to initialize chat session",
+    "invalidAudio": "Invalid audio",
+    "requestCancelled": "Request was cancelled"
+  }
+}

@@ -1,8 +1,11 @@
+import React from "react";
 import type { Metadata } from "next";
 import clsx from "clsx";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { Analytics } from "@vercel/analytics/react";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale } from "./lib/i18n";
 
 export const metadata: Metadata = {
   title: "Swift",
@@ -10,13 +13,18 @@ export const metadata: Metadata = {
     "A fast, open-source voice assistant powered by Groq, Cartesia, and Vercel."
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+
+  // Load messages for the current locale
+  const messages = (await import(`./messages/${locale}.json`)).default;
+
   return (
-    <html lang="en">
+    <html lang={locale}>
       <head>
         <link
           href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap"
@@ -28,12 +36,14 @@ export default function RootLayout({
           "py-8 px-6 lg:p-10 dark:text-white bg-white dark:bg-black min-h-dvh flex flex-col justify-between antialiased font-sans select-none"
         )}
       >
-        <main className="flex flex-col items-center justify-center grow">
-          {children}
-        </main>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <main className="flex flex-col items-center justify-center grow">
+            {children}
+          </main>
 
-        <Toaster richColors theme="system" />
-        <Analytics />
+          <Toaster richColors theme="system" />
+          <Analytics />
+        </NextIntlClientProvider>
       </body>
     </html>
   );

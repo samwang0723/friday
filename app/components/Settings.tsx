@@ -1,7 +1,9 @@
 "use client";
 
+import React, { useState, useEffect } from "react";
 import clsx from "clsx";
-import { useState, useEffect } from "react";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useTranslations } from "next-intl";
 
 interface SettingsProps {
   isOpen: boolean;
@@ -24,6 +26,8 @@ export default function Settings({
   isAuthenticated,
   onSettingsChange
 }: SettingsProps) {
+  const t = useTranslations("settings");
+
   const [settings, setSettings] = useState<SettingsState>({
     sttEngine: "groq",
     ttsEngine: "elevenlabs",
@@ -67,7 +71,7 @@ export default function Settings({
         </div>
 
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-medium text-white">Settings</h2>
+          <h2 className="text-xl font-medium text-white">{t("title")}</h2>
           <button
             onClick={onClose}
             className="p-2 rounded-full hover:bg-white/10 transition-colors"
@@ -108,7 +112,12 @@ export default function Settings({
                   d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
                 />
               </svg>
-              <span className="text-white text-sm">Speech-to-Text</span>
+              <div className="flex flex-col">
+                <span className="text-white text-sm">{t("speechToText")}</span>
+                <span className="text-gray-400 text-xs">
+                  {t("speechToTextDescription")}
+                </span>
+              </div>
             </div>
             <select
               value={settings.sttEngine}
@@ -141,7 +150,12 @@ export default function Settings({
                   d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M9.464 15.536a5 5 0 01-7.072-7.072m9.9-2.828a9 9 0 00-12.728 0"
                 />
               </svg>
-              <span className="text-white text-sm">Text-to-Speech</span>
+              <div className="flex flex-col">
+                <span className="text-white text-sm">{t("textToSpeech")}</span>
+                <span className="text-gray-400 text-xs">
+                  {t("textToSpeechDescription")}
+                </span>
+              </div>
             </div>
             <select
               value={settings.ttsEngine}
@@ -177,9 +191,9 @@ export default function Settings({
                 />
               </svg>
               <div className="flex flex-col">
-                <span className="text-white text-sm">Streaming Audio</span>
+                <span className="text-white text-sm">{t("streaming")}</span>
                 <span className="text-gray-400 text-xs">
-                  Play audio as it's generated
+                  {t("streamingDescription")}
                 </span>
               </div>
             </div>
@@ -205,8 +219,11 @@ export default function Settings({
             </button>
           </div>
 
+          {/* Language Switcher */}
+          <LanguageSwitcher />
+
           {/* Logout Button */}
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end pt-6">
             <button
               onClick={handleLogout}
               disabled={!isAuthenticated}
@@ -220,7 +237,7 @@ export default function Settings({
                 }
               )}
             >
-              Sign Out
+              {t("auth.signOut")}
             </button>
           </div>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import {
+import React, {
   useActionState,
   useEffect,
   useRef,
@@ -9,6 +9,7 @@ import {
   startTransition
 } from "react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { EnterIcon, LoadingIcon } from "@/lib/icons";
 import { usePlayer } from "@/lib/usePlayer";
 import { track } from "@vercel/analytics";
@@ -25,6 +26,7 @@ type Message = {
 };
 
 export default function Home() {
+  const t = useTranslations();
   const [input, setInput] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
@@ -154,7 +156,7 @@ export default function Home() {
     string | Blob
   >(async (prevMessages, data) => {
     if (!isAuthenticated) {
-      toast.error("Please login to continue");
+      toast.error(t("auth.loginToContinue"));
       return prevMessages;
     }
 
@@ -225,9 +227,9 @@ export default function Home() {
             toast.error("Authentication error. Please refresh the page.");
           }
         } else if (response.status === 429) {
-          toast.error("Too many requests. Please try again later.");
+          toast.error(t("errors.tooManyRequests"));
         } else {
-          toast.error((await response.text()) || "An error occurred.");
+          toast.error((await response.text()) || t("common.error"));
         }
 
         return prevMessages;
@@ -284,7 +286,7 @@ export default function Home() {
   function handleFormSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!isAuthenticated) {
-      toast.error("Please login to continue");
+      toast.error(t("auth.loginToContinue"));
       return;
     }
     startTransition(() => submit(input));
@@ -328,7 +330,9 @@ export default function Home() {
           className="bg-transparent focus:outline-hidden pl-6 pr-4 py-4 w-full placeholder:text-neutral-600 dark:placeholder:text-neutral-400 disabled:cursor-not-allowed"
           required
           placeholder={
-            isAuthenticated ? "Ask me anything" : "Please login to continue"
+            isAuthenticated
+              ? t("assistant.placeholder")
+              : t("auth.loginToContinue")
           }
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -354,11 +358,9 @@ export default function Home() {
           }
         )}
       >
-        {authLoading && <p>Checking authentication...</p>}
+        {authLoading && <p>{t("auth.checkingAuth")}</p>}
 
-        {!authLoading && !isAuthenticated && (
-          <p>Please sign in with Google to use the voice assistant.</p>
-        )}
+        {!authLoading && !isAuthenticated && <p>{t("auth.pleaseSignIn")}</p>}
 
         {!authLoading && isAuthenticated && messages.length > 0 && (
           <p>
@@ -385,11 +387,11 @@ export default function Home() {
             </p>
 
             {vad.loading ? (
-              <p>Loading speech detection...</p>
+              <p>{t("assistant.loadingSpeech")}</p>
             ) : vad.errored ? (
-              <p>Failed to load speech detection.</p>
+              <p>{t("assistant.speechDetectionFailed")}</p>
             ) : (
-              <p>Start talking to chat.</p>
+              <p>{t("assistant.startTalking")}</p>
             )}
           </>
         )}
