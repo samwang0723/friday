@@ -73,7 +73,8 @@ const schema = zfd.formData({
     .json(
       z.object({
         sttEngine: z.string(),
-        ttsEngine: z.string()
+        ttsEngine: z.string(),
+        streaming: z.boolean().optional() // Add streaming support
       })
     )
     .optional()
@@ -112,7 +113,8 @@ export async function POST(request: Request) {
     // Get settings with defaults
     const settings = data.settings || {
       sttEngine: "groq",
-      ttsEngine: "elevenlabs"
+      ttsEngine: "elevenlabs",
+      streaming: false
     };
 
     console.log("Using settings:", settings);
@@ -187,36 +189,69 @@ export async function POST(request: Request) {
     );
 
     const ttsService = getTextToSpeechService(settings.ttsEngine);
-    const voice = await ttsService.synthesize(
-      accumulatedResponse,
-      abortController.signal
-    );
 
-    // Clean up the request from tracking since it completed successfully
-    requestManager.completeRequest(accessToken);
-
-    console.timeEnd(
-      "tts request " + request.headers.get("x-vercel-id") || "local"
-    );
-
-    if (!voice.ok) {
-      console.error(await voice.text());
-      return new Response("Voice synthesis failed", { status: 500 });
-    }
-
-    console.time("stream " + request.headers.get("x-vercel-id") || "local");
-    after(() => {
-      console.timeEnd(
-        "stream " + request.headers.get("x-vercel-id") || "local"
+    // Use streaming or non-streaming based on settings
+    if (settings.streaming) {
+      console.log("Using streaming TTS");
+      const audioStream = await ttsService.synthesizeStream(
+        accumulatedResponse,
+        abortController.signal
       );
-    });
 
-    return new Response(voice.body, {
-      headers: {
-        "X-Transcript": encodeURIComponent(transcript),
-        "X-Response": encodeURIComponent(accumulatedResponse)
+      // Clean up the request from tracking since it completed successfully
+      requestManager.completeRequest(accessToken);
+
+      console.timeEnd(
+        "tts request " + request.headers.get("x-vercel-id") || "local"
+      );
+
+      console.time("stream " + request.headers.get("x-vercel-id") || "local");
+      after(() => {
+        console.timeEnd(
+          "stream " + request.headers.get("x-vercel-id") || "local"
+        );
+      });
+
+      return new Response(audioStream, {
+        headers: {
+          "Content-Type": "audio/mpeg",
+          "X-Transcript": encodeURIComponent(transcript),
+          "X-Response": encodeURIComponent(accumulatedResponse)
+        }
+      });
+    } else {
+      console.log("Using non-streaming TTS");
+      const voice = await ttsService.synthesize(
+        accumulatedResponse,
+        abortController.signal
+      );
+
+      // Clean up the request from tracking since it completed successfully
+      requestManager.completeRequest(accessToken);
+
+      console.timeEnd(
+        "tts request " + request.headers.get("x-vercel-id") || "local"
+      );
+
+      if (!voice.ok) {
+        console.error(await voice.text());
+        return new Response("Voice synthesis failed", { status: 500 });
       }
-    });
+
+      console.time("stream " + request.headers.get("x-vercel-id") || "local");
+      after(() => {
+        console.timeEnd(
+          "stream " + request.headers.get("x-vercel-id") || "local"
+        );
+      });
+
+      return new Response(voice.body, {
+        headers: {
+          "X-Transcript": encodeURIComponent(transcript),
+          "X-Response": encodeURIComponent(accumulatedResponse)
+        }
+      });
+    }
   } catch (error) {
     // Clean up the request from tracking if it failed
     requestManager.completeRequest(accessToken);

@@ -77,4 +77,85 @@ export class ElevenLabsTextToSpeechService implements ITextToSpeechService {
       return new Response("ElevenLabs TTS failed", { status: 500 });
     }
   }
+
+  async synthesizeStream(
+    text: string,
+    abortSignal?: AbortSignal
+  ): Promise<ReadableStream<Uint8Array>> {
+    const config = ttsConfigs.elevenlabs as TextToSpeechConfig;
+    if (!config || !config.apiKey || !config.voiceId) {
+      console.error(
+        "ElevenLabs API key or Voice ID is not configured for TTS."
+      );
+      throw new Error(
+        "ElevenLabs API key or Voice ID is not configured for TTS."
+      );
+    }
+
+    const elevenlabs = getElevenLabsClient(config.apiKey);
+    if (!elevenlabs) {
+      throw new Error("ElevenLabs client not initialized");
+    }
+
+    try {
+      // Check if operation was cancelled before starting
+      if (abortSignal?.aborted) {
+        console.info(
+          "ElevenLabs TTS streaming operation was cancelled before starting"
+        );
+        throw new Error(
+          "ElevenLabs TTS streaming operation was cancelled before starting"
+        );
+      }
+
+      const audioStream = await elevenlabs.textToSpeech.convertAsStream(
+        config.voiceId,
+        {
+          text,
+          model_id: config.modelName,
+          output_format: "mp3_22050_32"
+        }
+      );
+
+      return new ReadableStream<Uint8Array>({
+        async start(controller) {
+          try {
+            for await (const chunk of audioStream) {
+              // Check for cancellation during stream processing
+              if (abortSignal?.aborted) {
+                console.info(
+                  "ElevenLabs TTS streaming operation was cancelled during processing"
+                );
+                controller.close();
+                return;
+              }
+
+              // Enqueue the chunk as Uint8Array
+              controller.enqueue(new Uint8Array(chunk));
+            }
+            controller.close();
+          } catch (error) {
+            if (error instanceof Error && error.name === "AbortError") {
+              console.info("ElevenLabs TTS streaming operation was aborted");
+              controller.close();
+            } else {
+              console.error("ElevenLabs TTS streaming failed:", error);
+              controller.error(error);
+            }
+          }
+        },
+        cancel() {
+          console.info("ElevenLabs TTS streaming was cancelled by client");
+        }
+      });
+    } catch (error) {
+      // Handle AbortError specifically
+      if (error instanceof Error && error.name === "AbortError") {
+        console.info("ElevenLabs TTS streaming operation was aborted");
+        throw error;
+      }
+      console.error("ElevenLabs TTS streaming failed:", error);
+      throw error;
+    }
+  }
 }

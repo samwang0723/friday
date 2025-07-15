@@ -62,4 +62,66 @@ export class GroqTextToSpeechService implements ITextToSpeechService {
       return new Response("Groq TTS failed", { status: 500 });
     }
   }
+
+  async synthesizeStream(
+    text: string,
+    abortSignal?: AbortSignal
+  ): Promise<ReadableStream<Uint8Array>> {
+    const config = ttsConfigs.groq;
+    if (!config || !config.apiKey) {
+      console.error("Groq API key is not configured for TTS.");
+      throw new Error("Groq API key is not configured for TTS.");
+    }
+
+    if (!groq) {
+      throw new Error("Groq client not initialized");
+    }
+
+    try {
+      if (abortSignal?.aborted) {
+        console.info("Groq TTS streaming synthesis was cancelled");
+        throw new Error("Groq TTS streaming operation was cancelled");
+      }
+
+      const response = await groq.audio.speech.create({
+        model: config.modelName,
+        voice: config.voiceId!,
+        input: text,
+        response_format: "wav"
+      });
+
+      // Check for cancellation before processing the response
+      if (abortSignal?.aborted) {
+        console.info("Groq TTS streaming cancelled before stream processing");
+        throw new Error(
+          "Groq TTS streaming cancelled before stream processing"
+        );
+      }
+
+      // Return the body as a ReadableStream
+      if (response.body) {
+        return response.body;
+      } else {
+        // Fallback: convert response to stream
+        const buffer = await response.arrayBuffer();
+        return new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new Uint8Array(buffer));
+            controller.close();
+          },
+          cancel() {
+            console.info("Groq TTS streaming was cancelled by client");
+          }
+        });
+      }
+    } catch (error) {
+      // Handle AbortError specifically
+      if (error instanceof Error && error.name === "AbortError") {
+        console.info("Groq TTS streaming operation was cancelled");
+        throw error;
+      }
+      console.error("Groq TTS streaming failed:", error);
+      throw error;
+    }
+  }
 }

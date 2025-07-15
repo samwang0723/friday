@@ -32,7 +32,8 @@ export default function Home() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [appSettings, setAppSettings] = useState<SettingsState>({
     sttEngine: "groq",
-    ttsEngine: "elevenlabs"
+    ttsEngine: "elevenlabs",
+    streaming: false
   });
   const inputRef = useRef<HTMLInputElement>(null);
   const player = usePlayer();
@@ -236,10 +237,20 @@ export default function Home() {
       currentRequestRef.current = null;
 
       const latency = Date.now() - submittedAt;
-      player.play(response.body, () => {
-        const isFirefox = navigator.userAgent.includes("Firefox");
-        if (isFirefox) vad.start();
-      });
+
+      // Use streaming or non-streaming playback based on settings
+      if (appSettings.streaming) {
+        player.playStream(response.body, () => {
+          const isFirefox = navigator.userAgent.includes("Firefox");
+          if (isFirefox) vad.start();
+        });
+      } else {
+        player.play(response.body, () => {
+          const isFirefox = navigator.userAgent.includes("Firefox");
+          if (isFirefox) vad.start();
+        });
+      }
+
       setInput(transcript);
 
       return [
