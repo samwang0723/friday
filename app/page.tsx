@@ -15,6 +15,7 @@ import { track } from "@vercel/analytics";
 import { useMicVAD, utils } from "@ricky0123/vad-react";
 import authModule from "@/lib/auth";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
+import Settings, { SettingsState } from "@/components/Settings";
 import { AgentCoreService } from "@/lib/agentCore";
 
 type Message = {
@@ -28,6 +29,11 @@ export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [agentCoreInitialized, setAgentCoreInitialized] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [appSettings, setAppSettings] = useState<SettingsState>({
+    sttEngine: "groq",
+    ttsEngine: "elevenlabs"
+  });
   const inputRef = useRef<HTMLInputElement>(null);
   const player = usePlayer();
   const agentCoreRef = useRef<AgentCoreService | null>(null);
@@ -175,6 +181,9 @@ export default function Home() {
       formData.append("message", JSON.stringify(message));
     }
 
+    // Add settings to the form data
+    formData.append("settings", JSON.stringify(appSettings));
+
     const submittedAt = Date.now();
 
     // Get the access token for Bearer authorization
@@ -270,6 +279,21 @@ export default function Home() {
     startTransition(() => submit(input));
   }
 
+  const handleLogout = async () => {
+    try {
+      await authModule.logout();
+      toast.success("Signed out successfully");
+    } catch (error) {
+      console.error("Failed to logout:", error);
+      toast.error("Failed to sign out. Please try again.");
+    }
+  };
+
+  const handleSettingsChange = (settings: SettingsState) => {
+    setAppSettings(settings);
+    console.log("Settings updated:", settings);
+  };
+
   return (
     <>
       <div className="pb-4 min-h-28" />
@@ -278,11 +302,12 @@ export default function Home() {
 
       <form
         className={clsx(
-          "rounded-full bg-neutral-200/80 dark:bg-neutral-800/80 flex items-center w-full max-w-3xl border border-transparent",
+          "rounded-full bg-neutral-200/80 dark:bg-neutral-800/80 flex items-center w-full max-w-3xl border border-transparent transition-all duration-500",
           {
             "hover:border-neutral-300 focus-within:border-neutral-400 hover:focus-within:border-neutral-400 dark:hover:border-neutral-700 dark:focus-within:border-neutral-600 dark:hover:focus-within:border-neutral-600":
               isAuthenticated,
-            "opacity-50 cursor-not-allowed": !isAuthenticated
+            "opacity-50 cursor-not-allowed": !isAuthenticated,
+            "opacity-40 blur-sm pointer-events-none": isSettingsOpen
           }
         )}
         onSubmit={handleFormSubmit}
@@ -310,7 +335,14 @@ export default function Home() {
         </button>
       </form>
 
-      <div className="text-neutral-400 dark:text-neutral-600 pt-4 text-center max-w-xl text-balance min-h-28 space-y-4">
+      <div
+        className={clsx(
+          "text-neutral-400 dark:text-neutral-600 pt-4 text-center max-w-xl text-balance min-h-28 space-y-4 transition-all duration-500",
+          {
+            "scale-95 -translate-y-2 opacity-40 blur-sm": isSettingsOpen
+          }
+        )}
+      >
         {authLoading && <p>Checking authentication...</p>}
 
         {!authLoading && !isAuthenticated && (
@@ -365,6 +397,43 @@ export default function Home() {
             "opacity-100 scale-110": isAuthenticated && vad.userSpeaking
           }
         )}
+      />
+
+      {/* Settings Button */}
+      <button
+        onClick={() => setIsSettingsOpen(true)}
+        className="fixed bottom-6 right-6 p-3 rounded-full bg-neutral-200/80 dark:bg-neutral-800/80 backdrop-blur-md hover:bg-neutral-300/80 dark:hover:bg-neutral-700/80 transition-colors shadow-lg z-50"
+        aria-label="Settings"
+      >
+        <svg
+          className="h-6 w-6 text-neutral-700 dark:text-neutral-300"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+          />
+        </svg>
+      </button>
+
+      {/* Settings Component */}
+      <Settings
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onLogout={handleLogout}
+        isAuthenticated={isAuthenticated}
+        onSettingsChange={handleSettingsChange}
       />
     </>
   );

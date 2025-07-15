@@ -68,7 +68,15 @@ const schema = zfd.formData({
         content: z.string()
       })
     )
-  )
+  ),
+  settings: zfd
+    .json(
+      z.object({
+        sttEngine: z.string(),
+        ttsEngine: z.string()
+      })
+    )
+    .optional()
 });
 
 export async function POST(request: Request) {
@@ -101,13 +109,21 @@ export async function POST(request: Request) {
     const { data, success } = schema.safeParse(await request.formData());
     if (!success) return new Response("Invalid request", { status: 400 });
 
+    // Get settings with defaults
+    const settings = data.settings || {
+      sttEngine: "groq",
+      ttsEngine: "elevenlabs"
+    };
+
+    console.log("Using settings:", settings);
+
     // Check if request was cancelled during form parsing
     if (abortController.signal.aborted) {
       console.log("Request cancelled during form parsing");
       return new Response("Request cancelled", { status: 200 });
     }
 
-    const transcript = await getTranscript(data.input);
+    const transcript = await getTranscript(data.input, settings.sttEngine);
     if (!transcript) return new Response("Invalid audio", { status: 400 });
 
     // Check if request was cancelled during transcription
@@ -167,10 +183,10 @@ export async function POST(request: Request) {
     }
 
     console.time(
-      "cartesia request " + request.headers.get("x-vercel-id") || "local"
+      "tts request " + request.headers.get("x-vercel-id") || "local"
     );
 
-    const ttsService = getTextToSpeechService("elevenlabs");
+    const ttsService = getTextToSpeechService(settings.ttsEngine);
     const voice = await ttsService.synthesize(
       accumulatedResponse,
       abortController.signal
@@ -180,7 +196,7 @@ export async function POST(request: Request) {
     requestManager.completeRequest(accessToken);
 
     console.timeEnd(
-      "cartesia request " + request.headers.get("x-vercel-id") || "local"
+      "tts request " + request.headers.get("x-vercel-id") || "local"
     );
 
     if (!voice.ok) {
@@ -234,11 +250,11 @@ async function time() {
   return new Date().toLocaleString("en-US", { timeZone });
 }
 
-async function getTranscript(input: string | File) {
+async function getTranscript(input: string | File, sttEngine: string = "groq") {
   if (typeof input === "string") return input;
 
   try {
-    const transcriptionService = getTranscriptionService("groq");
+    const transcriptionService = getTranscriptionService(sttEngine);
     const transcript = await transcriptionService.transcribe(
       Buffer.from(await input.arrayBuffer())
     );
