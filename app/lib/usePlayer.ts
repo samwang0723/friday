@@ -6,6 +6,7 @@ export function usePlayer() {
   const source = useRef<AudioBufferSourceNode | null>(null);
   const nextStartTime = useRef<number>(0);
   const isStreamingPlayback = useRef<boolean>(false);
+  const streamFormat = useRef<"wav" | "pcm">("pcm"); // Default to pcm, will be detected
 
   async function play(stream: ReadableStream, callback: () => void) {
     stop();
@@ -54,8 +55,31 @@ export function usePlayer() {
     let isProcessing = false;
     let streamEnded = false;
     let pendingBuffers: AudioBuffer[] = [];
+    let isFirstChunk = true;
 
     setIsPlaying(true);
+
+    // Fast check for WAV header
+    const isWavHeader = (chunk: Uint8Array): boolean => {
+      if (chunk.length < 12) return false;
+      // "RIFF"
+      if (
+        chunk[0] !== 82 ||
+        chunk[1] !== 73 ||
+        chunk[2] !== 70 ||
+        chunk[3] !== 70
+      )
+        return false;
+      // "WAVE"
+      if (
+        chunk[8] !== 87 ||
+        chunk[9] !== 65 ||
+        chunk[10] !== 86 ||
+        chunk[11] !== 69
+      )
+        return false;
+      return true;
+    };
 
     const processChunk = async () => {
       if (isProcessing || chunkQueue.length === 0) return;
@@ -64,14 +88,21 @@ export function usePlayer() {
       const chunk = chunkQueue.shift()!;
 
       try {
-        // Try to decode the chunk as audio
-        const arrayBuffer = chunk.buffer.slice(
-          chunk.byteOffset,
-          chunk.byteOffset + chunk.byteLength
-        );
-        const audioBuffer = await audioContext.current!.decodeAudioData(
-          arrayBuffer as ArrayBuffer
-        );
+        let audioBuffer: AudioBuffer;
+
+        if (streamFormat.current === "wav") {
+          // Decode WAV chunk
+          const arrayBuffer = chunk.buffer.slice(
+            chunk.byteOffset,
+            chunk.byteOffset + chunk.byteLength
+          );
+          audioBuffer = await audioContext.current!.decodeAudioData(
+            arrayBuffer as ArrayBuffer
+          );
+        } else {
+          // Process raw PCM chunk
+          audioBuffer = createPCMBuffer(chunk);
+        }
 
         // Queue the buffer for playback
         pendingBuffers.push(audioBuffer);
@@ -81,18 +112,7 @@ export function usePlayer() {
           await playBufferAtTime(audioBuffer);
         }
       } catch (error) {
-        console.warn("Failed to decode audio chunk, trying as raw PCM:", error);
-        // For raw PCM data (Cartesia), we need to handle it differently
-        try {
-          const audioBuffer = createPCMBuffer(chunk);
-          pendingBuffers.push(audioBuffer);
-
-          if (audioContext.current && isStreamingPlayback.current) {
-            await playBufferAtTime(audioBuffer);
-          }
-        } catch (pcmError) {
-          console.error("Failed to process audio chunk:", pcmError);
-        }
+        console.error("Failed to process audio chunk:", error);
       }
 
       isProcessing = false;
@@ -140,15 +160,33 @@ export function usePlayer() {
       if (!audioContext.current) throw new Error("No audio context");
 
       // Process raw PCM data (Float32 format from Cartesia)
+      // Ensure proper alignment by creating a new buffer if needed
       const length = Math.floor(data.length / 4) * 4;
-      const buffer = new Float32Array(data.buffer, data.byteOffset, length / 4);
+
+      let float32Data: Float32Array;
+
+      // Check if the data is properly aligned
+      if (data.byteOffset % 4 === 0) {
+        // Data is aligned, we can create Float32Array directly
+        float32Data = new Float32Array(
+          data.buffer,
+          data.byteOffset,
+          length / 4
+        );
+      } else {
+        // Data is not aligned, we need to copy it to a new aligned buffer
+        const alignedBuffer = new ArrayBuffer(length);
+        const alignedUint8 = new Uint8Array(alignedBuffer);
+        alignedUint8.set(new Uint8Array(data.buffer, data.byteOffset, length));
+        float32Data = new Float32Array(alignedBuffer);
+      }
 
       const audioBuffer = audioContext.current.createBuffer(
         1,
-        buffer.length,
+        float32Data.length,
         audioContext.current.sampleRate
       );
-      audioBuffer.copyToChannel(buffer, 0);
+      audioBuffer.copyToChannel(float32Data, 0);
 
       return audioBuffer;
     };
@@ -169,6 +207,17 @@ export function usePlayer() {
               callback();
             }
             break;
+          }
+
+          if (isFirstChunk) {
+            isFirstChunk = false;
+            if (isWavHeader(result.value)) {
+              console.log("Detected WAV audio stream.");
+              streamFormat.current = "wav";
+            } else {
+              console.log("Detected raw PCM audio stream.");
+              streamFormat.current = "pcm";
+            }
           }
 
           chunkQueue.push(result.value);
@@ -211,14 +260,27 @@ export function usePlayer() {
 
     // Process raw PCM data (Float32 format from Cartesia)
     const length = Math.floor(data.length / 4) * 4;
-    const buffer = new Float32Array(data.buffer, 0, length / 4);
+
+    let float32Data: Float32Array;
+
+    // Check if the data is properly aligned
+    if (data.byteOffset % 4 === 0) {
+      // Data is aligned, we can create Float32Array directly
+      float32Data = new Float32Array(data.buffer, data.byteOffset, length / 4);
+    } else {
+      // Data is not aligned, we need to copy it to a new aligned buffer
+      const alignedBuffer = new ArrayBuffer(length);
+      const alignedUint8 = new Uint8Array(alignedBuffer);
+      alignedUint8.set(new Uint8Array(data.buffer, data.byteOffset, length));
+      float32Data = new Float32Array(alignedBuffer);
+    }
 
     const audioBuffer = audioContext.current.createBuffer(
       1,
-      buffer.length,
+      float32Data.length,
       audioContext.current.sampleRate
     );
-    audioBuffer.copyToChannel(buffer, 0);
+    audioBuffer.copyToChannel(float32Data, 0);
 
     source.current = audioContext.current.createBufferSource();
     source.current.buffer = audioBuffer;
