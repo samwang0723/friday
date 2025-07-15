@@ -241,17 +241,10 @@ export default function Home() {
       const latency = Date.now() - submittedAt;
 
       // Use streaming or non-streaming playback based on settings
-      if (appSettings.streaming) {
-        player.playStream(response.body, () => {
-          const isFirefox = navigator.userAgent.includes("Firefox");
-          if (isFirefox) vad.start();
-        });
-      } else {
-        player.play(response.body, () => {
-          const isFirefox = navigator.userAgent.includes("Firefox");
-          if (isFirefox) vad.start();
-        });
-      }
+      player.play(response.body, () => {
+        const isFirefox = navigator.userAgent.includes("Firefox");
+        if (isFirefox) vad.start();
+      });
 
       setInput(transcript);
 

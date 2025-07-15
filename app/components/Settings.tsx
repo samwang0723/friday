@@ -30,8 +30,8 @@ export default function Settings({
 
   const [settings, setSettings] = useState<SettingsState>({
     sttEngine: "groq",
-    ttsEngine: "elevenlabs",
-    streaming: false
+    ttsEngine: "cartesia",
+    streaming: true
   });
 
   const updateSetting = (key: string, value: any) => {
@@ -168,7 +168,6 @@ export default function Settings({
               }}
             >
               <option value="elevenlabs">ElevenLabs</option>
-              <option value="groq">Groq</option>
               <option value="cartesia">Cartesia</option>
             </select>
           </div>

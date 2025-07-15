@@ -1,17 +1,15 @@
 import type { ITranscriptionService, ITextToSpeechService } from "./types";
 import { GroqTranscriptionService } from "@/lib/audio/transcription";
 import {
-  GroqTextToSpeechService,
-  CartesiaTextToSpeechService
+  CartesiaTextToSpeechService,
+  ElevenLabsTextToSpeechService
 } from "@/lib/audio/text-to-speech";
-import { ElevenLabsTextToSpeechService } from "./text-to-speech/elevenlabs.tts";
 
 const transcriptionServices: Record<string, ITranscriptionService> = {
   groq: new GroqTranscriptionService()
 };
 
 const ttsServices: Record<string, ITextToSpeechService> = {
-  groq: new GroqTextToSpeechService(),
   cartesia: new CartesiaTextToSpeechService(),
   elevenlabs: new ElevenLabsTextToSpeechService()
 };
