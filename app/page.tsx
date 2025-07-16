@@ -312,6 +312,8 @@ export default function Home() {
           let buffer = "";
           let accumulatedText = "";
           let finalLatency = 0;
+          let firstPacketLatency = 0;
+          let firstPacketReceived = false;
           let audioStreamStarted = false;
           let audioStreamClosed = false;
 
@@ -403,6 +405,16 @@ export default function Home() {
                   if (eventType && eventData) {
                     try {
                       const data = JSON.parse(eventData);
+
+                      // Capture first packet latency on first meaningful data
+                      if (
+                        !firstPacketReceived &&
+                        (eventType === "text" || eventType === "audio")
+                      ) {
+                        firstPacketLatency = Date.now() - submittedAt;
+                        firstPacketReceived = true;
+                      }
+
                       switch (eventType) {
                         case "text":
                           accumulatedText += data.content;
@@ -459,7 +471,7 @@ export default function Home() {
               const assistantMessage: Message = {
                 role: "assistant",
                 content: accumulatedText,
-                latency: finalLatency
+                latency: firstPacketReceived ? firstPacketLatency : finalLatency
               };
 
               resolve([...updatedMessages, assistantMessage]);
@@ -503,6 +515,9 @@ export default function Home() {
         signal: abortController.signal
       });
 
+      // Capture first packet latency (response headers received)
+      const firstPacketLatency = Date.now() - submittedAt;
+
       // Check if request was cancelled
       if (abortController.signal.aborted) {
         console.log("Request was cancelled on client side");
@@ -536,8 +551,6 @@ export default function Home() {
       // Clear the current request reference since it completed successfully
       currentRequestRef.current = null;
 
-      const latency = Date.now() - submittedAt;
-
       // Use streaming or non-streaming playback based on settings
       player.play(response.body, () => {
         const isFirefox = navigator.userAgent.includes("Firefox");
@@ -555,7 +568,7 @@ export default function Home() {
         {
           role: "assistant",
           content: text,
-          latency
+          latency: firstPacketLatency
         }
       ];
     } catch (error) {
