@@ -129,13 +129,26 @@ export default function Home() {
     };
 
     const handleLogout = () => {
-      setIsAuthenticated(false);
-      setAgentCoreInitialized(false);
+      // Stop audio playback immediately
+      player.stop();
+
       // Cancel any ongoing request when logging out
       if (currentRequestRef.current) {
         currentRequestRef.current.abort();
         currentRequestRef.current = null;
       }
+
+      // Reset all chat-related state
+      setIsAuthenticated(false);
+      setAgentCoreInitialized(false);
+      setInput("");
+      setStreamingMessage("");
+      setIsStreaming(false);
+
+      // Reset messages to empty array
+      startTransition(() => {
+        submit("__reset__");
+      });
     };
 
     authModule.on("authenticated", handleAuthenticated);
@@ -196,6 +209,11 @@ export default function Home() {
     Array<Message>,
     string | Blob
   >(async (prevMessages, data) => {
+    // Handle reset case for logout
+    if (typeof data === "string" && data === "__reset__") {
+      return [];
+    }
+
     if (!isAuthenticated) {
       toast.error(t("auth.loginToContinue"));
       return prevMessages;
@@ -567,7 +585,30 @@ export default function Home() {
 
   const handleLogout = async () => {
     try {
+      // Stop audio playback immediately
+      player.stop();
+
+      // Cancel any ongoing request
+      if (currentRequestRef.current) {
+        currentRequestRef.current.abort();
+        currentRequestRef.current = null;
+      }
+
+      // Reset all chat-related state
+      setInput("");
+      setStreamingMessage("");
+      setIsStreaming(false);
+
+      // Clear messages by calling submit with empty state reset
+      // This will trigger the useActionState to reset to initial state
+      startTransition(() => {
+        // Reset messages to empty array
+        submit("__reset__");
+      });
+
+      // Logout from auth module
       await authModule.logout();
+
       toast.success("Signed out successfully");
     } catch (error) {
       console.error("Failed to logout:", error);
