@@ -9,6 +9,42 @@ import { CartesiaClient } from "@cartesia/cartesia-js";
 import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import Groq from "groq-sdk";
 
+/**
+ * Sanitizes and validates text for TTS processing
+ * @param text - Raw text input
+ * @param minLength - Minimum required length (default: 3)
+ * @returns Sanitized text or null if invalid
+ */
+export function sanitizeTextForTTS(
+  text: string,
+  minLength: number = 3
+): string | null {
+  // Initial validation
+  const cleanText = text.trim();
+  if (!cleanText) {
+    console.warn("Empty text provided for TTS");
+    return null;
+  }
+
+  if (cleanText.length < minLength) {
+    console.warn("Text chunk too short, skipping:", cleanText);
+    return null;
+  }
+
+  // Remove problematic characters that might cause API issues
+  const sanitizedText = cleanText
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "") // Remove control characters
+    .replace(/\s+/g, " ") // Normalize whitespace
+    .trim();
+
+  if (!sanitizedText) {
+    console.warn("Text chunk empty after sanitization, skipping");
+    return null;
+  }
+
+  return sanitizedText;
+}
+
 // Convert 16-bit signed little-endian PCM to 32-bit float little-endian PCM
 function convertS16LEToF32LE(input: Buffer): Uint8Array {
   // Each S16LE sample is 2 bytes, each F32LE sample is 4 bytes
@@ -69,6 +105,12 @@ export async function synthesizeSpeech(
   abortSignal?: AbortSignal
 ): Promise<Response> {
   try {
+    // Validate and sanitize text input
+    const sanitizedText = sanitizeTextForTTS(text);
+    if (!sanitizedText) {
+      return new Response("Invalid text content", { status: 400 });
+    }
+
     if (engine === "cartesia") {
       const config = ttsConfigs.cartesia as TextToSpeechConfig;
       if (!config || !config.apiKey || !config.voiceId) {
@@ -82,11 +124,17 @@ export async function synthesizeSpeech(
         return new Response("TTS operation cancelled", { status: 200 });
       }
 
+      // Additional validation for voice ID
+      if (!config.voiceId.trim()) {
+        console.error("Cartesia voice ID is empty");
+        return new Response("Invalid voice configuration", { status: 500 });
+      }
+
       const cartesia = new CartesiaClient({ apiKey: config.apiKey });
 
       const audioResponse = await cartesia.tts.bytes({
         modelId: config.modelName,
-        transcript: text,
+        transcript: sanitizedText,
         voice: {
           mode: "id",
           id: config.voiceId
@@ -114,10 +162,16 @@ export async function synthesizeSpeech(
         return new Response("TTS operation cancelled", { status: 200 });
       }
 
+      // Additional validation for voice ID
+      if (!config.voiceId.trim()) {
+        console.error("ElevenLabs voice ID is empty");
+        return new Response("Invalid voice configuration", { status: 500 });
+      }
+
       const elevenlabs = new ElevenLabsClient({ apiKey: config.apiKey });
 
       const audioStream = await elevenlabs.textToSpeech.stream(config.voiceId, {
-        text,
+        text: sanitizedText,
         modelId: config.modelName,
         outputFormat: "pcm_24000"
       });
@@ -164,6 +218,33 @@ export function synthesizeSpeechStream(
   return new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
+        // Add initial configuration validation and diagnostics
+        if (engine === "cartesia") {
+          const config = ttsConfigs.cartesia as TextToSpeechConfig;
+          if (!config || !config.apiKey || !config.voiceId) {
+            throw new Error(
+              "Cartesia API key or Voice ID is not configured for TTS."
+            );
+          }
+          console.log("Cartesia TTS config validated:", {
+            hasApiKey: !!config.apiKey,
+            voiceId: config.voiceId,
+            modelName: config.modelName
+          });
+        } else if (engine === "elevenlabs") {
+          const config = ttsConfigs.elevenlabs as TextToSpeechConfig;
+          if (!config || !config.apiKey || !config.voiceId) {
+            throw new Error(
+              "ElevenLabs API key or Voice ID is not configured for TTS."
+            );
+          }
+          console.log("ElevenLabs TTS config validated:", {
+            hasApiKey: !!config.apiKey,
+            voiceId: config.voiceId,
+            modelName: config.modelName
+          });
+        }
+
         // Common text processing logic
         const processTextChunks = async (
           processTextChunk: (text: string) => Promise<void>
@@ -239,12 +320,21 @@ export function synthesizeSpeechStream(
           const cartesia = new CartesiaClient({ apiKey: config.apiKey });
 
           const processTextChunk = async (text: string) => {
-            if (!text.trim() || abortSignal?.aborted) return;
+            if (abortSignal?.aborted) return;
+
+            // Validate and sanitize text content
+            const sanitizedText = sanitizeTextForTTS(text);
+            if (!sanitizedText) return;
 
             try {
+              // Validate configuration before making API call
+              if (!config.voiceId || config.voiceId.trim() === "") {
+                throw new Error("Cartesia voice ID is not configured or empty");
+              }
+
               const response = await cartesia.tts.sse({
                 modelId: config.modelName,
-                transcript: text,
+                transcript: sanitizedText,
                 voice: {
                   mode: "id",
                   id: config.voiceId!
@@ -257,21 +347,30 @@ export function synthesizeSpeechStream(
               });
 
               for await (const chunk of response) {
-                if (abortSignal?.aborted) return;
+                if (abortSignal?.aborted || chunk.type === "done") return;
 
                 if (chunk.type === "chunk" && chunk.data) {
-                  // Convert base64 to Uint8Array
-                  const binaryString = atob(chunk.data);
-                  const audioData = new Uint8Array(binaryString.length);
-                  for (let i = 0; i < binaryString.length; i++) {
-                    audioData[i] = binaryString.charCodeAt(i);
-                  }
+                  const audioData = Uint8Array.from(atob(chunk.data), c =>
+                    c.charCodeAt(0)
+                  );
                   controller.enqueue(audioData);
                 }
               }
             } catch (error) {
               if (error instanceof Error && error.name !== "AbortError") {
-                console.error("Error processing text chunk:", error);
+                // Enhanced error logging for 400 errors
+                if (error.message.includes("Status code: 400")) {
+                  console.error("Cartesia API 400 error details:", {
+                    originalText: text,
+                    sanitizedText: sanitizedText,
+                    textLength: sanitizedText.length,
+                    voiceId: config.voiceId,
+                    modelName: config.modelName,
+                    error: error.message
+                  });
+                } else {
+                  console.error("Error processing text chunk:", error);
+                }
               }
             }
           };
@@ -288,13 +387,24 @@ export function synthesizeSpeechStream(
           const elevenlabs = new ElevenLabsClient({ apiKey: config.apiKey });
 
           const processTextChunk = async (text: string) => {
-            if (!text.trim() || abortSignal?.aborted) return;
+            if (abortSignal?.aborted) return;
+
+            // Validate and sanitize text content
+            const sanitizedText = sanitizeTextForTTS(text);
+            if (!sanitizedText) return;
 
             try {
+              // Validate configuration before making API call
+              if (!config.voiceId || config.voiceId.trim() === "") {
+                throw new Error(
+                  "ElevenLabs voice ID is not configured or empty"
+                );
+              }
+
               const audioStream = await elevenlabs.textToSpeech.stream(
                 config.voiceId!,
                 {
-                  text,
+                  text: sanitizedText,
                   modelId: config.modelName,
                   outputFormat: "pcm_24000"
                 }
@@ -322,7 +432,22 @@ export function synthesizeSpeechStream(
               controller.enqueue(f32leData);
             } catch (error) {
               if (error instanceof Error && error.name !== "AbortError") {
-                console.error("Error processing text chunk:", error);
+                // Enhanced error logging for 400 errors
+                if (
+                  error.message.includes("Status code: 400") ||
+                  error.message.includes("400")
+                ) {
+                  console.error("ElevenLabs API 400 error details:", {
+                    originalText: text,
+                    sanitizedText: sanitizedText,
+                    textLength: sanitizedText.length,
+                    voiceId: config.voiceId,
+                    modelName: config.modelName,
+                    error: error.message
+                  });
+                } else {
+                  console.error("Error processing text chunk:", error);
+                }
               }
             }
           };
