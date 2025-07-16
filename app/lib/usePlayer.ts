@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useMemo, useCallback } from "react";
 
 interface StreamQueueItem {
   stream: ReadableStream;
@@ -6,7 +6,6 @@ interface StreamQueueItem {
 }
 
 export function usePlayer() {
-  const [isPlaying, setIsPlaying] = useState(false);
   const audioContext = useRef<AudioContext | null>(null);
   const source = useRef<AudioBufferSourceNode | null>(null);
   const streamQueue = useRef<StreamQueueItem[]>([]);
@@ -42,7 +41,6 @@ export function usePlayer() {
     let leftover = new Uint8Array();
     let result = await reader.read();
     let lastSource: AudioBufferSourceNode | null = null;
-    setIsPlaying(true);
 
     while (!result.done && audioContext.current) {
       const data = new Uint8Array(leftover.length + result.value.length);
@@ -92,7 +90,6 @@ export function usePlayer() {
           audioContext.current.close();
           audioContext.current = null;
         }
-        setIsPlaying(streamQueue.current.length > 0);
         callback();
       };
     } else {
@@ -101,12 +98,11 @@ export function usePlayer() {
         audioContext.current.close();
         audioContext.current = null;
       }
-      setIsPlaying(streamQueue.current.length > 0);
       callback();
     }
   }
 
-  async function play(stream: ReadableStream, callback: () => void) {
+  const play = useCallback(async function play(stream: ReadableStream, callback: () => void) {
     // Add stream to queue
     streamQueue.current.push({ stream, callback });
 
@@ -114,9 +110,9 @@ export function usePlayer() {
     if (!isProcessing.current) {
       processNextStream();
     }
-  }
+  }, []);
 
-  function stop() {
+  const stop = useCallback(function stop() {
     // Clear the queue
     streamQueue.current = [];
     isProcessing.current = false;
@@ -150,13 +146,10 @@ export function usePlayer() {
       }
       audioContext.current = null;
     }
+  }, []);
 
-    setIsPlaying(false);
-  }
-
-  return {
-    isPlaying,
+  return useMemo(() => ({
     play,
     stop
-  };
+  }), [play, stop]);
 }

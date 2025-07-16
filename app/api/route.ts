@@ -3,10 +3,7 @@ import { z } from "zod";
 import { zfd } from "zod-form-data";
 import { after } from "next/server";
 import { AgentCoreService } from "@/lib/agentCore";
-import {
-  getTextToSpeechService,
-  getTranscriptionService
-} from "@/lib/audio/providers";
+import { transcribeAudio, synthesizeSpeechStream } from "@/lib/audio";
 
 const agentCore = new AgentCoreService();
 
@@ -150,9 +147,8 @@ export async function POST(request: Request) {
       clientDatetime: new Date().toISOString()
     };
 
-    // Use streaming or non-streaming based on settings
-    if (settings.streaming) {
-      console.log("Using real-time streaming pipeline with SSE");
+    // Always use streaming pipeline with SSE
+    console.log("Using real-time streaming pipeline with SSE");
 
       // Create SSE response stream
       const sseStream = new ReadableStream({
@@ -245,8 +241,7 @@ export async function POST(request: Request) {
               abortController.signal
             );
 
-            // Get TTS service
-            const ttsService = getTextToSpeechService(settings.ttsEngine);
+            // Use simplified TTS streaming
 
             // Create a text accumulator for SSE events
             const textChunks: string[] = [];
@@ -274,8 +269,9 @@ export async function POST(request: Request) {
             }
 
             // Create audio stream from text
-            const audioStream = await ttsService.synthesizeStream(
+            const audioStream = synthesizeSpeechStream(
               textWithSSE(),
+              settings.ttsEngine,
               abortController.signal
             );
 
@@ -398,81 +394,6 @@ export async function POST(request: Request) {
           "X-Response-Type": "sse-stream"
         }
       });
-    }
-
-    // Non-streaming path (original implementation)
-    let accumulatedResponse = "";
-
-    // Stream the response from Agent Core
-    for await (const chunk of agentCore.chatStream(
-      `
-      - User location is ${await location()}.
-			- The current time is ${await time()}.
-			${transcript}
-      `,
-      accessToken as string,
-      clientContext,
-      abortController.signal // Pass abort signal to Agent Core
-    )) {
-      // Check if request was cancelled during streaming
-      if (abortController.signal.aborted) {
-        console.log("Request cancelled during Agent Core streaming");
-        return new Response("Request cancelled", { status: 200 });
-      }
-      accumulatedResponse += chunk;
-    }
-
-    console.timeEnd(
-      "streaming completion " + request.headers.get("x-vercel-id") || "local"
-    );
-
-    // Check if request was cancelled after streaming
-    if (abortController.signal.aborted) {
-      console.log("Request cancelled after Agent Core streaming");
-      return new Response("Request cancelled", { status: 200 });
-    }
-
-    if (!accumulatedResponse) {
-      return new Response("No response from Agent Core", { status: 500 });
-    }
-
-    console.time(
-      "tts request " + request.headers.get("x-vercel-id") || "local"
-    );
-
-    const ttsService = getTextToSpeechService(settings.ttsEngine);
-
-    console.log("Using non-streaming TTS");
-    const voice = await ttsService.synthesize(
-      accumulatedResponse,
-      abortController.signal
-    );
-
-    // Clean up the request from tracking since it completed successfully
-    requestManager.completeRequest(accessToken);
-
-    console.timeEnd(
-      "tts request " + request.headers.get("x-vercel-id") || "local"
-    );
-
-    if (!voice.ok) {
-      console.error(await voice.text());
-      return new Response("Voice synthesis failed", { status: 500 });
-    }
-
-    console.time("stream " + request.headers.get("x-vercel-id") || "local");
-    after(() => {
-      console.timeEnd(
-        "stream " + request.headers.get("x-vercel-id") || "local"
-      );
-    });
-
-    return new Response(voice.body, {
-      headers: {
-        "X-Transcript": encodeURIComponent(transcript),
-        "X-Response": encodeURIComponent(accumulatedResponse)
-      }
-    });
   } catch (error) {
     // Clean up the request from tracking if it failed
     requestManager.completeRequest(accessToken);
@@ -510,9 +431,9 @@ async function getTranscript(input: string | File, sttEngine: string = "groq") {
   if (typeof input === "string") return input;
 
   try {
-    const transcriptionService = getTranscriptionService(sttEngine);
-    const transcript = await transcriptionService.transcribe(
-      Buffer.from(await input.arrayBuffer())
+    const transcript = await transcribeAudio(
+      Buffer.from(await input.arrayBuffer()),
+      sttEngine
     );
 
     return transcript.trim() || "";

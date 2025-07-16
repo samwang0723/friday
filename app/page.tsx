@@ -7,17 +7,18 @@ import React, {
   useRef,
   useState,
   startTransition,
-  useCallback
+  useCallback,
+  useMemo
 } from "react";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { EnterIcon, LoadingIcon } from "@/lib/icons";
-import { usePlayer } from "@/lib/usePlayer";
 import { track } from "@vercel/analytics";
 import { useMicVAD, utils } from "@ricky0123/vad-react";
-import authModule from "@/lib/auth";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import Settings, { SettingsState } from "@/components/Settings";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { usePlayer } from "@/lib/usePlayer";
 import { AgentCoreService } from "@/lib/agentCore";
 
 type Message = {
@@ -26,35 +27,38 @@ type Message = {
   latency?: number;
 };
 
+interface ChatState {
+  isStreaming: boolean;
+  message: string;
+  input: string;
+  agentCoreInitialized: boolean;
+}
+
 export default function Home() {
   const t = useTranslations();
-  const [input, setInput] = useState("");
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [agentCoreInitialized, setAgentCoreInitialized] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [appSettings, setAppSettings] = useState<SettingsState>({
-    sttEngine: "groq",
-    ttsEngine: "elevenlabs",
-    streaming: false
-  });
-  const [streamingMessage, setStreamingMessage] = useState<string>("");
-  const [isStreaming, setIsStreaming] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const player = usePlayer();
   const agentCoreRef = useRef<AgentCoreService | null>(null);
-
-  // VAD Tuning Configuration - Centralized settings to prevent false triggers
-  const DEFAULT_VAD_TUNING = {
-    positiveSpeechThreshold: 0.8, // Increased from 0.7 for less sensitivity
-    negativeSpeechThreshold: 0.5, // Increased from 0.5 for cleaner cutoffs
-    minSpeechFrames: 8, // Increased from 6, requires ~100ms vs 64ms
-    redemptionFrames: 1, // Reduced from 4 for shorter speech tails
-    frameSamples: 480 // Aligned with RNNoise frame size
-  };
-
-  // Track current request for cancellation
   const currentRequestRef = useRef<AbortController | null>(null);
+  
+  // UI state
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState<SettingsState>({
+    sttEngine: "groq",
+    ttsEngine: "elevenlabs",
+    streaming: true // Always use streaming
+  });
+
+  // Chat state
+  const [chatState, setChatState] = useState<ChatState>({
+    isStreaming: false,
+    message: "",
+    input: "",
+    agentCoreInitialized: false
+  });
+
+  // Authentication hook
+  const auth = useAuth();
 
   // Initialize Agent Core service
   useEffect(() => {
@@ -63,207 +67,116 @@ export default function Home() {
     }
   }, []);
 
-  const vad = useMicVAD({
-    startOnLoad: isAuthenticated, // Only start VAD if authenticated
-    onSpeechStart: () => {
-      if (!isAuthenticated) return;
-
-      // Interrupt immediately when user starts speaking
-      if (streamingMessage || isStreaming) {
-        console.log("Interrupting current stream - user started speaking");
-
-        // Cancel current request immediately
-        if (currentRequestRef.current) {
-          console.log("Cancelling current request due to speech start");
-          currentRequestRef.current.abort();
-          currentRequestRef.current = null;
-        }
-
-        // Stop audio playback immediately
-        player.stop();
-
-        // Reset streaming state immediately
-        setIsStreaming(false);
-        setStreamingMessage("");
-      }
-    },
-    onSpeechEnd: (audio) => {
-      if (!isAuthenticated) return; // Only guard against authentication
-
-      // Stop any remaining audio playback before processing new input
-      player.stop();
-
-      // Process the completed speech input
-      const wav = utils.encodeWAV(audio);
-      const blob = new Blob([wav], { type: "audio/wav" });
-      startTransition(() => submit(blob));
-      const isFirefox = navigator.userAgent.includes("Firefox");
-      if (isFirefox) vad.pause();
-    },
-    // model: "v5",
-    // ...DEFAULT_VAD_TUNING,
-    positiveSpeechThreshold: 0.6,
-    minSpeechFrames: 4
-  });
-
-  // Bootstrap authentication on component mount (runs only once)
-  useEffect(() => {
-    const bootstrapAuth = async () => {
-      setAuthLoading(true);
-      try {
-        const authenticated = await authModule.bootstrap();
-        setIsAuthenticated(authenticated);
-      } catch (error) {
-        console.error("Authentication bootstrap failed:", error);
-        setIsAuthenticated(false);
-      } finally {
-        setAuthLoading(false);
-      }
-    };
-
-    bootstrapAuth();
-
-    // Listen for authentication events
-    const handleAuthenticated = () => {
-      setIsAuthenticated(true);
-    };
-
-    const handleLogout = () => {
-      // Stop audio playback immediately
-      player.stop();
-
-      // Cancel any ongoing request when logging out
-      if (currentRequestRef.current) {
-        currentRequestRef.current.abort();
-        currentRequestRef.current = null;
-      }
-
-      // Reset all chat-related state
-      setIsAuthenticated(false);
-      setAgentCoreInitialized(false);
-      setInput("");
-      setStreamingMessage("");
-      setIsStreaming(false);
-
-      // Reset messages to empty array
-      startTransition(() => {
-        submit("__reset__");
-      });
-    };
-
-    authModule.on("authenticated", handleAuthenticated);
-    authModule.on("logout", handleLogout);
-
-    return () => {
-      authModule.off("authenticated", handleAuthenticated);
-      authModule.off("logout", handleLogout);
-    };
-  }, []); // Empty dependency array - runs only once on mount
-
   // Initialize Agent Core chat session after authentication
   useEffect(() => {
     const initAgentCore = async () => {
-      if (isAuthenticated && !agentCoreInitialized && agentCoreRef.current) {
+      if (auth.isAuthenticated && !chatState.agentCoreInitialized && agentCoreRef.current) {
         try {
-          const accessToken = authModule.getToken();
+          const accessToken = auth.getToken();
           if (accessToken) {
             await agentCoreRef.current.initChat(accessToken, {
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
               clientDatetime: new Date().toISOString()
             });
-            setAgentCoreInitialized(true);
+            setChatState(prev => ({
+              ...prev,
+              agentCoreInitialized: true
+            }));
             console.log("Agent Core chat session initialized");
           }
         } catch (error) {
           console.error("Failed to initialize Agent Core:", error);
-          toast.error("Failed to initialize chat session");
         }
       }
     };
 
     initAgentCore();
-  }, [isAuthenticated, agentCoreInitialized]);
+  }, [auth.isAuthenticated, chatState.agentCoreInitialized]);
 
-  // Separate effect to handle VAD state changes based on authentication and streaming
-  useEffect(() => {
-    if (isAuthenticated && vad && !vad.loading && !vad.errored) {
-      // Keep VAD active during streaming to allow interruption
-      vad.start();
-    } else if (!isAuthenticated && vad) {
-      vad.pause();
-    }
-  }, [isAuthenticated, vad]); // Removed streamingMessage dependency to allow interruption
+  // Helper function to update chat state
+  const updateChatState = useCallback((updates: Partial<ChatState>) => {
+    setChatState(prev => ({ ...prev, ...updates }));
+  }, []);
 
-  useEffect(() => {
-    function keyDown(e: KeyboardEvent) {
-      if (!isAuthenticated) return; // Don't handle keyboard events if not authenticated
-      if (e.key === "Enter") return inputRef.current?.focus();
-      if (e.key === "Escape") return setInput("");
-    }
-
-    window.addEventListener("keydown", keyDown);
-    return () => window.removeEventListener("keydown", keyDown);
-  }, [isAuthenticated]);
-
-  const [messages, submit, isPending] = useActionState<
-    Array<Message>,
-    string | Blob
-  >(async (prevMessages, data) => {
-    // Handle reset case for logout
-    if (typeof data === "string" && data === "__reset__") {
-      return [];
-    }
-
-    if (!isAuthenticated) {
-      toast.error(t("auth.loginToContinue"));
-      return prevMessages;
-    }
-
-    // Cancel any previous request (if not already cancelled by onSpeechStart)
+  // Helper function to stop current request
+  const stopCurrentRequest = useCallback(() => {
     if (currentRequestRef.current) {
-      console.log("Cancelling previous request in submit");
       currentRequestRef.current.abort();
+      currentRequestRef.current = null;
     }
+  }, []);
 
-    // Stop any ongoing audio playback (if not already stopped by onSpeechStart)
-    player.stop();
-
-    // Create new AbortController for this request
-    const abortController = new AbortController();
-    currentRequestRef.current = abortController;
-
-    const formData = new FormData();
-
-    if (typeof data === "string") {
-      formData.append("input", data);
-      track("Text input");
-    } else {
-      formData.append("input", data, "audio.wav");
-      track("Speech input");
+  // Reset chat state on logout
+  useEffect(() => {
+    if (!auth.isAuthenticated) {
+      stopCurrentRequest();
+      player.stop();
+      setChatState({
+        isStreaming: false,
+        message: "",
+        input: "",
+        agentCoreInitialized: false
+      });
     }
+  }, [auth.isAuthenticated]);
 
-    for (const message of prevMessages) {
-      formData.append("message", JSON.stringify(message));
-    }
+  // Define the action state
+  const [messages, submit, isPending] = useActionState<Array<Message>, string | Blob>(
+    async (prevMessages, data) => {
+      // Handle reset case for logout
+      if (typeof data === "string" && data === "__reset__") {
+        return [];
+      }
 
-    // Add settings to the form data
-    formData.append("settings", JSON.stringify(appSettings));
+      if (!auth.isAuthenticated) {
+        toast.error(t("auth.loginToContinue"));
+        return prevMessages;
+      }
 
-    const submittedAt = Date.now();
+      // Cancel any previous request
+      if (currentRequestRef.current) {
+        console.log("Cancelling previous request in submit");
+        currentRequestRef.current.abort();
+      }
 
-    // Get the access token for Bearer authorization
-    const accessToken = authModule.getToken();
-    const headers: HeadersInit = {};
+      // Stop any ongoing audio playback
+      player.stop();
 
-    if (accessToken) {
-      headers["Authorization"] = `Bearer ${accessToken}`;
-    }
+      // Create new AbortController for this request
+      const abortController = new AbortController();
+      currentRequestRef.current = abortController;
 
-    try {
-      // Handle streaming mode with SSE
-      if (appSettings.streaming) {
-        setIsStreaming(true);
-        setStreamingMessage("");
+      const formData = new FormData();
+
+      if (typeof data === "string") {
+        formData.append("input", data);
+        track("Text input");
+      } else {
+        formData.append("input", data, "audio.wav");
+        track("Speech input");
+      }
+
+      for (const message of prevMessages) {
+        formData.append("message", JSON.stringify(message));
+      }
+
+      // Always use streaming
+      formData.append("settings", JSON.stringify({ ...settings, streaming: true }));
+
+      const submittedAt = Date.now();
+      const accessToken = auth.getToken();
+      const headers: HeadersInit = {};
+
+      if (accessToken) {
+        headers["Authorization"] = `Bearer ${accessToken}`;
+      }
+
+      try {
+        // Handle streaming mode with SSE
+        updateChatState({
+          isStreaming: true,
+          message: ""
+        });
 
         const response = await fetch("/api", {
           method: "POST",
@@ -273,9 +186,9 @@ export default function Home() {
         });
 
         if (!response.ok) {
-          setIsStreaming(false);
+          updateChatState({ isStreaming: false });
           if (response.status === 401) {
-            await authModule.logout();
+            await auth.logout();
             toast.error("Session expired. Please sign in again.");
           } else if (response.status === 429) {
             toast.error(t("errors.tooManyRequests"));
@@ -290,12 +203,12 @@ export default function Home() {
         );
 
         if (!transcript) {
-          setIsStreaming(false);
+          updateChatState({ isStreaming: false });
           toast.error("No transcript received");
           return prevMessages;
         }
 
-        setInput(transcript);
+        updateChatState({ input: transcript });
 
         // Add user message immediately
         const userMessage: Message = {
@@ -318,8 +231,7 @@ export default function Home() {
           let audioStreamClosed = false;
 
           // Create a ReadableStream for audio playback
-          let audioStreamController: ReadableStreamDefaultController<Uint8Array> | null =
-            null;
+          let audioStreamController: ReadableStreamDefaultController<Uint8Array> | null = null;
           const audioStream = new ReadableStream<Uint8Array>({
             start(controller) {
               audioStreamController = controller;
@@ -336,7 +248,6 @@ export default function Home() {
                 audioStreamController.close();
                 audioStreamClosed = true;
               } catch (error) {
-                // Stream might already be closed
                 console.warn("Audio stream close error:", error);
               }
             }
@@ -354,10 +265,10 @@ export default function Home() {
               if (!audioStreamStarted && audioStreamController) {
                 audioStreamStarted = true;
                 player.play(audioStream, () => {
-                  // Audio playback completed
                   const isFirefox = navigator.userAgent.includes("Firefox");
-                  if (isFirefox && vad) {
-                    vad.start();
+                  if (isFirefox) {
+                    const currentVad = vadRef.current;
+                    if (currentVad) currentVad.start();
                   }
                 });
               }
@@ -418,7 +329,7 @@ export default function Home() {
                       switch (eventType) {
                         case "text":
                           accumulatedText += data.content;
-                          setStreamingMessage(accumulatedText);
+                          updateChatState({ message: accumulatedText });
                           break;
 
                         case "audio":
@@ -435,17 +346,18 @@ export default function Home() {
                           finalLatency = Date.now() - submittedAt;
                           accumulatedText = data.fullText;
                           // Reset streaming state when text is complete
-                          setIsStreaming(false);
-                          setStreamingMessage("");
+                          updateChatState({
+                            isStreaming: false,
+                            message: ""
+                          });
 
-                          // Close audio stream after a small delay to ensure all chunks are processed
+                          // Close audio stream after a small delay
                           setTimeout(() => {
                             closeAudioStream();
                           }, 100);
                           break;
 
                         case "error":
-                          // Close audio stream on error
                           closeAudioStream();
                           throw new Error(data.message);
                       }
@@ -485,11 +397,11 @@ export default function Home() {
                 reject(error);
               }
             } finally {
-              // Clean up only if not already done
-              if (isStreaming) {
-                setIsStreaming(false);
-                setStreamingMessage("");
-              }
+              // Clean up
+              updateChatState({
+                isStreaming: false,
+                message: ""
+              });
               currentRequestRef.current = null;
 
               // Close audio stream if not already closed
@@ -497,131 +409,165 @@ export default function Home() {
 
               // Resume VAD after streaming completes (for Firefox)
               const isFirefox = navigator.userAgent.includes("Firefox");
-              if (isFirefox && vad) {
-                setTimeout(() => vad.start(), 100);
+              if (isFirefox) {
+                setTimeout(() => {
+                  const currentVad = vadRef.current;
+                  if (currentVad) currentVad.start();
+                }, 100);
               }
             }
           };
 
           processSSE();
         });
-      }
+      } catch (error) {
+        currentRequestRef.current = null;
 
-      // Non-streaming path (original implementation)
-      const response = await fetch("/api", {
-        method: "POST",
-        headers,
-        body: formData,
-        signal: abortController.signal
-      });
-
-      // Capture first packet latency (response headers received)
-      const firstPacketLatency = Date.now() - submittedAt;
-
-      // Check if request was cancelled
-      if (abortController.signal.aborted) {
-        console.log("Request was cancelled on client side");
-        return prevMessages;
-      }
-
-      const transcript = decodeURIComponent(
-        response.headers.get("X-Transcript") || ""
-      );
-      const text = decodeURIComponent(response.headers.get("X-Response") || "");
-
-      if (!response.ok || !transcript || !text || !response.body) {
-        if (response.status === 401) {
-          // Handle unauthorized - clear auth state and trigger re-authentication
-          try {
-            await authModule.logout();
-            toast.error("Session expired. Please sign in again.");
-          } catch (error) {
-            console.error("Failed to logout:", error);
-            toast.error("Authentication error. Please refresh the page.");
-          }
-        } else if (response.status === 429) {
-          toast.error(t("errors.tooManyRequests"));
-        } else {
-          toast.error((await response.text()) || t("common.error"));
+        // Handle AbortError specifically
+        if (error instanceof Error && error.name === "AbortError") {
+          console.log("Request was cancelled");
+          return prevMessages;
         }
 
+        console.error("Request failed:", error);
+        toast.error("Request failed. Please try again.");
         return prevMessages;
       }
+    },
+    []
+  );
 
-      // Clear the current request reference since it completed successfully
-      currentRequestRef.current = null;
+  // Create refs for stable access to current values
+  const chatStateRef = useRef(chatState);
+  const authRef = useRef(auth);
+  const playerRef = useRef(player);
+  const updateChatStateRef = useRef(updateChatState);
+  const submitRef = useRef(submit);
 
-      // Use streaming or non-streaming playback based on settings
-      player.play(response.body, () => {
-        const isFirefox = navigator.userAgent.includes("Firefox");
-        if (isFirefox) vad.start();
-      });
+  // Update refs when values change
+  useEffect(() => {
+    chatStateRef.current = chatState;
+    authRef.current = auth;
+    playerRef.current = player;
+    updateChatStateRef.current = updateChatState;
+    submitRef.current = submit;
+  });
 
-      setInput(transcript);
+  // VAD setup with stable callbacks using refs
+  const onSpeechStart = useCallback(() => {
+    if (!authRef.current.isAuthenticated) return;
 
-      return [
-        ...prevMessages,
-        {
-          role: "user",
-          content: transcript
-        },
-        {
-          role: "assistant",
-          content: text,
-          latency: firstPacketLatency
-        }
-      ];
-    } catch (error) {
-      // Clear the current request reference
-      currentRequestRef.current = null;
+    // Interrupt immediately when user starts speaking
+    if (chatStateRef.current.message || chatStateRef.current.isStreaming) {
+      console.log("Interrupting current stream - user started speaking");
 
-      // Handle AbortError specifically (when request was cancelled)
-      if (error instanceof Error && error.name === "AbortError") {
-        console.log("Request was cancelled");
-        return prevMessages;
-      }
-
-      console.error("Request failed:", error);
-      toast.error("Request failed. Please try again.");
-      return prevMessages;
-    }
-  }, []);
-
-  function handleFormSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!isAuthenticated) {
-      toast.error(t("auth.loginToContinue"));
-      return;
-    }
-    startTransition(() => submit(input));
-  }
-
-  const handleLogout = async () => {
-    try {
-      // Stop audio playback immediately
-      player.stop();
-
-      // Cancel any ongoing request
+      // Cancel current request immediately
       if (currentRequestRef.current) {
+        console.log("Cancelling current request due to speech start");
         currentRequestRef.current.abort();
         currentRequestRef.current = null;
       }
 
-      // Reset all chat-related state
-      setInput("");
-      setStreamingMessage("");
-      setIsStreaming(false);
+      // Stop audio playback immediately
+      playerRef.current.stop();
 
-      // Clear messages by calling submit with empty state reset
-      // This will trigger the useActionState to reset to initial state
-      startTransition(() => {
-        // Reset messages to empty array
-        submit("__reset__");
+      // Reset streaming state immediately
+      updateChatStateRef.current({
+        isStreaming: false,
+        message: ""
       });
+    }
+  }, []);
 
-      // Logout from auth module
-      await authModule.logout();
+  const onSpeechEnd = useCallback((audio: Float32Array) => {
+    if (!authRef.current.isAuthenticated) return;
 
+    // Stop any remaining audio playback before processing new input
+    playerRef.current.stop();
+
+    // Process the completed speech input
+    const wav = utils.encodeWAV(audio);
+    const blob = new Blob([wav], { type: "audio/wav" });
+    
+    // Submit the audio
+    startTransition(() => submitRef.current(blob));
+    
+    track("Speech input");
+    
+    const isFirefox = navigator.userAgent.includes("Firefox");
+    if (isFirefox) {
+      const currentVad = vadRef.current;
+      if (currentVad) currentVad.pause();
+    }
+  }, []);
+
+  const vadRef = useRef<any>(null);
+  
+  const vad = useMicVAD({
+    startOnLoad: false, // Don't auto-start, we'll manage it manually
+    onSpeechStart,
+    onSpeechEnd,
+    positiveSpeechThreshold: 0.6,
+    minSpeechFrames: 4
+  });
+
+  // Create stable VAD state object
+  const [vadState, setVadState] = useState({
+    loading: true,
+    errored: false,
+    userSpeaking: false
+  });
+
+  // Store VAD instance in ref and update state
+  useEffect(() => {
+    vadRef.current = vad;
+    setVadState({
+      loading: vad?.loading || false,
+      errored: Boolean(vad?.errored),
+      userSpeaking: vad?.userSpeaking || false
+    });
+  }, [vad?.loading, vad?.errored, vad?.userSpeaking]);
+
+  // VAD management with timeout to avoid circular dependency
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      const currentVad = vadRef.current;
+      if (auth.isAuthenticated && currentVad && !vadState.loading && !vadState.errored) {
+        currentVad.start();
+      } else if (!auth.isAuthenticated && currentVad) {
+        currentVad.pause();
+      }
+    }, 100); // Small delay to ensure VAD is ready
+
+    return () => clearTimeout(timeoutId);
+  }, [auth.isAuthenticated, vadState.loading, vadState.errored]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    function keyDown(e: KeyboardEvent) {
+      if (!auth.isAuthenticated) return;
+      if (e.key === "Enter") return inputRef.current?.focus();
+      if (e.key === "Escape") return updateChatState({ input: "" });
+    }
+
+    window.addEventListener("keydown", keyDown);
+    return () => window.removeEventListener("keydown", keyDown);
+  }, [auth.isAuthenticated]);
+
+  function handleFormSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!auth.isAuthenticated) {
+      toast.error(t("auth.loginToContinue"));
+      return;
+    }
+    startTransition(() => submit(chatState.input));
+  }
+
+  const handleLogout = async () => {
+    try {
+      stopCurrentRequest();
+      startTransition(() => submit("__reset__"));
+      await auth.logout();
       toast.success("Signed out successfully");
     } catch (error) {
       console.error("Failed to logout:", error);
@@ -629,24 +575,24 @@ export default function Home() {
     }
   };
 
-  const handleSettingsChange = (settings: SettingsState) => {
-    setAppSettings(settings);
-    console.log("Settings updated:", settings);
+  const handleSettingsChange = (newSettings: SettingsState) => {
+    setSettings({ ...newSettings, streaming: true }); // Always enable streaming
+    console.log("Settings updated:", newSettings);
   };
 
   return (
     <>
       <div className="pb-4 min-h-28" />
 
-      {!isAuthenticated && <GoogleLoginButton disabled={authLoading} />}
+      {!auth.isAuthenticated && <GoogleLoginButton disabled={auth.loading} />}
 
       <form
         className={clsx(
           "rounded-full bg-neutral-200/80 dark:bg-neutral-800/80 flex items-center w-full max-w-3xl border border-transparent transition-all duration-500",
           {
             "hover:drop-shadow-lg hover:drop-shadow-[0_0_15px_rgba(34,211,238,0.3)] focus-within:drop-shadow-xl focus-within:drop-shadow-[0_0_25px_rgba(34,211,238,0.4)] focus-within:ring-2 focus-within:ring-cyan-500/30 dark:hover:drop-shadow-[0_0_15px_rgba(34,211,238,0.4)] dark:focus-within:drop-shadow-[0_0_25px_rgba(34,211,238,0.5)] dark:focus-within:ring-cyan-400/30":
-              isAuthenticated,
-            "opacity-50 cursor-not-allowed": !isAuthenticated,
+              auth.isAuthenticated,
+            "opacity-50 cursor-not-allowed": !auth.isAuthenticated,
             "opacity-40 blur-sm pointer-events-none": isSettingsOpen
           }
         )}
@@ -657,23 +603,23 @@ export default function Home() {
           className="bg-transparent focus:outline-hidden pl-6 pr-4 py-4 w-full placeholder:text-neutral-600 dark:placeholder:text-neutral-400 disabled:cursor-not-allowed"
           required
           placeholder={
-            isAuthenticated
+            auth.isAuthenticated
               ? t("assistant.placeholder")
               : t("auth.loginToContinue")
           }
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
+          value={chatState.input}
+          onChange={(e) => updateChatState({ input: e.target.value })}
           ref={inputRef}
-          disabled={!isAuthenticated}
+          disabled={!auth.isAuthenticated}
         />
 
         <button
           type="submit"
           className="p-4 mr-1 text-neutral-700 hover:text-black dark:text-neutral-300 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={isPending || !isAuthenticated || isStreaming}
+          disabled={isPending || !auth.isAuthenticated || chatState.isStreaming}
           aria-label="Submit"
         >
-          {isPending || isStreaming ? <LoadingIcon /> : <EnterIcon />}
+          {isPending || chatState.isStreaming ? <LoadingIcon /> : <EnterIcon />}
         </button>
       </form>
 
@@ -685,18 +631,18 @@ export default function Home() {
           }
         )}
       >
-        {authLoading && <p>{t("auth.checkingAuth")}</p>}
+        {auth.loading && <p>{t("auth.checkingAuth")}</p>}
 
-        {!authLoading && !isAuthenticated && <p>{t("auth.pleaseSignIn")}</p>}
+        {!auth.loading && !auth.isAuthenticated && <p>{t("auth.pleaseSignIn")}</p>}
 
-        {!authLoading && isAuthenticated && streamingMessage && (
-          <p>{streamingMessage}</p>
+        {!auth.loading && auth.isAuthenticated && chatState.message && (
+          <p>{chatState.message}</p>
         )}
 
-        {!authLoading &&
-          isAuthenticated &&
+        {!auth.loading &&
+          auth.isAuthenticated &&
           messages.length > 0 &&
-          !streamingMessage && (
+          !chatState.message && (
             <p>
               {messages.at(-1)?.content}
               <span className="text-xs font-mono text-neutral-300 dark:text-neutral-700">
@@ -706,10 +652,10 @@ export default function Home() {
             </p>
           )}
 
-        {!authLoading &&
-          isAuthenticated &&
+        {!auth.loading &&
+          auth.isAuthenticated &&
           messages.length === 0 &&
-          !streamingMessage && (
+          !chatState.message && (
             <>
               <p>
                 A fast, open-source voice assistant powered by{" "}
@@ -723,9 +669,9 @@ export default function Home() {
                 .
               </p>
 
-              {vad.loading ? (
+              {vadState.loading ? (
                 <p>{t("assistant.loadingSpeech")}</p>
-              ) : vad.errored ? (
+              ) : vadState.errored ? (
                 <p>{t("assistant.speechDetectionFailed")}</p>
               ) : (
                 <p>{t("assistant.startTalking")}</p>
@@ -738,15 +684,15 @@ export default function Home() {
         className={clsx(
           "absolute size-48 blur-3xl rounded-full bg-linear-to-b from-cyan-200 to-cyan-400 dark:from-cyan-600 dark:to-cyan-800 -z-50 transition ease-in-out",
           {
-            "opacity-0": !isAuthenticated || vad.loading || vad.errored,
+            "opacity-0": !auth.isAuthenticated || vadState.loading || vadState.errored,
             "opacity-30":
-              isAuthenticated &&
-              !vad.loading &&
-              !vad.errored &&
-              !vad.userSpeaking &&
-              !streamingMessage,
+              auth.isAuthenticated &&
+              !vadState.loading &&
+              !vadState.errored &&
+              !vadState.userSpeaking &&
+              !chatState.message,
             "opacity-100 scale-110":
-              isAuthenticated && (vad.userSpeaking || streamingMessage)
+              auth.isAuthenticated && (vadState.userSpeaking || chatState.message)
           }
         )}
       />
@@ -784,7 +730,7 @@ export default function Home() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onLogout={handleLogout}
-        isAuthenticated={isAuthenticated}
+        isAuthenticated={auth.isAuthenticated}
         onSettingsChange={handleSettingsChange}
       />
     </>
