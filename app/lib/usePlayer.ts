@@ -41,6 +41,7 @@ export function usePlayer() {
     const reader = stream.getReader();
     let leftover = new Uint8Array();
     let result = await reader.read();
+    let lastSource: AudioBufferSourceNode | null = null;
     setIsPlaying(true);
 
     while (!result.done && audioContext.current) {
@@ -54,6 +55,11 @@ export function usePlayer() {
 
       leftover = new Uint8Array(data.buffer, length, remainder);
 
+      // Check if audio context is still valid
+      if (!audioContext.current || audioContext.current.state === "closed") {
+        break;
+      }
+
       const audioBuffer = audioContext.current.createBuffer(
         1,
         buffer.length,
@@ -66,18 +72,37 @@ export function usePlayer() {
       source.current.connect(audioContext.current.destination);
       source.current.start(nextStartTime);
 
+      // Keep reference to the last created source for onended handler
+      lastSource = source.current;
       nextStartTime += audioBuffer.duration;
 
       result = await reader.read();
-      if (result.done) {
-        source.current.onended = () => {
-          // Clean up current stream
-          audioContext.current?.close();
+    }
+
+    // Set onended handler on the last source that was created
+    // Use lastSource instead of source.current to avoid race conditions
+    if (
+      lastSource &&
+      audioContext.current &&
+      audioContext.current.state !== "closed"
+    ) {
+      lastSource.onended = () => {
+        // Clean up current stream
+        if (audioContext.current) {
+          audioContext.current.close();
           audioContext.current = null;
-          setIsPlaying(streamQueue.current.length > 0);
-          callback();
-        };
+        }
+        setIsPlaying(streamQueue.current.length > 0);
+        callback();
+      };
+    } else {
+      // If no source was created or context is invalid, still call callback
+      if (audioContext.current) {
+        audioContext.current.close();
+        audioContext.current = null;
       }
+      setIsPlaying(streamQueue.current.length > 0);
+      callback();
     }
   }
 
@@ -99,16 +124,33 @@ export function usePlayer() {
     // Stop current playback
     if (source.current) {
       try {
-        source.current.stop();
+        // Only stop if the source hasn't already ended
+        if (
+          source.current.context &&
+          source.current.context.state !== "closed"
+        ) {
+          source.current.stop();
+        }
         source.current.disconnect();
       } catch (e) {
-        // Ignore errors if source is already stopped
+        // Ignore errors if source is already stopped or disconnected
+        console.log("Source cleanup error (likely already stopped):", e);
       }
       source.current = null;
     }
 
-    audioContext.current?.close();
-    audioContext.current = null;
+    // Clean up audio context
+    if (audioContext.current) {
+      try {
+        if (audioContext.current.state !== "closed") {
+          audioContext.current.close();
+        }
+      } catch (e) {
+        console.log("AudioContext cleanup error:", e);
+      }
+      audioContext.current = null;
+    }
+
     setIsPlaying(false);
   }
 

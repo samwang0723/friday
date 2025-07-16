@@ -47,10 +47,9 @@ export default function Home() {
   // VAD Tuning Configuration - Centralized settings to prevent false triggers
   const DEFAULT_VAD_TUNING = {
     positiveSpeechThreshold: 0.8, // Increased from 0.7 for less sensitivity
-    negativeSpeechThreshold: 0.6, // Increased from 0.5 for cleaner cutoffs
-    minSpeechFrames: 10, // Increased from 6, requires ~100ms vs 64ms
-    redemptionFrames: 3, // Reduced from 4 for shorter speech tails
-    preSpeechPadFrames: 1,
+    negativeSpeechThreshold: 0.5, // Increased from 0.5 for cleaner cutoffs
+    minSpeechFrames: 8, // Increased from 6, requires ~100ms vs 64ms
+    redemptionFrames: 1, // Reduced from 4 for shorter speech tails
     frameSamples: 480 // Aligned with RNNoise frame size
   };
 
@@ -66,19 +65,45 @@ export default function Home() {
 
   const vad = useMicVAD({
     startOnLoad: isAuthenticated, // Only start VAD if authenticated
+    onSpeechStart: () => {
+      if (!isAuthenticated) return;
+
+      // Interrupt immediately when user starts speaking
+      if (streamingMessage || isStreaming) {
+        console.log("Interrupting current stream - user started speaking");
+
+        // Cancel current request immediately
+        if (currentRequestRef.current) {
+          console.log("Cancelling current request due to speech start");
+          currentRequestRef.current.abort();
+          currentRequestRef.current = null;
+        }
+
+        // Stop audio playback immediately
+        player.stop();
+
+        // Reset streaming state immediately
+        setIsStreaming(false);
+        setStreamingMessage("");
+      }
+    },
     onSpeechEnd: (audio) => {
-      if (!isAuthenticated || streamingMessage) return; // Guard against usage when not authenticated or streaming
+      if (!isAuthenticated) return; // Only guard against authentication
+
+      // Stop any remaining audio playback before processing new input
       player.stop();
+
+      // Process the completed speech input
       const wav = utils.encodeWAV(audio);
       const blob = new Blob([wav], { type: "audio/wav" });
       startTransition(() => submit(blob));
       const isFirefox = navigator.userAgent.includes("Firefox");
       if (isFirefox) vad.pause();
     },
-    model: "v5",
-    ...DEFAULT_VAD_TUNING,
-    userSpeakingThreshold: 0.6,
-    preSpeechPadFrames: 2
+    // model: "v5",
+    // ...DEFAULT_VAD_TUNING,
+    positiveSpeechThreshold: 0.6,
+    minSpeechFrames: 4
   });
 
   // Bootstrap authentication on component mount (runs only once)
@@ -148,18 +173,13 @@ export default function Home() {
 
   // Separate effect to handle VAD state changes based on authentication and streaming
   useEffect(() => {
-    if (
-      isAuthenticated &&
-      vad &&
-      !vad.loading &&
-      !vad.errored &&
-      !streamingMessage
-    ) {
+    if (isAuthenticated && vad && !vad.loading && !vad.errored) {
+      // Keep VAD active during streaming to allow interruption
       vad.start();
-    } else if ((!isAuthenticated || streamingMessage) && vad) {
+    } else if (!isAuthenticated && vad) {
       vad.pause();
     }
-  }, [isAuthenticated, streamingMessage, vad]);
+  }, [isAuthenticated, vad]); // Removed streamingMessage dependency to allow interruption
 
   useEffect(() => {
     function keyDown(e: KeyboardEvent) {
@@ -181,13 +201,13 @@ export default function Home() {
       return prevMessages;
     }
 
-    // Cancel any previous request
+    // Cancel any previous request (if not already cancelled by onSpeechStart)
     if (currentRequestRef.current) {
-      console.log("Cancelling previous request");
+      console.log("Cancelling previous request in submit");
       currentRequestRef.current.abort();
     }
 
-    // Stop any ongoing audio playback
+    // Stop any ongoing audio playback (if not already stopped by onSpeechStart)
     player.stop();
 
     // Create new AbortController for this request

@@ -127,6 +127,8 @@ export async function POST(request: Request) {
     const transcript = await getTranscript(data.input, settings.sttEngine);
     if (!transcript) return new Response("Invalid audio", { status: 400 });
 
+    console.log("Transcript:", transcript);
+
     // Check if request was cancelled during transcription
     if (abortController.signal.aborted) {
       console.log("Request cancelled during transcription");
@@ -156,6 +158,79 @@ export async function POST(request: Request) {
       const sseStream = new ReadableStream({
         async start(controller) {
           const encoder = new TextEncoder();
+          let isControllerClosed = false;
+
+          // Listen for abort signal to immediately mark controller as closed
+          abortController.signal.addEventListener("abort", () => {
+            isControllerClosed = true;
+          });
+
+          // Safe enqueue helper that checks controller state and abort signal
+          const safeEnqueue = (data: Uint8Array): boolean => {
+            // First check if we already know the controller is closed or request is aborted
+            if (isControllerClosed || abortController.signal.aborted) {
+              return false;
+            }
+
+            try {
+              // Additional check: try to access controller properties to detect if it's closed
+              // This is a more robust way to check controller state
+              if (!controller || typeof controller.enqueue !== "function") {
+                isControllerClosed = true;
+                return false;
+              }
+
+              controller.enqueue(data);
+              return true;
+            } catch (error: any) {
+              // Handle specific controller closed errors
+              if (
+                error?.code === "ERR_INVALID_STATE" ||
+                error?.message?.includes("Controller is already closed") ||
+                error?.message?.includes("already been closed")
+              ) {
+                isControllerClosed = true;
+                return false;
+              }
+
+              // Log other unexpected errors but still mark controller as closed
+              console.log(
+                "Controller enqueue failed:",
+                error?.message || error
+              );
+              isControllerClosed = true;
+              return false;
+            }
+          };
+
+          // Safe close helper
+          const safeClose = () => {
+            if (isControllerClosed) {
+              return; // Already closed, nothing to do
+            }
+
+            try {
+              // Check if controller is still valid before closing
+              if (controller && typeof controller.close === "function") {
+                controller.close();
+              }
+              isControllerClosed = true;
+            } catch (error: any) {
+              // Handle specific controller closed errors silently
+              if (
+                error?.code === "ERR_INVALID_STATE" ||
+                error?.message?.includes("Controller is already closed") ||
+                error?.message?.includes("already been closed")
+              ) {
+                isControllerClosed = true;
+                return;
+              }
+
+              // Log other unexpected errors
+              console.log("Controller close failed:", error?.message || error);
+              isControllerClosed = true;
+            }
+          };
 
           try {
             // Create Agent Core text stream
@@ -179,7 +254,7 @@ export async function POST(request: Request) {
             // Create an async generator that emits text via SSE and passes to TTS
             async function* textWithSSE() {
               for await (const chunk of textStream) {
-                if (abortController.signal.aborted) {
+                if (abortController.signal.aborted || isControllerClosed) {
                   break;
                 }
 
@@ -188,7 +263,10 @@ export async function POST(request: Request) {
                 const textEvent = `event: text\ndata: ${JSON.stringify({
                   content: chunk
                 })}\n\n`;
-                controller.enqueue(encoder.encode(textEvent));
+
+                if (!safeEnqueue(encoder.encode(textEvent))) {
+                  break; // Stop if we can't enqueue (controller closed)
+                }
 
                 // Pass chunk to TTS
                 yield chunk;
@@ -209,11 +287,20 @@ export async function POST(request: Request) {
             let audioChunkIndex = 0;
 
             while (true) {
+              // Check abort signal and controller state before each iteration
+              if (abortController.signal.aborted || isControllerClosed) {
+                break;
+              }
+
               const { done, value } = await reader.read();
 
               if (done) {
                 // Send any remaining buffered audio
-                if (audioBuffer.length > 0) {
+                if (
+                  audioBuffer.length > 0 &&
+                  !isControllerClosed &&
+                  !abortController.signal.aborted
+                ) {
                   const combinedBuffer = new Uint8Array(currentBufferSize);
                   let offset = 0;
                   for (const chunk of audioBuffer) {
@@ -225,18 +312,26 @@ export async function POST(request: Request) {
                     chunk: Buffer.from(combinedBuffer).toString("base64"),
                     index: audioChunkIndex++
                   })}\n\n`;
-                  controller.enqueue(encoder.encode(audioEvent));
+                  safeEnqueue(encoder.encode(audioEvent));
                 }
 
                 // Send complete event
-                const completeEvent = `event: complete\ndata: ${JSON.stringify({
-                  fullText: textChunks.join("")
-                })}\n\n`;
-                controller.enqueue(encoder.encode(completeEvent));
+                if (!isControllerClosed && !abortController.signal.aborted) {
+                  const completeEvent = `event: complete\ndata: ${JSON.stringify(
+                    {
+                      fullText: textChunks.join("")
+                    }
+                  )}\n\n`;
+                  safeEnqueue(encoder.encode(completeEvent));
+                }
                 break;
               }
 
-              if (value) {
+              if (
+                value &&
+                !isControllerClosed &&
+                !abortController.signal.aborted
+              ) {
                 // Buffer audio chunks
                 audioBuffer.push(new Uint8Array(value));
                 currentBufferSize += value.byteLength;
@@ -253,7 +348,10 @@ export async function POST(request: Request) {
                     chunk: Buffer.from(combinedBuffer).toString("base64"),
                     index: audioChunkIndex++
                   })}\n\n`;
-                  controller.enqueue(encoder.encode(audioEvent));
+
+                  if (!safeEnqueue(encoder.encode(audioEvent))) {
+                    break; // Stop if we can't enqueue (controller closed)
+                  }
 
                   // Clear buffer
                   audioBuffer.length = 0;
@@ -262,14 +360,17 @@ export async function POST(request: Request) {
               }
             }
 
-            controller.close();
+            safeClose();
           } catch (error) {
-            // Send error event
-            const errorEvent = `event: error\ndata: ${JSON.stringify({
-              message: error instanceof Error ? error.message : "Unknown error"
-            })}\n\n`;
-            controller.enqueue(encoder.encode(errorEvent));
-            controller.close();
+            // Send error event only if controller is still open
+            if (!isControllerClosed && !abortController.signal.aborted) {
+              const errorEvent = `event: error\ndata: ${JSON.stringify({
+                message:
+                  error instanceof Error ? error.message : "Unknown error"
+              })}\n\n`;
+              safeEnqueue(encoder.encode(errorEvent));
+            }
+            safeClose();
           }
         }
       });
