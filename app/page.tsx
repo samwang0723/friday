@@ -1,25 +1,24 @@
 "use client";
 
-import clsx from "clsx";
-import React, {
-  useActionState,
-  useEffect,
-  useRef,
-  useState,
-  startTransition,
-  useCallback,
-  useMemo
-} from "react";
-import { toast } from "sonner";
-import { useTranslations } from "next-intl";
-import { EnterIcon, LoadingIcon } from "@/lib/icons";
-import { track } from "@vercel/analytics";
-import { useMicVAD, utils } from "@ricky0123/vad-react";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import Settings, { SettingsState } from "@/components/Settings";
-import { useAuth } from "@/lib/hooks/useAuth";
-import { usePlayer } from "@/lib/usePlayer";
 import { AgentCoreService } from "@/lib/agentCore";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { EnterIcon, LoadingIcon } from "@/lib/icons";
+import { usePlayer } from "@/lib/usePlayer";
+import { useMicVAD, utils } from "@ricky0123/vad-react";
+import { track } from "@vercel/analytics";
+import clsx from "clsx";
+import { useTranslations } from "next-intl";
+import React, {
+  startTransition,
+  useActionState,
+  useCallback,
+  useEffect,
+  useRef,
+  useState
+} from "react";
+import { toast } from "sonner";
 
 type Message = {
   role: "user" | "assistant";
@@ -40,7 +39,7 @@ export default function Home() {
   const player = usePlayer();
   const agentCoreRef = useRef<AgentCoreService | null>(null);
   const currentRequestRef = useRef<AbortController | null>(null);
-  
+
   // UI state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<SettingsState>({
@@ -70,7 +69,11 @@ export default function Home() {
   // Initialize Agent Core chat session after authentication
   useEffect(() => {
     const initAgentCore = async () => {
-      if (auth.isAuthenticated && !chatState.agentCoreInitialized && agentCoreRef.current) {
+      if (
+        auth.isAuthenticated &&
+        !chatState.agentCoreInitialized &&
+        agentCoreRef.current
+      ) {
         try {
           const accessToken = auth.getToken();
           if (accessToken) {
@@ -121,321 +124,325 @@ export default function Home() {
   }, [auth.isAuthenticated]);
 
   // Define the action state
-  const [messages, submit, isPending] = useActionState<Array<Message>, string | Blob>(
-    async (prevMessages, data) => {
-      // Handle reset case for logout
-      if (typeof data === "string" && data === "__reset__") {
-        return [];
-      }
+  const [messages, submit, isPending] = useActionState<
+    Array<Message>,
+    string | Blob
+  >(async (prevMessages, data) => {
+    // Handle reset case for logout
+    if (typeof data === "string" && data === "__reset__") {
+      return [];
+    }
 
-      if (!auth.isAuthenticated) {
-        toast.error(t("auth.loginToContinue"));
+    if (!auth.isAuthenticated) {
+      toast.error(t("auth.loginToContinue"));
+      return prevMessages;
+    }
+
+    // Cancel any previous request
+    if (currentRequestRef.current) {
+      console.log("Cancelling previous request in submit");
+      currentRequestRef.current.abort();
+    }
+
+    // Stop any ongoing audio playback
+    player.stop();
+
+    // Create new AbortController for this request
+    const abortController = new AbortController();
+    currentRequestRef.current = abortController;
+
+    const formData = new FormData();
+
+    if (typeof data === "string") {
+      formData.append("input", data);
+      track("Text input");
+    } else {
+      formData.append("input", data, "audio.wav");
+      track("Speech input");
+    }
+
+    for (const message of prevMessages) {
+      formData.append("message", JSON.stringify(message));
+    }
+
+    // Always use streaming
+    formData.append(
+      "settings",
+      JSON.stringify({ ...settings, streaming: true })
+    );
+
+    const submittedAt = Date.now();
+    const accessToken = auth.getToken();
+    const headers: HeadersInit = {};
+
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    try {
+      // Handle streaming mode with SSE
+      updateChatState({
+        isStreaming: true,
+        message: ""
+      });
+
+      const response = await fetch("/api", {
+        method: "POST",
+        headers,
+        body: formData,
+        signal: abortController.signal
+      });
+
+      if (!response.ok) {
+        updateChatState({ isStreaming: false });
+        if (response.status === 401) {
+          await auth.logout();
+          toast.error("Session expired. Please sign in again.");
+        } else if (response.status === 429) {
+          toast.error(t("errors.tooManyRequests"));
+        } else {
+          toast.error((await response.text()) || t("common.error"));
+        }
         return prevMessages;
       }
 
-      // Cancel any previous request
-      if (currentRequestRef.current) {
-        console.log("Cancelling previous request in submit");
-        currentRequestRef.current.abort();
+      const transcript = decodeURIComponent(
+        response.headers.get("X-Transcript") || ""
+      );
+
+      if (!transcript) {
+        updateChatState({ isStreaming: false });
+        toast.error("No transcript received");
+        return prevMessages;
       }
 
-      // Stop any ongoing audio playback
-      player.stop();
+      updateChatState({ input: transcript });
 
-      // Create new AbortController for this request
-      const abortController = new AbortController();
-      currentRequestRef.current = abortController;
+      // Add user message immediately
+      const userMessage: Message = {
+        role: "user",
+        content: transcript
+      };
 
-      const formData = new FormData();
+      const updatedMessages = [...prevMessages, userMessage];
 
-      if (typeof data === "string") {
-        formData.append("input", data);
-        track("Text input");
-      } else {
-        formData.append("input", data, "audio.wav");
-        track("Speech input");
-      }
+      // Handle SSE streaming
+      return new Promise<Message[]>((resolve, reject) => {
+        const reader = response.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let accumulatedText = "";
+        let finalLatency = 0;
+        let firstPacketLatency = 0;
+        let firstPacketReceived = false;
+        let audioStreamStarted = false;
+        let audioStreamClosed = false;
 
-      for (const message of prevMessages) {
-        formData.append("message", JSON.stringify(message));
-      }
-
-      // Always use streaming
-      formData.append("settings", JSON.stringify({ ...settings, streaming: true }));
-
-      const submittedAt = Date.now();
-      const accessToken = auth.getToken();
-      const headers: HeadersInit = {};
-
-      if (accessToken) {
-        headers["Authorization"] = `Bearer ${accessToken}`;
-      }
-
-      try {
-        // Handle streaming mode with SSE
-        updateChatState({
-          isStreaming: true,
-          message: ""
-        });
-
-        const response = await fetch("/api", {
-          method: "POST",
-          headers,
-          body: formData,
-          signal: abortController.signal
-        });
-
-        if (!response.ok) {
-          updateChatState({ isStreaming: false });
-          if (response.status === 401) {
-            await auth.logout();
-            toast.error("Session expired. Please sign in again.");
-          } else if (response.status === 429) {
-            toast.error(t("errors.tooManyRequests"));
-          } else {
-            toast.error((await response.text()) || t("common.error"));
+        // Create a ReadableStream for audio playback
+        let audioStreamController: ReadableStreamDefaultController<Uint8Array> | null =
+          null;
+        const audioStream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            audioStreamController = controller;
           }
-          return prevMessages;
-        }
+        });
 
-        const transcript = decodeURIComponent(
-          response.headers.get("X-Transcript") || ""
-        );
+        // Track audio chunks for ordering
+        const audioChunkMap = new Map<number, Uint8Array>();
+        let nextExpectedIndex = 0;
 
-        if (!transcript) {
-          updateChatState({ isStreaming: false });
-          toast.error("No transcript received");
-          return prevMessages;
-        }
-
-        updateChatState({ input: transcript });
-
-        // Add user message immediately
-        const userMessage: Message = {
-          role: "user",
-          content: transcript
+        const closeAudioStream = () => {
+          if (audioStreamController && !audioStreamClosed) {
+            try {
+              audioStreamController.close();
+              audioStreamClosed = true;
+            } catch (error) {
+              console.warn("Audio stream close error:", error);
+            }
+          }
         };
 
-        const updatedMessages = [...prevMessages, userMessage];
+        const processAudioChunk = (index: number, bytes: Uint8Array) => {
+          // Store chunk
+          audioChunkMap.set(index, bytes);
 
-        // Handle SSE streaming
-        return new Promise<Message[]>((resolve, reject) => {
-          const reader = response.body!.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-          let accumulatedText = "";
-          let finalLatency = 0;
-          let firstPacketLatency = 0;
-          let firstPacketReceived = false;
-          let audioStreamStarted = false;
-          let audioStreamClosed = false;
+          // Process any consecutive chunks we have
+          while (audioChunkMap.has(nextExpectedIndex)) {
+            const chunk = audioChunkMap.get(nextExpectedIndex)!;
 
-          // Create a ReadableStream for audio playback
-          let audioStreamController: ReadableStreamDefaultController<Uint8Array> | null = null;
-          const audioStream = new ReadableStream<Uint8Array>({
-            start(controller) {
-              audioStreamController = controller;
-            }
-          });
-
-          // Track audio chunks for ordering
-          const audioChunkMap = new Map<number, Uint8Array>();
-          let nextExpectedIndex = 0;
-
-          const closeAudioStream = () => {
-            if (audioStreamController && !audioStreamClosed) {
-              try {
-                audioStreamController.close();
-                audioStreamClosed = true;
-              } catch (error) {
-                console.warn("Audio stream close error:", error);
-              }
-            }
-          };
-
-          const processAudioChunk = (index: number, bytes: Uint8Array) => {
-            // Store chunk
-            audioChunkMap.set(index, bytes);
-
-            // Process any consecutive chunks we have
-            while (audioChunkMap.has(nextExpectedIndex)) {
-              const chunk = audioChunkMap.get(nextExpectedIndex)!;
-
-              // Start audio playback on first chunk
-              if (!audioStreamStarted && audioStreamController) {
-                audioStreamStarted = true;
-                player.play(audioStream, () => {
-                  const isFirefox = navigator.userAgent.includes("Firefox");
-                  if (isFirefox) {
-                    const currentVad = vadRef.current;
-                    if (currentVad) currentVad.start();
-                  }
-                });
-              }
-
-              // Feed chunk to audio stream
-              if (audioStreamController && !audioStreamClosed) {
-                audioStreamController.enqueue(chunk);
-              }
-
-              // Clean up and move to next
-              audioChunkMap.delete(nextExpectedIndex);
-              nextExpectedIndex++;
-            }
-          };
-
-          const processSSE = async () => {
-            try {
-              while (true) {
-                const { done, value } = await reader.read();
-
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-
-                // Process complete events from buffer
-                let eventType = "";
-                let eventData = "";
-
-                while (buffer.includes("\n\n")) {
-                  const eventEnd = buffer.indexOf("\n\n");
-                  const eventText = buffer.substring(0, eventEnd);
-                  buffer = buffer.substring(eventEnd + 2);
-
-                  const eventLines = eventText.split("\n");
-
-                  for (const line of eventLines) {
-                    if (line.startsWith("event:")) {
-                      eventType = line.substring(6).trim();
-                    } else if (line.startsWith("data:")) {
-                      eventData = line.substring(5).trim();
-                    }
-                  }
-
-                  // Process the complete event
-                  if (eventType && eventData) {
-                    try {
-                      const data = JSON.parse(eventData);
-
-                      // Capture first packet latency on first meaningful data
-                      if (
-                        !firstPacketReceived &&
-                        (eventType === "text" || eventType === "audio")
-                      ) {
-                        firstPacketLatency = Date.now() - submittedAt;
-                        firstPacketReceived = true;
-                      }
-
-                      switch (eventType) {
-                        case "text":
-                          accumulatedText += data.content;
-                          updateChatState({ message: accumulatedText });
-                          break;
-
-                        case "audio":
-                          // Decode base64 audio chunk
-                          const binaryString = atob(data.chunk);
-                          const bytes = new Uint8Array(binaryString.length);
-                          for (let j = 0; j < binaryString.length; j++) {
-                            bytes[j] = binaryString.charCodeAt(j);
-                          }
-                          processAudioChunk(data.index || 0, bytes);
-                          break;
-
-                        case "complete":
-                          finalLatency = Date.now() - submittedAt;
-                          accumulatedText = data.fullText;
-                          // Reset streaming state when text is complete
-                          updateChatState({
-                            isStreaming: false,
-                            message: ""
-                          });
-
-                          // Close audio stream after a small delay
-                          setTimeout(() => {
-                            closeAudioStream();
-                          }, 100);
-                          break;
-
-                        case "error":
-                          closeAudioStream();
-                          throw new Error(data.message);
-                      }
-                    } catch (error) {
-                      console.error(
-                        "Error parsing SSE data:",
-                        error,
-                        "eventType:",
-                        eventType,
-                        "raw data:",
-                        eventData
-                      );
-                    }
-                  }
-
-                  // Reset for next event
-                  eventType = "";
-                  eventData = "";
-                }
-              }
-
-              // After processing all SSE events, resolve with final messages
-              const assistantMessage: Message = {
-                role: "assistant",
-                content: accumulatedText,
-                latency: firstPacketReceived ? firstPacketLatency : finalLatency
-              };
-
-              resolve([...updatedMessages, assistantMessage]);
-            } catch (error) {
-              currentRequestRef.current = null;
-              if (error instanceof Error && error.name === "AbortError") {
-                console.log("SSE stream was cancelled");
-                resolve(prevMessages);
-              } else {
-                console.error("SSE stream error:", error);
-                reject(error);
-              }
-            } finally {
-              // Clean up
-              updateChatState({
-                isStreaming: false,
-                message: ""
-              });
-              currentRequestRef.current = null;
-
-              // Close audio stream if not already closed
-              closeAudioStream();
-
-              // Resume VAD after streaming completes (for Firefox)
-              const isFirefox = navigator.userAgent.includes("Firefox");
-              if (isFirefox) {
-                setTimeout(() => {
+            // Start audio playback on first chunk
+            if (!audioStreamStarted && audioStreamController) {
+              audioStreamStarted = true;
+              player.play(audioStream, () => {
+                const isFirefox = navigator.userAgent.includes("Firefox");
+                if (isFirefox) {
                   const currentVad = vadRef.current;
                   if (currentVad) currentVad.start();
-                }, 100);
+                }
+              });
+            }
+
+            // Feed chunk to audio stream
+            if (audioStreamController && !audioStreamClosed) {
+              audioStreamController.enqueue(chunk);
+            }
+
+            // Clean up and move to next
+            audioChunkMap.delete(nextExpectedIndex);
+            nextExpectedIndex++;
+          }
+        };
+
+        const processSSE = async () => {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+
+              if (done) break;
+
+              buffer += decoder.decode(value, { stream: true });
+
+              // Process complete events from buffer
+              let eventType = "";
+              let eventData = "";
+
+              while (buffer.includes("\n\n")) {
+                const eventEnd = buffer.indexOf("\n\n");
+                const eventText = buffer.substring(0, eventEnd);
+                buffer = buffer.substring(eventEnd + 2);
+
+                const eventLines = eventText.split("\n");
+
+                for (const line of eventLines) {
+                  if (line.startsWith("event:")) {
+                    eventType = line.substring(6).trim();
+                  } else if (line.startsWith("data:")) {
+                    eventData = line.substring(5).trim();
+                  }
+                }
+
+                // Process the complete event
+                if (eventType && eventData) {
+                  try {
+                    const data = JSON.parse(eventData);
+
+                    // Capture first packet latency on first meaningful data
+                    if (
+                      !firstPacketReceived &&
+                      (eventType === "text" || eventType === "audio")
+                    ) {
+                      firstPacketLatency = Date.now() - submittedAt;
+                      firstPacketReceived = true;
+                    }
+
+                    switch (eventType) {
+                      case "text":
+                        accumulatedText += data.content;
+                        updateChatState({ message: accumulatedText });
+                        break;
+
+                      case "audio":
+                        // Decode base64 audio chunk
+                        const binaryString = atob(data.chunk);
+                        const bytes = new Uint8Array(binaryString.length);
+                        for (let j = 0; j < binaryString.length; j++) {
+                          bytes[j] = binaryString.charCodeAt(j);
+                        }
+                        processAudioChunk(data.index || 0, bytes);
+                        break;
+
+                      case "complete":
+                        finalLatency = Date.now() - submittedAt;
+                        accumulatedText = data.fullText;
+                        // Reset streaming state when text is complete
+                        updateChatState({
+                          isStreaming: false,
+                          message: ""
+                        });
+
+                        // Close audio stream after a small delay
+                        setTimeout(() => {
+                          closeAudioStream();
+                        }, 100);
+                        break;
+
+                      case "error":
+                        closeAudioStream();
+                        throw new Error(data.message);
+                    }
+                  } catch (error) {
+                    console.error(
+                      "Error parsing SSE data:",
+                      error,
+                      "eventType:",
+                      eventType,
+                      "raw data:",
+                      eventData
+                    );
+                  }
+                }
+
+                // Reset for next event
+                eventType = "";
+                eventData = "";
               }
             }
-          };
 
-          processSSE();
-        });
-      } catch (error) {
-        currentRequestRef.current = null;
+            // After processing all SSE events, resolve with final messages
+            const assistantMessage: Message = {
+              role: "assistant",
+              content: accumulatedText,
+              latency: firstPacketReceived ? firstPacketLatency : finalLatency
+            };
 
-        // Handle AbortError specifically
-        if (error instanceof Error && error.name === "AbortError") {
-          console.log("Request was cancelled");
-          return prevMessages;
-        }
+            resolve([...updatedMessages, assistantMessage]);
+          } catch (error) {
+            currentRequestRef.current = null;
+            if (error instanceof Error && error.name === "AbortError") {
+              console.log("SSE stream was cancelled");
+              resolve(prevMessages);
+            } else {
+              console.error("SSE stream error:", error);
+              reject(error);
+            }
+          } finally {
+            // Clean up
+            updateChatState({
+              isStreaming: false,
+              message: ""
+            });
+            currentRequestRef.current = null;
 
-        console.error("Request failed:", error);
-        toast.error("Request failed. Please try again.");
+            // Close audio stream if not already closed
+            closeAudioStream();
+
+            // Resume VAD after streaming completes (for Firefox)
+            const isFirefox = navigator.userAgent.includes("Firefox");
+            if (isFirefox) {
+              setTimeout(() => {
+                const currentVad = vadRef.current;
+                if (currentVad) currentVad.start();
+              }, 100);
+            }
+          }
+        };
+
+        processSSE();
+      });
+    } catch (error) {
+      currentRequestRef.current = null;
+
+      // Handle AbortError specifically
+      if (error instanceof Error && error.name === "AbortError") {
+        console.log("Request was cancelled");
         return prevMessages;
       }
-    },
-    []
-  );
+
+      console.error("Request failed:", error);
+      toast.error("Request failed. Please try again.");
+      return prevMessages;
+    }
+  }, []);
 
   // Create refs for stable access to current values
   const chatStateRef = useRef(chatState);
@@ -488,12 +495,12 @@ export default function Home() {
     // Process the completed speech input
     const wav = utils.encodeWAV(audio);
     const blob = new Blob([wav], { type: "audio/wav" });
-    
+
     // Submit the audio
     startTransition(() => submitRef.current(blob));
-    
+
     track("Speech input");
-    
+
     const isFirefox = navigator.userAgent.includes("Firefox");
     if (isFirefox) {
       const currentVad = vadRef.current;
@@ -502,7 +509,7 @@ export default function Home() {
   }, []);
 
   const vadRef = useRef<any>(null);
-  
+
   const vad = useMicVAD({
     startOnLoad: false, // Don't auto-start, we'll manage it manually
     onSpeechStart,
@@ -532,7 +539,12 @@ export default function Home() {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       const currentVad = vadRef.current;
-      if (auth.isAuthenticated && currentVad && !vadState.loading && !vadState.errored) {
+      if (
+        auth.isAuthenticated &&
+        currentVad &&
+        !vadState.loading &&
+        !vadState.errored
+      ) {
         currentVad.start();
       } else if (!auth.isAuthenticated && currentVad) {
         currentVad.pause();
@@ -608,7 +620,7 @@ export default function Home() {
               : t("auth.loginToContinue")
           }
           value={chatState.input}
-          onChange={(e) => updateChatState({ input: e.target.value })}
+          onChange={e => updateChatState({ input: e.target.value })}
           ref={inputRef}
           disabled={!auth.isAuthenticated}
         />
@@ -633,7 +645,9 @@ export default function Home() {
       >
         {auth.loading && <p>{t("auth.checkingAuth")}</p>}
 
-        {!auth.loading && !auth.isAuthenticated && <p>{t("auth.pleaseSignIn")}</p>}
+        {!auth.loading && !auth.isAuthenticated && (
+          <p>{t("auth.pleaseSignIn")}</p>
+        )}
 
         {!auth.loading && auth.isAuthenticated && chatState.message && (
           <p>{chatState.message}</p>
@@ -684,7 +698,8 @@ export default function Home() {
         className={clsx(
           "absolute size-48 blur-3xl rounded-full bg-linear-to-b from-cyan-200 to-cyan-400 dark:from-cyan-600 dark:to-cyan-800 -z-50 transition ease-in-out",
           {
-            "opacity-0": !auth.isAuthenticated || vadState.loading || vadState.errored,
+            "opacity-0":
+              !auth.isAuthenticated || vadState.loading || vadState.errored,
             "opacity-30":
               auth.isAuthenticated &&
               !vadState.loading &&
@@ -692,7 +707,8 @@ export default function Home() {
               !vadState.userSpeaking &&
               !chatState.message,
             "opacity-100 scale-110":
-              auth.isAuthenticated && (vadState.userSpeaking || chatState.message)
+              auth.isAuthenticated &&
+              (vadState.userSpeaking || chatState.message)
           }
         )}
       />

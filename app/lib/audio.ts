@@ -3,10 +3,11 @@
  * Direct provider integrations without complex abstractions
  */
 
-import Groq from "groq-sdk";
-import { ElevenLabsClient } from "elevenlabs";
-import { transcriptionConfigs, ttsConfigs } from "@/config";
 import type { TextToSpeechConfig } from "@/config";
+import { transcriptionConfigs, ttsConfigs } from "@/config";
+import { CartesiaClient } from "@cartesia/cartesia-js";
+import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
+import Groq from "groq-sdk";
 
 // Convert 16-bit signed little-endian PCM to 32-bit float little-endian PCM
 function convertS16LEToF32LE(input: Buffer): Uint8Array {
@@ -28,7 +29,10 @@ function convertS16LEToF32LE(input: Buffer): Uint8Array {
 }
 
 // Simple transcription function
-export async function transcribeAudio(audio: Buffer, engine: string = "groq"): Promise<string> {
+export async function transcribeAudio(
+  audio: Buffer,
+  engine: string = "groq"
+): Promise<string> {
   try {
     if (engine === "groq") {
       const config = transcriptionConfigs.groq;
@@ -49,7 +53,7 @@ export async function transcribeAudio(audio: Buffer, engine: string = "groq"): P
 
       return text.trim() || "";
     }
-    
+
     // Add other providers here as needed
     return "";
   } catch (error) {
@@ -60,7 +64,7 @@ export async function transcribeAudio(audio: Buffer, engine: string = "groq"): P
 
 // Simple TTS function
 export async function synthesizeSpeech(
-  text: string, 
+  text: string,
   engine: string = "cartesia",
   abortSignal?: AbortSignal
 ): Promise<Response> {
@@ -68,7 +72,9 @@ export async function synthesizeSpeech(
     if (engine === "cartesia") {
       const config = ttsConfigs.cartesia as TextToSpeechConfig;
       if (!config || !config.apiKey || !config.voiceId) {
-        console.error("Cartesia API key or Voice ID is not configured for TTS.");
+        console.error(
+          "Cartesia API key or Voice ID is not configured for TTS."
+        );
         return new Response("Cartesia TTS not configured", { status: 500 });
       }
 
@@ -76,36 +82,31 @@ export async function synthesizeSpeech(
         return new Response("TTS operation cancelled", { status: 200 });
       }
 
-      const response = await fetch("https://api.cartesia.ai/tts/bytes", {
-        method: "POST",
-        headers: {
-          "Cartesia-Version": "2024-06-30",
-          "Content-Type": "application/json",
-          "X-API-Key": config.apiKey
+      const cartesia = new CartesiaClient({ apiKey: config.apiKey });
+
+      const audioResponse = await cartesia.tts.bytes({
+        modelId: config.modelName,
+        transcript: text,
+        voice: {
+          mode: "id",
+          id: config.voiceId
         },
-        body: JSON.stringify({
-          model_id: config.modelName,
-          transcript: text,
-          voice: {
-            mode: "id",
-            id: config.voiceId
-          },
-          output_format: {
-            container: "raw",
-            encoding: "pcm_f32le",
-            sample_rate: 24000
-          }
-        }),
-        signal: abortSignal
+        outputFormat: {
+          container: "raw",
+          encoding: "pcm_f32le",
+          sampleRate: 24000
+        }
       });
 
-      return response;
+      return new Response(audioResponse, { status: 200 });
     }
-    
+
     if (engine === "elevenlabs") {
       const config = ttsConfigs.elevenlabs as TextToSpeechConfig;
       if (!config || !config.apiKey || !config.voiceId) {
-        console.error("ElevenLabs API key or Voice ID is not configured for TTS.");
+        console.error(
+          "ElevenLabs API key or Voice ID is not configured for TTS."
+        );
         return new Response("ElevenLabs TTS not configured", { status: 500 });
       }
 
@@ -115,21 +116,25 @@ export async function synthesizeSpeech(
 
       const elevenlabs = new ElevenLabsClient({ apiKey: config.apiKey });
 
-      const audioStream = await elevenlabs.textToSpeech.convertAsStream(
-        config.voiceId,
-        {
-          text,
-          model_id: config.modelName,
-          output_format: "pcm_24000"
-        }
-      );
+      const audioStream = await elevenlabs.textToSpeech.stream(config.voiceId, {
+        text,
+        modelId: config.modelName,
+        outputFormat: "pcm_24000"
+      });
 
       const chunks: Buffer[] = [];
-      for await (const chunk of audioStream) {
-        if (abortSignal?.aborted) {
-          return new Response("TTS operation cancelled", { status: 200 });
+      const reader = audioStream.getReader();
+      try {
+        while (true) {
+          if (abortSignal?.aborted) {
+            return new Response("TTS operation cancelled", { status: 200 });
+          }
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(Buffer.from(value));
         }
-        chunks.push(chunk);
+      } finally {
+        reader.releaseLock();
       }
 
       // Convert S16LE to F32LE
@@ -138,7 +143,7 @@ export async function synthesizeSpeech(
 
       return new Response(f32leData, { status: 200 });
     }
-    
+
     throw new Error(`Unsupported TTS engine: ${engine}`);
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
@@ -160,7 +165,9 @@ export function synthesizeSpeechStream(
     async start(controller) {
       try {
         // Common text processing logic
-        const processTextChunks = async (processTextChunk: (text: string) => Promise<void>) => {
+        const processTextChunks = async (
+          processTextChunk: (text: string) => Promise<void>
+        ) => {
           let textBuffer = "";
           const sentenceEnders = [".", "!", "?", "\n"];
           const minChunkSize = 20;
@@ -178,14 +185,19 @@ export function synthesizeSpeechStream(
               // Find the nearest sentence ender
               for (const ender of sentenceEnders) {
                 const index = textBuffer.indexOf(ender);
-                if (index !== -1 && (sentenceEnd === -1 || index < sentenceEnd)) {
+                if (
+                  index !== -1 &&
+                  (sentenceEnd === -1 || index < sentenceEnd)
+                ) {
                   sentenceEnd = index;
                 }
               }
 
               if (sentenceEnd !== -1) {
                 // Process complete sentence
-                const sentence = textBuffer.substring(0, sentenceEnd + 1).trim();
+                const sentence = textBuffer
+                  .substring(0, sentenceEnd + 1)
+                  .trim();
                 textBuffer = textBuffer.substring(sentenceEnd + 1);
 
                 if (sentence) {
@@ -219,81 +231,42 @@ export function synthesizeSpeechStream(
         if (engine === "cartesia") {
           const config = ttsConfigs.cartesia as TextToSpeechConfig;
           if (!config || !config.apiKey || !config.voiceId) {
-            throw new Error("Cartesia API key or Voice ID is not configured for TTS.");
+            throw new Error(
+              "Cartesia API key or Voice ID is not configured for TTS."
+            );
           }
+
+          const cartesia = new CartesiaClient({ apiKey: config.apiKey });
 
           const processTextChunk = async (text: string) => {
             if (!text.trim() || abortSignal?.aborted) return;
 
             try {
-              const response = await fetch("https://api.cartesia.ai/tts/sse", {
-                method: "POST",
-                headers: {
-                  "Cartesia-Version": "2025-04-16",
-                  "Authorization": `Bearer ${config.apiKey}`,
-                  "Content-Type": "application/json"
+              const response = await cartesia.tts.sse({
+                modelId: config.modelName,
+                transcript: text,
+                voice: {
+                  mode: "id",
+                  id: config.voiceId!
                 },
-                body: JSON.stringify({
-                  model_id: config.modelName,
-                  transcript: text,
-                  voice: {
-                    mode: "id",
-                    id: config.voiceId
-                  },
-                  output_format: {
-                    container: "raw",
-                    encoding: "pcm_f32le",
-                    sample_rate: 24000
-                  },
-                  language: "en"
-                }),
-                signal: abortSignal
+                outputFormat: {
+                  container: "raw",
+                  encoding: "pcm_f32le",
+                  sampleRate: 24000
+                }
               });
 
-              if (!response.ok) {
-                console.error(`Cartesia API error: ${response.status}`);
-                return;
-              }
+              for await (const chunk of response) {
+                if (abortSignal?.aborted) return;
 
-              if (response.body) {
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = "";
-
-                while (true) {
-                  const { done, value } = await reader.read();
-                  if (done) break;
-
-                  if (abortSignal?.aborted) {
-                    reader.cancel();
-                    return;
+                if (chunk.type === "chunk" && chunk.data) {
+                  // Convert base64 to Uint8Array
+                  const binaryString = atob(chunk.data);
+                  const audioData = new Uint8Array(binaryString.length);
+                  for (let i = 0; i < binaryString.length; i++) {
+                    audioData[i] = binaryString.charCodeAt(i);
                   }
-
-                  buffer += decoder.decode(value, { stream: true });
-                  const lines = buffer.split("\n");
-                  buffer = lines.pop() || "";
-
-                  for (const line of lines) {
-                    if (line.startsWith("data: ")) {
-                      const dataStr = line.slice(6);
-                      if (dataStr === "[DONE]") continue;
-
-                      try {
-                        const eventData = JSON.parse(dataStr);
-                        if (eventData.type === "chunk" && eventData.data) {
-                          // Convert base64 to Uint8Array
-                          const binaryString = atob(eventData.data);
-                          const audioData = new Uint8Array(binaryString.length);
-                          for (let i = 0; i < binaryString.length; i++) {
-                            audioData[i] = binaryString.charCodeAt(i);
-                          }
-                          controller.enqueue(audioData);
-                        }
-                      } catch (e) {
-                        console.warn("Failed to parse SSE event:", e);
-                      }
-                    }
-                  }
+                  controller.enqueue(audioData);
                 }
               }
             } catch (error) {
@@ -304,11 +277,12 @@ export function synthesizeSpeechStream(
           };
 
           await processTextChunks(processTextChunk);
-
         } else if (engine === "elevenlabs") {
           const config = ttsConfigs.elevenlabs as TextToSpeechConfig;
           if (!config || !config.apiKey || !config.voiceId) {
-            throw new Error("ElevenLabs API key or Voice ID is not configured for TTS.");
+            throw new Error(
+              "ElevenLabs API key or Voice ID is not configured for TTS."
+            );
           }
 
           const elevenlabs = new ElevenLabsClient({ apiKey: config.apiKey });
@@ -317,22 +291,29 @@ export function synthesizeSpeechStream(
             if (!text.trim() || abortSignal?.aborted) return;
 
             try {
-              const audioStream = await elevenlabs.textToSpeech.convertAsStream(
+              const audioStream = await elevenlabs.textToSpeech.stream(
                 config.voiceId!,
                 {
                   text,
-                  model_id: config.modelName,
-                  output_format: "pcm_24000"
+                  modelId: config.modelName,
+                  outputFormat: "pcm_24000"
                 }
               );
 
               // Collect chunks and convert to F32LE
               const chunks: Buffer[] = [];
-              for await (const chunk of audioStream) {
-                if (abortSignal?.aborted) {
-                  return;
+              const reader = audioStream.getReader();
+              try {
+                while (true) {
+                  if (abortSignal?.aborted) {
+                    return;
+                  }
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  chunks.push(Buffer.from(value));
                 }
-                chunks.push(chunk);
+              } finally {
+                reader.releaseLock();
               }
 
               // Convert S16LE to F32LE and enqueue
@@ -347,7 +328,6 @@ export function synthesizeSpeechStream(
           };
 
           await processTextChunks(processTextChunk);
-
         } else {
           throw new Error(`Unsupported streaming TTS engine: ${engine}`);
         }
@@ -361,6 +341,7 @@ export function synthesizeSpeechStream(
       } finally {
         try {
           controller.close();
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e) {
           // Controller might already be closed
         }

@@ -61,7 +61,7 @@ export default function LanguageSwitcher({
       </div>
       <select
         value={locale}
-        onChange={(e) => changeLanguage(e.target.value as Locale)}
+        onChange={e => changeLanguage(e.target.value as Locale)}
         disabled={isPending}
         className="bg-white/10 text-white text-sm rounded-md px-3 py-1 border-none focus:ring-2 focus:ring-cyan-500 focus:outline-none appearance-none bg-no-repeat bg-right pr-8"
         style={{
@@ -70,7 +70,7 @@ export default function LanguageSwitcher({
           backgroundSize: "1.25em"
         }}
       >
-        {locales.map((localeOption) => (
+        {locales.map(localeOption => (
           <option key={localeOption} value={localeOption}>
             {localeLabels[localeOption]}
           </option>

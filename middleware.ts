@@ -32,7 +32,7 @@ function getLocale(request: NextRequest): string | null {
   // 3. Check Accept-Language header
   const acceptLanguage = request.headers.get("accept-language");
   if (acceptLanguage) {
-    const preferredLanguages = acceptLanguage.split(",").map((lang) => {
+    const preferredLanguages = acceptLanguage.split(",").map(lang => {
       const [code] = lang.trim().split(";");
       return code.toLowerCase();
     });

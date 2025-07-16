@@ -48,7 +48,11 @@ export function useVoiceChat(
   // Initialize Agent Core chat session after authentication
   useEffect(() => {
     const initAgentCore = async () => {
-      if (isAuthenticated && !chatState.agentCoreInitialized && agentCoreRef.current) {
+      if (
+        isAuthenticated &&
+        !chatState.agentCoreInitialized &&
+        agentCoreRef.current
+      ) {
         try {
           const accessToken = getToken();
           if (accessToken) {
@@ -98,7 +102,7 @@ export function useVoiceChat(
         }));
       }
     },
-    onSpeechEnd: (audio) => {
+    onSpeechEnd: audio => {
       if (!isAuthenticated) return;
 
       // Stop any remaining audio playback before processing new input
@@ -107,14 +111,14 @@ export function useVoiceChat(
       // Process the completed speech input
       const wav = utils.encodeWAV(audio);
       const blob = new Blob([wav], { type: "audio/wav" });
-      
+
       // Call the provided callback with the audio blob
       if (onSpeechEnd) {
         onSpeechEnd(blob);
       }
-      
+
       track("Speech input");
-      
+
       const isFirefox = navigator.userAgent.includes("Firefox");
       if (isFirefox) vad.pause();
     },

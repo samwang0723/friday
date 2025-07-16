@@ -37,7 +37,7 @@ export function useAuth() {
     initAuth();
 
     // Listen for auth state changes
-    const unsubscribe = authService.onStateChange((state) => {
+    const unsubscribe = authService.onStateChange(state => {
       setAuthState({
         isAuthenticated: state.isAuthenticated,
         loading: state.loading

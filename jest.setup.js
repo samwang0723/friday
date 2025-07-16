@@ -13,7 +13,7 @@ Object.defineProperty(window, "webkitAudioContext", {
 
 // Mock setImmediate for Node environments (Jest runs in Node)
 if (typeof setImmediate === "undefined") {
-  global.setImmediate = (callback) => {
+  global.setImmediate = callback => {
     setTimeout(callback, 0);
   };
 }

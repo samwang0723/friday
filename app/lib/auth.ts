@@ -28,7 +28,8 @@ let authState: AuthState = {
 const authListeners = new Set<(state: AuthState) => void>();
 
 const config = {
-  agentCoreAPI: process.env.NEXT_PUBLIC_AGENT_CORE_API || "http://localhost:3030/api/v1",
+  agentCoreAPI:
+    process.env.NEXT_PUBLIC_AGENT_CORE_API || "http://localhost:3030/api/v1",
   oAuthScopes: [
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/userinfo.email",
@@ -69,11 +70,11 @@ const apiCall = async (endpoint: string, data?: any) => {
     headers: { "Content-Type": "application/json" },
     body: data ? JSON.stringify(data) : undefined
   });
-  
+
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
-  
+
   return response.json();
 };
 
@@ -82,11 +83,11 @@ export const authService = {
   // Bootstrap authentication - check for existing token or handle OAuth callback
   async bootstrap(): Promise<boolean> {
     updateAuthState({ loading: true });
-    
+
     try {
       // Check for existing token
       const existingToken = storage.retrieve("oauth_token");
-      
+
       if (existingToken && !isTokenExpired(existingToken)) {
         updateAuthState({
           isAuthenticated: true,
@@ -95,17 +96,17 @@ export const authService = {
         });
         return true;
       }
-      
+
       // Handle OAuth callback
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get("code");
       const state = urlParams.get("state");
       const error = urlParams.get("error");
-      
+
       if (error) {
         throw new Error(`OAuth error: ${error}`);
       }
-      
+
       if (code) {
         const redirectUri = `${window.location.origin}${window.location.pathname}`;
         const tokenData = await apiCall("/auth/oauth/token", {
@@ -114,21 +115,25 @@ export const authService = {
           redirect_uri: redirectUri,
           state
         });
-        
+
         tokenData.timestamp = Date.now();
         storage.store("oauth_token", tokenData);
-        
+
         updateAuthState({
           isAuthenticated: true,
           loading: false,
           token: tokenData.access_token
         });
-        
+
         // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname
+        );
         return true;
       }
-      
+
       updateAuthState({ loading: false });
       return false;
     } catch (error) {
@@ -143,13 +148,13 @@ export const authService = {
     try {
       const state = crypto.randomUUID();
       const redirectUri = `${window.location.origin}${window.location.pathname}`;
-      
+
       const response = await apiCall("/auth/oauth/initiate", {
         redirect_uri: redirectUri,
         state,
         scopes: config.oAuthScopes
       });
-      
+
       if (response.auth_url) {
         window.location.href = response.auth_url;
       } else {

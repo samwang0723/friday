@@ -150,250 +150,244 @@ export async function POST(request: Request) {
     // Always use streaming pipeline with SSE
     console.log("Using real-time streaming pipeline with SSE");
 
-      // Create SSE response stream
-      const sseStream = new ReadableStream({
-        async start(controller) {
-          const encoder = new TextEncoder();
-          let isControllerClosed = false;
+    // Create SSE response stream
+    const sseStream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        let isControllerClosed = false;
 
-          // Listen for abort signal to immediately mark controller as closed
-          abortController.signal.addEventListener("abort", () => {
-            isControllerClosed = true;
-          });
+        // Listen for abort signal to immediately mark controller as closed
+        abortController.signal.addEventListener("abort", () => {
+          isControllerClosed = true;
+        });
 
-          // Safe enqueue helper that checks controller state and abort signal
-          const safeEnqueue = (data: Uint8Array): boolean => {
-            // First check if we already know the controller is closed or request is aborted
-            if (isControllerClosed || abortController.signal.aborted) {
-              return false;
-            }
-
-            try {
-              // Additional check: try to access controller properties to detect if it's closed
-              // This is a more robust way to check controller state
-              if (!controller || typeof controller.enqueue !== "function") {
-                isControllerClosed = true;
-                return false;
-              }
-
-              controller.enqueue(data);
-              return true;
-            } catch (error: any) {
-              // Handle specific controller closed errors
-              if (
-                error?.code === "ERR_INVALID_STATE" ||
-                error?.message?.includes("Controller is already closed") ||
-                error?.message?.includes("already been closed")
-              ) {
-                isControllerClosed = true;
-                return false;
-              }
-
-              // Log other unexpected errors but still mark controller as closed
-              console.log(
-                "Controller enqueue failed:",
-                error?.message || error
-              );
-              isControllerClosed = true;
-              return false;
-            }
-          };
-
-          // Safe close helper
-          const safeClose = () => {
-            if (isControllerClosed) {
-              return; // Already closed, nothing to do
-            }
-
-            try {
-              // Check if controller is still valid before closing
-              if (controller && typeof controller.close === "function") {
-                controller.close();
-              }
-              isControllerClosed = true;
-            } catch (error: any) {
-              // Handle specific controller closed errors silently
-              if (
-                error?.code === "ERR_INVALID_STATE" ||
-                error?.message?.includes("Controller is already closed") ||
-                error?.message?.includes("already been closed")
-              ) {
-                isControllerClosed = true;
-                return;
-              }
-
-              // Log other unexpected errors
-              console.log("Controller close failed:", error?.message || error);
-              isControllerClosed = true;
-            }
-          };
+        // Safe enqueue helper that checks controller state and abort signal
+        const safeEnqueue = (data: Uint8Array): boolean => {
+          // First check if we already know the controller is closed or request is aborted
+          if (isControllerClosed || abortController.signal.aborted) {
+            return false;
+          }
 
           try {
-            // Create Agent Core text stream
-            const textStream = agentCore.chatStream(
-              `
+            // Additional check: try to access controller properties to detect if it's closed
+            // This is a more robust way to check controller state
+            if (!controller || typeof controller.enqueue !== "function") {
+              isControllerClosed = true;
+              return false;
+            }
+
+            controller.enqueue(data);
+            return true;
+          } catch (error: any) {
+            // Handle specific controller closed errors
+            if (
+              error?.code === "ERR_INVALID_STATE" ||
+              error?.message?.includes("Controller is already closed") ||
+              error?.message?.includes("already been closed")
+            ) {
+              isControllerClosed = true;
+              return false;
+            }
+
+            // Log other unexpected errors but still mark controller as closed
+            console.log("Controller enqueue failed:", error?.message || error);
+            isControllerClosed = true;
+            return false;
+          }
+        };
+
+        // Safe close helper
+        const safeClose = () => {
+          if (isControllerClosed) {
+            return; // Already closed, nothing to do
+          }
+
+          try {
+            // Check if controller is still valid before closing
+            if (controller && typeof controller.close === "function") {
+              controller.close();
+            }
+            isControllerClosed = true;
+          } catch (error: any) {
+            // Handle specific controller closed errors silently
+            if (
+              error?.code === "ERR_INVALID_STATE" ||
+              error?.message?.includes("Controller is already closed") ||
+              error?.message?.includes("already been closed")
+            ) {
+              isControllerClosed = true;
+              return;
+            }
+
+            // Log other unexpected errors
+            console.log("Controller close failed:", error?.message || error);
+            isControllerClosed = true;
+          }
+        };
+
+        try {
+          // Create Agent Core text stream
+          const textStream = agentCore.chatStream(
+            `
               - User location is ${await location()}.
               - The current time is ${await time()}.
               ${transcript}
               `,
-              accessToken as string,
-              clientContext,
-              abortController.signal
-            );
+            accessToken as string,
+            clientContext,
+            abortController.signal
+          );
 
-            // Use simplified TTS streaming
+          // Use simplified TTS streaming
 
-            // Create a text accumulator for SSE events
-            const textChunks: string[] = [];
+          // Create a text accumulator for SSE events
+          const textChunks: string[] = [];
 
-            // Create an async generator that emits text via SSE and passes to TTS
-            async function* textWithSSE() {
-              for await (const chunk of textStream) {
-                if (abortController.signal.aborted || isControllerClosed) {
-                  break;
-                }
-
-                // Store and send text chunk via SSE
-                textChunks.push(chunk);
-                const textEvent = `event: text\ndata: ${JSON.stringify({
-                  content: chunk
-                })}\n\n`;
-
-                if (!safeEnqueue(encoder.encode(textEvent))) {
-                  break; // Stop if we can't enqueue (controller closed)
-                }
-
-                // Pass chunk to TTS
-                yield chunk;
-              }
-            }
-
-            // Create audio stream from text
-            const audioStream = synthesizeSpeechStream(
-              textWithSSE(),
-              settings.ttsEngine,
-              abortController.signal
-            );
-
-            // Stream audio with buffering for better performance
-            const reader = audioStream.getReader();
-            const audioBuffer: Uint8Array[] = [];
-            const BUFFER_SIZE = 16384; // 16KB buffer
-            let currentBufferSize = 0;
-            let audioChunkIndex = 0;
-
-            while (true) {
-              // Check abort signal and controller state before each iteration
+          // Create an async generator that emits text via SSE and passes to TTS
+          async function* textWithSSE() {
+            for await (const chunk of textStream) {
               if (abortController.signal.aborted || isControllerClosed) {
                 break;
               }
 
-              const { done, value } = await reader.read();
+              // Store and send text chunk via SSE
+              textChunks.push(chunk);
+              const textEvent = `event: text\ndata: ${JSON.stringify({
+                content: chunk
+              })}\n\n`;
 
-              if (done) {
-                // Send any remaining buffered audio
-                if (
-                  audioBuffer.length > 0 &&
-                  !isControllerClosed &&
-                  !abortController.signal.aborted
-                ) {
-                  const combinedBuffer = new Uint8Array(currentBufferSize);
-                  let offset = 0;
-                  for (const chunk of audioBuffer) {
-                    combinedBuffer.set(chunk, offset);
-                    offset += chunk.length;
-                  }
-
-                  const audioEvent = `event: audio\ndata: ${JSON.stringify({
-                    chunk: Buffer.from(combinedBuffer).toString("base64"),
-                    index: audioChunkIndex++
-                  })}\n\n`;
-                  safeEnqueue(encoder.encode(audioEvent));
-                }
-
-                // Send complete event
-                if (!isControllerClosed && !abortController.signal.aborted) {
-                  const completeEvent = `event: complete\ndata: ${JSON.stringify(
-                    {
-                      fullText: textChunks.join("")
-                    }
-                  )}\n\n`;
-                  safeEnqueue(encoder.encode(completeEvent));
-                }
-                break;
+              if (!safeEnqueue(encoder.encode(textEvent))) {
+                break; // Stop if we can't enqueue (controller closed)
               }
 
+              // Pass chunk to TTS
+              yield chunk;
+            }
+          }
+
+          // Create audio stream from text
+          const audioStream = synthesizeSpeechStream(
+            textWithSSE(),
+            settings.ttsEngine,
+            abortController.signal
+          );
+
+          // Stream audio with buffering for better performance
+          const reader = audioStream.getReader();
+          const audioBuffer: Uint8Array[] = [];
+          const BUFFER_SIZE = 16384; // 16KB buffer
+          let currentBufferSize = 0;
+          let audioChunkIndex = 0;
+
+          while (true) {
+            // Check abort signal and controller state before each iteration
+            if (abortController.signal.aborted || isControllerClosed) {
+              break;
+            }
+
+            const { done, value } = await reader.read();
+
+            if (done) {
+              // Send any remaining buffered audio
               if (
-                value &&
+                audioBuffer.length > 0 &&
                 !isControllerClosed &&
                 !abortController.signal.aborted
               ) {
-                // Buffer audio chunks
-                audioBuffer.push(new Uint8Array(value));
-                currentBufferSize += value.byteLength;
-                // Send buffered audio when buffer is full
-                if (currentBufferSize >= BUFFER_SIZE) {
-                  const combinedBuffer = new Uint8Array(currentBufferSize);
-                  let offset = 0;
-                  for (const chunk of audioBuffer) {
-                    combinedBuffer.set(chunk, offset);
-                    offset += chunk.length;
-                  }
-
-                  const audioEvent = `event: audio\ndata: ${JSON.stringify({
-                    chunk: Buffer.from(combinedBuffer).toString("base64"),
-                    index: audioChunkIndex++
-                  })}\n\n`;
-
-                  if (!safeEnqueue(encoder.encode(audioEvent))) {
-                    break; // Stop if we can't enqueue (controller closed)
-                  }
-
-                  // Clear buffer
-                  audioBuffer.length = 0;
-                  currentBufferSize = 0;
+                const combinedBuffer = new Uint8Array(currentBufferSize);
+                let offset = 0;
+                for (const chunk of audioBuffer) {
+                  combinedBuffer.set(chunk, offset);
+                  offset += chunk.length;
                 }
+
+                const audioEvent = `event: audio\ndata: ${JSON.stringify({
+                  chunk: Buffer.from(combinedBuffer).toString("base64"),
+                  index: audioChunkIndex++
+                })}\n\n`;
+                safeEnqueue(encoder.encode(audioEvent));
+              }
+
+              // Send complete event
+              if (!isControllerClosed && !abortController.signal.aborted) {
+                const completeEvent = `event: complete\ndata: ${JSON.stringify({
+                  fullText: textChunks.join("")
+                })}\n\n`;
+                safeEnqueue(encoder.encode(completeEvent));
+              }
+              break;
+            }
+
+            if (
+              value &&
+              !isControllerClosed &&
+              !abortController.signal.aborted
+            ) {
+              // Buffer audio chunks
+              audioBuffer.push(new Uint8Array(value));
+              currentBufferSize += value.byteLength;
+              // Send buffered audio when buffer is full
+              if (currentBufferSize >= BUFFER_SIZE) {
+                const combinedBuffer = new Uint8Array(currentBufferSize);
+                let offset = 0;
+                for (const chunk of audioBuffer) {
+                  combinedBuffer.set(chunk, offset);
+                  offset += chunk.length;
+                }
+
+                const audioEvent = `event: audio\ndata: ${JSON.stringify({
+                  chunk: Buffer.from(combinedBuffer).toString("base64"),
+                  index: audioChunkIndex++
+                })}\n\n`;
+
+                if (!safeEnqueue(encoder.encode(audioEvent))) {
+                  break; // Stop if we can't enqueue (controller closed)
+                }
+
+                // Clear buffer
+                audioBuffer.length = 0;
+                currentBufferSize = 0;
               }
             }
-
-            safeClose();
-          } catch (error) {
-            // Send error event only if controller is still open
-            if (!isControllerClosed && !abortController.signal.aborted) {
-              const errorEvent = `event: error\ndata: ${JSON.stringify({
-                message:
-                  error instanceof Error ? error.message : "Unknown error"
-              })}\n\n`;
-              safeEnqueue(encoder.encode(errorEvent));
-            }
-            safeClose();
           }
+
+          safeClose();
+        } catch (error) {
+          // Send error event only if controller is still open
+          if (!isControllerClosed && !abortController.signal.aborted) {
+            const errorEvent = `event: error\ndata: ${JSON.stringify({
+              message: error instanceof Error ? error.message : "Unknown error"
+            })}\n\n`;
+            safeEnqueue(encoder.encode(errorEvent));
+          }
+          safeClose();
         }
-      });
+      }
+    });
 
-      // Clean up the request from tracking since it completed successfully
-      requestManager.completeRequest(accessToken);
+    // Clean up the request from tracking since it completed successfully
+    requestManager.completeRequest(accessToken);
 
+    console.timeEnd(
+      "streaming completion " + request.headers.get("x-vercel-id") || "local"
+    );
+
+    console.time("stream " + request.headers.get("x-vercel-id") || "local");
+    after(() => {
       console.timeEnd(
-        "streaming completion " + request.headers.get("x-vercel-id") || "local"
+        "stream " + request.headers.get("x-vercel-id") || "local"
       );
+    });
 
-      console.time("stream " + request.headers.get("x-vercel-id") || "local");
-      after(() => {
-        console.timeEnd(
-          "stream " + request.headers.get("x-vercel-id") || "local"
-        );
-      });
-
-      return new Response(sseStream, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          "Connection": "keep-alive",
-          "X-Transcript": encodeURIComponent(transcript),
-          "X-Response-Type": "sse-stream"
-        }
-      });
+    return new Response(sseStream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "X-Transcript": encodeURIComponent(transcript),
+        "X-Response-Type": "sse-stream"
+      }
+    });
   } catch (error) {
     // Clean up the request from tracking if it failed
     requestManager.completeRequest(accessToken);

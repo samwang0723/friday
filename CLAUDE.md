@@ -66,6 +66,7 @@ pnpm test:coverage
 ## Environment Variables
 
 Required environment variables (see `.env.example`):
+
 - `GROQ_API_KEY`: For Whisper transcription and Llama responses
 - `CARTESIA_API_KEY`: For Sonic TTS (primary TTS provider)
 - `AGENT_CORE_API_URL`: External AI agent service URL

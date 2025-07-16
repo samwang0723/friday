@@ -21,7 +21,9 @@ export class AgentCoreService {
   constructor() {
     this.baseURL = agentCoreConfig.baseURL;
     this.streamTimeout = agentCoreConfig.streamTimeout;
-    console.info(`Initialized Agent-Core Engine with base URL: ${this.baseURL}`);
+    console.info(
+      `Initialized Agent-Core Engine with base URL: ${this.baseURL}`
+    );
   }
 
   private getHeaders(
@@ -69,7 +71,11 @@ export class AgentCoreService {
 
       const response = await fetch(`${this.baseURL}/chat/init`, {
         method: "POST",
-        headers: this.getHeaders(token, context?.timezone, context?.clientDatetime),
+        headers: this.getHeaders(
+          token,
+          context?.timezone,
+          context?.clientDatetime
+        ),
         body: JSON.stringify({})
       });
 
@@ -91,7 +97,11 @@ export class AgentCoreService {
 
       const response = await fetch(`${this.baseURL}/chat`, {
         method: "POST",
-        headers: this.getHeaders(token, context?.timezone, context?.clientDatetime),
+        headers: this.getHeaders(
+          token,
+          context?.timezone,
+          context?.clientDatetime
+        ),
         body: JSON.stringify({ message })
       });
 
@@ -118,7 +128,9 @@ export class AgentCoreService {
       // Set up external cancellation support
       if (externalAbort) {
         if (externalAbort.aborted) {
-          console.info("External abort signal already triggered, cancelling stream");
+          console.info(
+            "External abort signal already triggered, cancelling stream"
+          );
           return;
         }
         externalAbort.addEventListener("abort", () => {
@@ -133,7 +145,11 @@ export class AgentCoreService {
         controller.abort();
       }, this.streamTimeout);
 
-      const headers = this.getHeaders(token, context?.timezone, context?.clientDatetime);
+      const headers = this.getHeaders(
+        token,
+        context?.timezone,
+        context?.clientDatetime
+      );
       headers["Accept"] = "text/event-stream";
       headers["Cache-Control"] = "no-cache";
 
@@ -246,7 +262,11 @@ export class AgentCoreService {
 
       const response = await fetch(`${this.baseURL}/chat/history`, {
         method: "DELETE",
-        headers: this.getHeaders(token, context?.timezone, context?.clientDatetime)
+        headers: this.getHeaders(
+          token,
+          context?.timezone,
+          context?.clientDatetime
+        )
       });
 
       await this.handleResponse(response);
@@ -263,7 +283,11 @@ export class AgentCoreService {
 
       const response = await fetch(`${this.baseURL}/health`, {
         method: "GET",
-        headers: this.getHeaders(undefined, context?.timezone, context?.clientDatetime)
+        headers: this.getHeaders(
+          undefined,
+          context?.timezone,
+          context?.clientDatetime
+        )
       });
 
       return await this.handleResponse<{ status: string }>(response);

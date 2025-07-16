@@ -102,7 +102,10 @@ export function usePlayer() {
     }
   }
 
-  const play = useCallback(async function play(stream: ReadableStream, callback: () => void) {
+  const play = useCallback(async function play(
+    stream: ReadableStream,
+    callback: () => void
+  ) {
     // Add stream to queue
     streamQueue.current.push({ stream, callback });
 
@@ -148,8 +151,11 @@ export function usePlayer() {
     }
   }, []);
 
-  return useMemo(() => ({
-    play,
-    stop
-  }), [play, stop]);
+  return useMemo(
+    () => ({
+      play,
+      stop
+    }),
+    [play, stop]
+  );
 }
