@@ -8,7 +8,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale } from "./lib/i18n";
 
 export const metadata: Metadata = {
-  title: "Swift",
+  title: "Friday",
   description:
     "A fast, open-source voice assistant powered by Groq, Cartesia, and Vercel."
 };

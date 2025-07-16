@@ -44,6 +44,16 @@ export default function Home() {
   const player = usePlayer();
   const agentCoreRef = useRef<AgentCoreService | null>(null);
 
+  // VAD Tuning Configuration - Centralized settings to prevent false triggers
+  const DEFAULT_VAD_TUNING = {
+    positiveSpeechThreshold: 0.8, // Increased from 0.7 for less sensitivity
+    negativeSpeechThreshold: 0.6, // Increased from 0.5 for cleaner cutoffs
+    minSpeechFrames: 10, // Increased from 6, requires ~100ms vs 64ms
+    redemptionFrames: 3, // Reduced from 4 for shorter speech tails
+    preSpeechPadFrames: 1,
+    frameSamples: 480 // Aligned with RNNoise frame size
+  };
+
   // Track current request for cancellation
   const currentRequestRef = useRef<AbortController | null>(null);
 
@@ -65,8 +75,10 @@ export default function Home() {
       const isFirefox = navigator.userAgent.includes("Firefox");
       if (isFirefox) vad.pause();
     },
-    positiveSpeechThreshold: 0.6,
-    minSpeechFrames: 4
+    model: "v5",
+    ...DEFAULT_VAD_TUNING,
+    userSpeakingThreshold: 0.6,
+    preSpeechPadFrames: 2
   });
 
   // Bootstrap authentication on component mount (runs only once)
@@ -279,7 +291,6 @@ export default function Home() {
           let nextExpectedIndex = 0;
 
           const closeAudioStream = () => {
-            console.log("--- Closing audio stream");
             if (audioStreamController && !audioStreamClosed) {
               try {
                 audioStreamController.close();
@@ -292,7 +303,6 @@ export default function Home() {
           };
 
           const processAudioChunk = (index: number, bytes: Uint8Array) => {
-            console.log("--- Processing audio chunk:", index);
             // Store chunk
             audioChunkMap.set(index, bytes);
 
