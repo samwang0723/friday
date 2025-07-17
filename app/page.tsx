@@ -772,6 +772,21 @@ export default function Home() {
         isAuthenticated={auth.isAuthenticated}
         onSettingsChange={handleSettingsChange}
       />
+
+      {/* Privacy Policy Link and Company Disclaimer */}
+      <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-10">
+        <div className="flex flex-col items-center space-y-2">
+          <a 
+            href="/privacy" 
+            className="text-xs text-gray-400 hover:text-gray-300 transition-colors underline"
+          >
+            {t("privacy.title")}
+          </a>
+          <p className="text-xs text-gray-500">
+            © 2024 Friday Inc. All rights reserved.
+          </p>
+        </div>
+      </div>
     </>
   );
 }

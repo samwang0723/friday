@@ -59,5 +59,56 @@
   },
   "success": {
     "signedOut": "Sesión cerrada exitosamente"
+  },
+  "privacy": {
+    "title": "Política de Privacidad",
+    "lastUpdated": "Última actualización: Diciembre 2024",
+    "overview": {
+      "title": "Resumen",
+      "content": "Friday Inc. está comprometida con la protección de tu privacidad. Esta Política de Privacidad explica cómo recopilamos, utilizamos y protegemos tu información cuando usas nuestro servicio de asistente de voz."
+    },
+    "dataCollection": {
+      "title": "Información que Recopilamos",
+      "intro": "Recopilamos los siguientes tipos de información:",
+      "voiceData": "Grabaciones de voz y transcripciones para procesar tus solicitudes",
+      "conversationHistory": "Historial de chat para proporcionar contexto a las conversaciones",
+      "technicalData": "Información del dispositivo, dirección IP y analíticas de uso",
+      "authData": "Información de autenticación de tu cuenta de Google"
+    },
+    "dataUsage": {
+      "title": "Cómo Usamos tu Información",
+      "intro": "Usamos tu información para:",
+      "providingServices": "Proporcionar y mejorar nuestros servicios de asistente de voz",
+      "improvingAccuracy": "Mejorar la precisión del reconocimiento de voz y las respuestas",
+      "personalizing": "Personalizar tu experiencia y respuestas",
+      "troubleshooting": "Solucionar problemas y brindar soporte al cliente"
+    },
+    "dataSharing": {
+      "title": "Compartir Información",
+      "intro": "Podemos compartir tu información con:",
+      "aiProviders": "Proveedores de servicios de IA de terceros (Groq, ElevenLabs, Cartesia) para procesamiento",
+      "serviceProviders": "Proveedores de servicios que ayudan en la operación de nuestro servicio",
+      "legalRequirements": "Autoridades policiales o regulatorias cuando sea requerido por ley"
+    },
+    "dataRetention": {
+      "title": "Retención de Datos",
+      "content": "Conservamos tus datos solo el tiempo necesario para proporcionar nuestros servicios y cumplir con las obligaciones legales. Puedes solicitar la eliminación de tus datos en cualquier momento."
+    },
+    "userRights": {
+      "title": "Tus Derechos",
+      "intro": "Tienes derecho a:",
+      "access": "Acceder a tu información personal",
+      "correction": "Corregir información inexacta",
+      "deletion": "Solicitar la eliminación de tus datos",
+      "dataPortability": "Exportar tus datos en un formato portátil"
+    },
+    "security": {
+      "title": "Seguridad",
+      "content": "Implementamos medidas de seguridad apropiadas para proteger tu información contra acceso no autorizado, alteración, divulgación o destrucción."
+    },
+    "contact": {
+      "title": "Contáctanos",
+      "content": "Si tienes alguna pregunta sobre esta Política de Privacidad, por favor contáctanos en privacy@friday-inc.com"
+    }
   }
 }

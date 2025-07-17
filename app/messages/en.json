@@ -59,5 +59,56 @@
   },
   "success": {
     "signedOut": "Signed out successfully"
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "lastUpdated": "Last updated: December 2024",
+    "overview": {
+      "title": "Overview",
+      "content": "Friday Inc. is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and protect your information when you use our voice assistant service."
+    },
+    "dataCollection": {
+      "title": "Information We Collect",
+      "intro": "We collect the following types of information:",
+      "voiceData": "Voice recordings and transcriptions for processing your requests",
+      "conversationHistory": "Chat history to provide context for conversations",
+      "technicalData": "Device information, IP address, and usage analytics",
+      "authData": "Authentication information from your Google account"
+    },
+    "dataUsage": {
+      "title": "How We Use Your Information",
+      "intro": "We use your information to:",
+      "providingServices": "Provide and improve our voice assistant services",
+      "improvingAccuracy": "Improve speech recognition and response accuracy",
+      "personalizing": "Personalize your experience and responses",
+      "troubleshooting": "Troubleshoot issues and provide customer support"
+    },
+    "dataSharing": {
+      "title": "Information Sharing",
+      "intro": "We may share your information with:",
+      "aiProviders": "Third-party AI service providers (Groq, ElevenLabs, Cartesia) for processing",
+      "serviceProviders": "Service providers who assist in operating our service",
+      "legalRequirements": "Law enforcement or regulatory authorities when required by law"
+    },
+    "dataRetention": {
+      "title": "Data Retention",
+      "content": "We retain your data only as long as necessary to provide our services and comply with legal obligations. You can request deletion of your data at any time."
+    },
+    "userRights": {
+      "title": "Your Rights",
+      "intro": "You have the right to:",
+      "access": "Access your personal information",
+      "correction": "Correct inaccurate information",
+      "deletion": "Request deletion of your data",
+      "dataPortability": "Export your data in a portable format"
+    },
+    "security": {
+      "title": "Security",
+      "content": "We implement appropriate security measures to protect your information against unauthorized access, alteration, disclosure, or destruction."
+    },
+    "contact": {
+      "title": "Contact Us",
+      "content": "If you have any questions about this Privacy Policy, please contact us at privacy@friday-inc.com"
+    }
   }
 }
