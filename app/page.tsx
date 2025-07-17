@@ -233,11 +233,38 @@ export default function Home() {
         const decoder = new TextDecoder();
         let buffer = "";
         let accumulatedText = "";
+        let displayedText = "";
+        let textQueue = "";
+        let typingIntervalId: NodeJS.Timeout | null = null;
         let finalLatency = 0;
         let firstPacketLatency = 0;
         let firstPacketReceived = false;
         let audioStreamStarted = false;
         let audioStreamClosed = false;
+
+        // Typing animation function
+        const startTypingAnimation = () => {
+          if (typingIntervalId) return; // Already typing
+          
+          typingIntervalId = setInterval(() => {
+            if (textQueue.length > 0) {
+              const nextChar = textQueue.charAt(0);
+              textQueue = textQueue.substring(1);
+              displayedText += nextChar;
+              updateChatState({ message: displayedText });
+            } else if (typingIntervalId) {
+              clearInterval(typingIntervalId);
+              typingIntervalId = null;
+            }
+          }, 20); // 20ms between characters for smooth typing
+        };
+
+        const stopTypingAnimation = () => {
+          if (typingIntervalId) {
+            clearInterval(typingIntervalId);
+            typingIntervalId = null;
+          }
+        };
 
         // Create a ReadableStream for audio playback
         let audioStreamController: ReadableStreamDefaultController<Uint8Array> | null =
@@ -338,7 +365,8 @@ export default function Home() {
                     switch (eventType) {
                       case "text":
                         accumulatedText += data.content;
-                        updateChatState({ message: accumulatedText });
+                        textQueue += data.content;
+                        startTypingAnimation();
                         break;
 
                       case "audio":
@@ -354,11 +382,22 @@ export default function Home() {
                       case "complete":
                         finalLatency = Date.now() - submittedAt;
                         accumulatedText = data.fullText;
-                        // Reset streaming state when text is complete
-                        updateChatState({
-                          isStreaming: false,
-                          message: ""
-                        });
+                        
+                        // Ensure all text is typed out before completing
+                        textQueue += data.fullText.substring(displayedText.length);
+                        
+                        // Wait for typing to complete, then reset streaming state
+                        const waitForTyping = () => {
+                          if (textQueue.length === 0 && !typingIntervalId) {
+                            updateChatState({
+                              isStreaming: false,
+                              message: ""
+                            });
+                          } else {
+                            setTimeout(waitForTyping, 50);
+                          }
+                        };
+                        waitForTyping();
 
                         // Close audio stream after a small delay
                         setTimeout(() => {
@@ -367,6 +406,7 @@ export default function Home() {
                         break;
 
                       case "error":
+                        stopTypingAnimation();
                         closeAudioStream();
                         throw new Error(data.message);
                     }
@@ -406,6 +446,9 @@ export default function Home() {
               reject(error);
             }
           } finally {
+            // Clean up typing animation
+            stopTypingAnimation();
+            
             // Clean up
             updateChatState({
               isStreaming: false,
