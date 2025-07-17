@@ -105,6 +105,30 @@ export default function MessageDisplay({
                   </Link>
                   .
                 </>
+              ) : locale === 'es' ? (
+                <>
+                  {t("assistant.description")}{" "}
+                  <Link href="https://groq.com">Groq</Link>,{" "}
+                  <Link href="https://cartesia.ai">Cartesia</Link>,{" "}
+                  <Link href="https://www.vad.ricky0123.com/">VAD</Link> y{" "}
+                  <Link href="https://vercel.com">Vercel</Link>.{" "}
+                  <Link href="https://github.com/samwang0723/friday" target="_blank">
+                    {t("assistant.learnMore")}
+                  </Link>
+                  .
+                </>
+              ) : locale === 'fr' ? (
+                <>
+                  {t("assistant.description")}{" "}
+                  <Link href="https://groq.com">Groq</Link>,{" "}
+                  <Link href="https://cartesia.ai">Cartesia</Link>,{" "}
+                  <Link href="https://www.vad.ricky0123.com/">VAD</Link> et{" "}
+                  <Link href="https://vercel.com">Vercel</Link>.{" "}
+                  <Link href="https://github.com/samwang0723/friday" target="_blank">
+                    {t("assistant.learnMore")}
+                  </Link>
+                  .
+                </>
               ) : (
                 <>
                   {t("assistant.description")}{" "}
