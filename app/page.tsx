@@ -4,9 +4,10 @@ import GoogleLoginButton from "@/components/GoogleLoginButton";
 import Settings, { SettingsState } from "@/components/Settings";
 import { AgentCoreService } from "@/lib/agentCore";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { useVADWithOrbControl } from "@/lib/hooks/useVADWithOrbControl";
 import { EnterIcon, LoadingIcon } from "@/lib/icons";
 import { usePlayer } from "@/lib/usePlayer";
-import { useMicVAD, utils } from "@ricky0123/vad-react";
+import { utils } from "@ricky0123/vad-react";
 import { track } from "@vercel/analytics";
 import clsx from "clsx";
 import { useTranslations } from "next-intl";
@@ -276,8 +277,7 @@ export default function Home() {
               player.play(audioStream, () => {
                 const isFirefox = navigator.userAgent.includes("Firefox");
                 if (isFirefox) {
-                  const currentVad = vadRef.current;
-                  if (currentVad) currentVad.start();
+                  vad.start();
                 }
               });
             }
@@ -420,8 +420,7 @@ export default function Home() {
             const isFirefox = navigator.userAgent.includes("Firefox");
             if (isFirefox) {
               setTimeout(() => {
-                const currentVad = vadRef.current;
-                if (currentVad) currentVad.start();
+                vad.start();
               }, 100);
             }
           }
@@ -503,56 +502,44 @@ export default function Home() {
 
     const isFirefox = navigator.userAgent.includes("Firefox");
     if (isFirefox) {
-      const currentVad = vadRef.current;
-      if (currentVad) currentVad.pause();
+      vad.pause();
     }
   }, []);
 
   const vadRef = useRef<any>(null);
 
-  const vad = useMicVAD({
-    startOnLoad: false, // Don't auto-start, we'll manage it manually
+  const vad = useVADWithOrbControl({
     onSpeechStart,
     onSpeechEnd,
+    isStreaming: chatState.isStreaming,
     positiveSpeechThreshold: 0.6,
     minSpeechFrames: 4
   });
 
-  // Create stable VAD state object
-  const [vadState, setVadState] = useState({
-    loading: true,
-    errored: false,
-    userSpeaking: false
-  });
+  // VAD state is now managed by the custom hook
+  const vadState = {
+    loading: vad.loading,
+    errored: vad.errored,
+    userSpeaking: vad.userSpeaking
+  };
 
-  // Store VAD instance in ref and update state
+  // Store VAD instance in ref
   useEffect(() => {
-    vadRef.current = vad;
-    setVadState({
-      loading: vad?.loading || false,
-      errored: Boolean(vad?.errored),
-      userSpeaking: vad?.userSpeaking || false
-    });
-  }, [vad?.loading, vad?.errored, vad?.userSpeaking]);
+    vadRef.current = vad.vad;
+  }, [vad.vad]);
 
   // VAD management with timeout to avoid circular dependency
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      const currentVad = vadRef.current;
-      if (
-        auth.isAuthenticated &&
-        currentVad &&
-        !vadState.loading &&
-        !vadState.errored
-      ) {
-        currentVad.start();
-      } else if (!auth.isAuthenticated && currentVad) {
-        currentVad.pause();
+      if (auth.isAuthenticated && !vadState.loading && !vadState.errored) {
+        vad.start();
+      } else if (!auth.isAuthenticated) {
+        vad.pause();
       }
     }, 100); // Small delay to ensure VAD is ready
 
     return () => clearTimeout(timeoutId);
-  }, [auth.isAuthenticated, vadState.loading, vadState.errored]);
+  }, [auth.isAuthenticated, vadState.loading, vadState.errored, vad]);
 
   // Keyboard shortcuts
   useEffect(() => {
