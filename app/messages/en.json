@@ -39,6 +39,7 @@
     "speechToTextDescription": "Choose your preferred STT engine",
     "textToSpeech": "Text to Speech Engine",
     "textToSpeechDescription": "Choose your preferred TTS engine",
+    "textToSpeechNonEnglish": "ElevenLabs required for non-English locales",
     "streaming": "Streaming Audio",
     "streamingDescription": "Play audio as it's generated",
     "auth": {

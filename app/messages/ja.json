@@ -39,6 +39,7 @@
     "speechToTextDescription": "お好みのSTTエンジンを選択してください",
     "textToSpeech": "音声合成エンジン",
     "textToSpeechDescription": "お好みのTTSエンジンを選択してください",
+    "textToSpeechNonEnglish": "英語以外の言語にはElevenLabsが必要です",
     "streaming": "ストリーミング音声",
     "streamingDescription": "音声の生成と同時に再生する",
     "auth": {

@@ -55,7 +55,7 @@ export const ttsConfigs: Record<string, TextToSpeechConfig> = {
   },
   cartesia: {
     provider: "cartesia",
-    modelName: "sonic-english",
+    modelName: "sonic-turbo-2025-03-07",
     apiKey: process.env.CARTESIA_API_KEY,
     voiceId: process.env.CARTESIA_VOICE_ID
   },

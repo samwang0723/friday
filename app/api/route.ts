@@ -1,9 +1,9 @@
+import { AgentCoreService } from "@/lib/agentCore";
+import { synthesizeSpeechStream, transcribeAudio } from "@/lib/audio";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
-import { after } from "next/server";
-import { AgentCoreService } from "@/lib/agentCore";
-import { transcribeAudio, synthesizeSpeechStream } from "@/lib/audio";
 
 const agentCore = new AgentCoreService();
 
@@ -140,11 +140,18 @@ export async function POST(request: Request) {
     );
 
     // Use Agent Core streaming service
+    const requestHeaders = await headers();
+    const acceptLanguage = requestHeaders.get("accept-language");
+
+    // Extract the primary locale from accept-language header
+    const locale = acceptLanguage?.split(",")[0]?.split(";")[0]?.trim();
+
     const clientContext = {
       timezone:
-        (await headers()).get("x-vercel-ip-timezone") ||
+        requestHeaders.get("x-vercel-ip-timezone") ||
         Intl.DateTimeFormat().resolvedOptions().timeZone,
-      clientDatetime: new Date().toISOString()
+      clientDatetime: new Date().toISOString(),
+      locale: locale
     };
 
     // Always use streaming pipeline with SSE

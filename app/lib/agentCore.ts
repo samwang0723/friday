@@ -5,6 +5,33 @@
 
 import { agentCoreConfig } from "@/config";
 
+// AgentCore supported locales (backend constraint)
+const AGENT_CORE_SUPPORTED_LOCALES = [
+  "en",
+  "es",
+  "fr",
+  "zh",
+  "ja",
+  "ko"
+] as const;
+type AgentCoreLocale = (typeof AGENT_CORE_SUPPORTED_LOCALES)[number];
+
+// Map client locales to AgentCore supported locales
+function mapToAgentCoreLocale(locale?: string): AgentCoreLocale | undefined {
+  if (!locale) return undefined;
+
+  // Direct mapping for supported locales
+  if (AGENT_CORE_SUPPORTED_LOCALES.includes(locale as AgentCoreLocale)) {
+    return locale as AgentCoreLocale;
+  }
+
+  // Map variants to base locales
+  if (locale.startsWith("zh")) return "zh";
+
+  // Default to undefined for unsupported locales
+  return undefined;
+}
+
 export interface ChatResponse {
   response: string;
 }
@@ -12,6 +39,7 @@ export interface ChatResponse {
 export interface ClientContext {
   timezone?: string;
   clientDatetime?: string;
+  locale?: string;
 }
 
 export class AgentCoreService {
@@ -29,8 +57,16 @@ export class AgentCoreService {
   private getHeaders(
     token?: string,
     timezone?: string,
-    clientDatetime?: string
+    clientDatetime?: string,
+    locale?: string
   ): Record<string, string> {
+    console.log("getHeaders called with:", {
+      token: !!token,
+      timezone,
+      clientDatetime,
+      locale
+    });
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       Accept: "application/json"
@@ -46,6 +82,19 @@ export class AgentCoreService {
 
     if (clientDatetime) {
       headers["X-Client-Datetime"] = clientDatetime;
+    }
+
+    if (locale) {
+      const mappedLocale = mapToAgentCoreLocale(locale);
+      console.log("Original locale:", locale, "Mapped locale:", mappedLocale);
+      if (mappedLocale) {
+        headers["X-Locale"] = mappedLocale;
+        console.log("X-Locale header added:", mappedLocale);
+      } else {
+        console.log("No mapped locale, X-Locale header not added");
+      }
+    } else {
+      console.log("No locale provided to getHeaders");
     }
 
     return headers;
@@ -74,7 +123,8 @@ export class AgentCoreService {
         headers: this.getHeaders(
           token,
           context?.timezone,
-          context?.clientDatetime
+          context?.clientDatetime,
+          context?.locale
         ),
         body: JSON.stringify({})
       });
@@ -100,7 +150,8 @@ export class AgentCoreService {
         headers: this.getHeaders(
           token,
           context?.timezone,
-          context?.clientDatetime
+          context?.clientDatetime,
+          context?.locale
         ),
         body: JSON.stringify({ message })
       });
@@ -148,7 +199,8 @@ export class AgentCoreService {
       const headers = this.getHeaders(
         token,
         context?.timezone,
-        context?.clientDatetime
+        context?.clientDatetime,
+        context?.locale
       );
       headers["Accept"] = "text/event-stream";
       headers["Cache-Control"] = "no-cache";
@@ -286,7 +338,8 @@ export class AgentCoreService {
         headers: this.getHeaders(
           undefined,
           context?.timezone,
-          context?.clientDatetime
+          context?.clientDatetime,
+          context?.locale
         )
       });
 

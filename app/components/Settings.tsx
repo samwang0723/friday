@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
 import clsx from "clsx";
+import { useLocale, useTranslations } from "next-intl";
+import { useEffect, useState } from "react";
 import LanguageSwitcher from "./LanguageSwitcher";
-import { useTranslations } from "next-intl";
 
 interface SettingsProps {
   isOpen: boolean;
@@ -27,12 +27,57 @@ export default function Settings({
   onSettingsChange
 }: SettingsProps) {
   const t = useTranslations("settings");
+  const locale = useLocale();
 
-  const [settings, setSettings] = useState<SettingsState>({
-    sttEngine: "groq",
-    ttsEngine: "cartesia",
-    streaming: true
-  });
+  // Check if current locale is English
+  const isEnglishLocale = locale === "en";
+
+  // Helper functions for localStorage persistence
+  const loadSettingsFromStorage = (): SettingsState => {
+    if (typeof window === 'undefined') {
+      // Server-side rendering fallback
+      return {
+        sttEngine: "groq",
+        ttsEngine: "elevenlabs", 
+        streaming: true
+      };
+    }
+
+    try {
+      const savedSettings = localStorage.getItem('voiceAssistantSettings');
+      if (savedSettings) {
+        const parsed = JSON.parse(savedSettings);
+        console.log('Loaded settings from localStorage:', parsed);
+        return {
+          sttEngine: parsed.sttEngine || "groq",
+          ttsEngine: parsed.ttsEngine || "elevenlabs",
+          streaming: parsed.streaming !== undefined ? parsed.streaming : true
+        };
+      }
+    } catch (error) {
+      console.error('Failed to load settings from localStorage:', error);
+    }
+
+    // Return defaults if no saved settings or error
+    return {
+      sttEngine: "groq",
+      ttsEngine: "elevenlabs",
+      streaming: true
+    };
+  };
+
+  const saveSettingsToStorage = (newSettings: SettingsState) => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('voiceAssistantSettings', JSON.stringify(newSettings));
+        console.log('Saved settings to localStorage:', newSettings);
+      } catch (error) {
+        console.error('Failed to save settings to localStorage:', error);
+      }
+    }
+  };
+
+  const [settings, setSettings] = useState<SettingsState>(loadSettingsFromStorage);
 
   const updateSetting = (key: string, value: any) => {
     const newSettings = {
@@ -40,8 +85,17 @@ export default function Settings({
       [key]: value
     };
     setSettings(newSettings);
+    saveSettingsToStorage(newSettings);
     onSettingsChange(newSettings);
   };
+
+  // Force TTS engine to ElevenLabs for non-English locales
+  useEffect(() => {
+    if (!isEnglishLocale && settings.ttsEngine !== "elevenlabs") {
+      console.log(`Forcing TTS engine to ElevenLabs for locale: ${locale}`);
+      updateSetting("ttsEngine", "elevenlabs");
+    }
+  }, [locale, isEnglishLocale, settings.ttsEngine]);
 
   // Call onSettingsChange with initial settings
   useEffect(() => {
@@ -120,6 +174,8 @@ export default function Settings({
               </div>
             </div>
             <select
+              id="stt-engine"
+              name="sttEngine"
               value={settings.sttEngine}
               onChange={e => updateSetting("sttEngine", e.target.value)}
               className="bg-white/10 text-white text-sm rounded-md px-3 py-1 border-none focus:ring-2 focus:ring-blue-500 focus:outline-none appearance-none bg-no-repeat bg-right pr-8"
@@ -153,14 +209,24 @@ export default function Settings({
               <div className="flex flex-col">
                 <span className="text-white text-sm">{t("textToSpeech")}</span>
                 <span className="text-gray-400 text-xs">
-                  {t("textToSpeechDescription")}
+                  {isEnglishLocale
+                    ? t("textToSpeechDescription")
+                    : t("textToSpeechNonEnglish")}
                 </span>
               </div>
             </div>
             <select
+              id="tts-engine"
+              name="ttsEngine"
               value={settings.ttsEngine}
               onChange={e => updateSetting("ttsEngine", e.target.value)}
-              className="bg-white/10 text-white text-sm rounded-md px-3 py-1 border-none focus:ring-2 focus:ring-blue-500 focus:outline-none appearance-none bg-no-repeat bg-right pr-8"
+              disabled={!isEnglishLocale}
+              className={clsx(
+                "bg-white/10 text-white text-sm rounded-md px-3 py-1 border-none focus:ring-2 focus:ring-blue-500 focus:outline-none appearance-none bg-no-repeat bg-right pr-8",
+                {
+                  "opacity-50 cursor-not-allowed": !isEnglishLocale
+                }
+              )}
               style={{
                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`,
                 backgroundPosition: "right 0.5rem center",
@@ -168,7 +234,9 @@ export default function Settings({
               }}
             >
               <option value="elevenlabs">ElevenLabs</option>
-              <option value="cartesia">Cartesia</option>
+              <option value="cartesia" disabled={!isEnglishLocale}>
+                Cartesia{!isEnglishLocale ? " (English)" : ""}
+              </option>
             </select>
           </div>
 

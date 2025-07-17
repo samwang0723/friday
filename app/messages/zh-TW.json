@@ -39,6 +39,7 @@
     "speechToTextDescription": "選擇您偏好的語音轉文字引擎",
     "textToSpeech": "文字轉語音引擎",
     "textToSpeechDescription": "選擇您偏好的文字轉語音引擎",
+    "textToSpeechNonEnglish": "非英語語言需要使用 ElevenLabs",
     "streaming": "串流音訊",
     "streamingDescription": "在生成時播放音訊",
     "auth": {

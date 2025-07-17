@@ -12,7 +12,7 @@ import { useVADWithOrbControl } from "@/lib/hooks/useVADWithOrbControl";
 import { usePlayer } from "@/lib/hooks/usePlayer";
 import { utils } from "@ricky0123/vad-react";
 import { track } from "@vercel/analytics";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import React, {
   startTransition,
   useActionState,
@@ -36,8 +36,50 @@ interface ChatState {
   agentCoreInitialized: boolean;
 }
 
+// Helper function to get current locale from client-side sources
+function getCurrentLocale(): string {
+  if (typeof document !== 'undefined') {
+    // Check URL parameters first
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlLocale = urlParams.get('locale');
+    if (urlLocale) {
+      console.log("Found locale in URL:", urlLocale);
+      return urlLocale;
+    }
+    
+    // Check cookies
+    const cookies = document.cookie.split(';');
+    const localeCookie = cookies.find(cookie => cookie.trim().startsWith('locale='));
+    if (localeCookie) {
+      const localeValue = localeCookie.split('=')[1];
+      console.log("Found locale cookie:", localeValue);
+      return localeValue;
+    }
+    
+    // Check localStorage as fallback
+    const storedLocale = localStorage.getItem('locale');
+    if (storedLocale) {
+      console.log("Found locale in localStorage:", storedLocale);
+      return storedLocale;
+    }
+    
+    console.log("No locale found, available cookies:", document.cookie);
+    console.log("Current URL:", window.location.href);
+  }
+  console.log("Document not available (SSR)");
+  return 'en'; // fallback to default
+}
+
 export default function Home() {
   const t = useTranslations();
+  const locale = useLocale();
+  const [clientLocale, setClientLocale] = useState<string>('en');
+  
+  // Get locale from client-side cookie after component mounts
+  useEffect(() => {
+    const currentLocale = getCurrentLocale();
+    setClientLocale(currentLocale);
+  }, []);
   const inputRef = useRef<HTMLInputElement>(null);
   const player = usePlayer();
   const agentCoreRef = useRef<AgentCoreService | null>(null);
@@ -80,9 +122,14 @@ export default function Home() {
         try {
           const accessToken = auth.getToken();
           if (accessToken) {
+            const currentLocale = getCurrentLocale();
+            console.log("Next-intl locale:", locale);
+            console.log("Client locale state:", clientLocale);
+            console.log("Fresh locale check:", currentLocale);
             await agentCoreRef.current.initChat(accessToken, {
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-              clientDatetime: new Date().toISOString()
+              clientDatetime: new Date().toISOString(),
+              locale: currentLocale
             });
             setChatState(prev => ({
               ...prev,
@@ -97,7 +144,7 @@ export default function Home() {
     };
 
     initAgentCore();
-  }, [auth.isAuthenticated, chatState.agentCoreInitialized]);
+  }, [auth.isAuthenticated, chatState.agentCoreInitialized, clientLocale]);
 
   // Helper function to update chat state
   const updateChatState = useCallback((updates: Partial<ChatState>) => {
@@ -176,10 +223,16 @@ export default function Home() {
 
     const submittedAt = Date.now();
     const accessToken = auth.getToken();
+    const currentLocale = getCurrentLocale();
     const headers: HeadersInit = {};
 
     if (accessToken) {
       headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    // Override browser's accept-language with user's selected locale
+    if (currentLocale) {
+      headers["Accept-Language"] = currentLocale;
     }
 
     try {

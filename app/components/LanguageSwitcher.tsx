@@ -60,6 +60,8 @@ export default function LanguageSwitcher({
         </div>
       </div>
       <select
+        id="language-selector"
+        name="language"
         value={locale}
         onChange={e => changeLanguage(e.target.value as Locale)}
         disabled={isPending}

@@ -40,6 +40,8 @@ export default function ChatForm({
       onSubmit={onSubmit}
     >
       <input
+        id="chat-input"
+        name="chatInput"
         type="text"
         className="bg-transparent focus:outline-hidden pl-6 pr-4 py-4 w-full placeholder:text-neutral-600 dark:placeholder:text-neutral-400 disabled:cursor-not-allowed"
         required

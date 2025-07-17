@@ -39,6 +39,7 @@
     "speechToTextDescription": "Elige tu motor de voz a texto preferido",
     "textToSpeech": "Motor de Texto a Voz",
     "textToSpeechDescription": "Elige tu motor de texto a voz preferido",
+    "textToSpeechNonEnglish": "ElevenLabs requerido para idiomas no ingleses",
     "streaming": "Audio en Transmisión",
     "streamingDescription": "Reproduce audio mientras se genera",
     "auth": {

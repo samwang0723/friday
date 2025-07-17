@@ -39,6 +39,7 @@
     "speechToTextDescription": "선호하는 STT 엔진을 선택하세요",
     "textToSpeech": "텍스트를 음성으로 변환 엔진",
     "textToSpeechDescription": "선호하는 TTS 엔진을 선택하세요",
+    "textToSpeechNonEnglish": "영어가 아닌 언어에는 ElevenLabs가 필요합니다",
     "streaming": "스트리밍 오디오",
     "streamingDescription": "생성되는 동안 오디오 재생",
     "auth": {

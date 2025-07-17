@@ -39,6 +39,7 @@
     "speechToTextDescription": "Choisissez votre moteur STT préféré",
     "textToSpeech": "Moteur de synthèse vocale",
     "textToSpeechDescription": "Choisissez votre moteur TTS préféré",
+    "textToSpeechNonEnglish": "ElevenLabs requis pour les langues non-anglaises",
     "streaming": "Audio en streaming",
     "streamingDescription": "Lire l'audio au fur et à mesure de sa génération",
     "auth": {
