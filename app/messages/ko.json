@@ -59,5 +59,56 @@
   },
   "success": {
     "signedOut": "성공적으로 로그아웃되었습니다"
+  },
+  "privacy": {
+    "title": "개인정보 보호정책",
+    "lastUpdated": "최종 업데이트: 2025년 7월",
+    "overview": {
+      "title": "개요",
+      "content": "Friday Intelligence Inc.는 귀하의 개인정보 보호에 최선을 다하고 있습니다. 이 개인정보 보호정책은 귀하가 당사의 음성 어시스턴트 서비스를 사용할 때 당사가 정보를 수집, 사용 및 보호하는 방법을 설명합니다."
+    },
+    "dataCollection": {
+      "title": "수집하는 정보",
+      "intro": "다음과 같은 유형의 정보를 수집합니다:",
+      "voiceData": "요청 처리를 위한 음성 녹음 및 전사",
+      "conversationHistory": "대화에 맥락을 제공하기 위한 채팅 기록",
+      "technicalData": "기기 정보, IP 주소 및 사용량 분석",
+      "authData": "Google 계정의 인증 정보"
+    },
+    "dataUsage": {
+      "title": "정보 사용 방법",
+      "intro": "귀하의 정보를 다음과 같이 사용합니다:",
+      "providingServices": "음성 어시스턴트 서비스 제공 및 개선",
+      "improvingAccuracy": "음성 인식 및 응답 정확도 향상",
+      "personalizing": "경험 및 응답 개인화",
+      "troubleshooting": "문제 해결 및 고객 지원 제공"
+    },
+    "dataSharing": {
+      "title": "정보 공유",
+      "intro": "다음과 같은 경우 귀하의 정보를 공유할 수 있습니다:",
+      "aiProviders": "처리를 위한 제3자 AI 서비스 제공업체 (Groq, ElevenLabs, Cartesia)",
+      "serviceProviders": "서비스 운영을 지원하는 서비스 제공업체",
+      "legalRequirements": "법적 요구사항에 의한 법 집행기관 또는 규제 당국"
+    },
+    "dataRetention": {
+      "title": "데이터 보존",
+      "content": "서비스 제공과 법적 의무 준수에 필요한 기간 동안만 귀하의 데이터를 보존합니다. 언제든지 데이터 삭제를 요청할 수 있습니다."
+    },
+    "userRights": {
+      "title": "귀하의 권리",
+      "intro": "귀하는 다음과 같은 권리를 가집니다:",
+      "access": "개인정보에 대한 액세스",
+      "correction": "부정확한 정보 수정",
+      "deletion": "데이터 삭제 요청",
+      "dataPortability": "휴대 가능한 형식으로 데이터 내보내기"
+    },
+    "security": {
+      "title": "보안",
+      "content": "무단 액세스, 변경, 공개 또는 파기로부터 귀하의 정보를 보호하기 위해 적절한 보안 조치를 구현하고 있습니다."
+    },
+    "contact": {
+      "title": "문의하기",
+      "content": "이 개인정보 보호정책에 대한 질문이 있으시면 privacy@friday-inc.com으로 문의해 주세요."
+    }
   }
 }

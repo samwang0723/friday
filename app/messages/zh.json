@@ -59,5 +59,56 @@
   },
   "success": {
     "signedOut": "登出成功"
+  },
+  "privacy": {
+    "title": "隐私政策",
+    "lastUpdated": "最后更新：2025年7月",
+    "overview": {
+      "title": "概述",
+      "content": "Friday Intelligence Inc. 致力于保护您的隐私。本隐私政策说明了当您使用我们的语音助手服务时，我们如何收集、使用和保护您的信息。"
+    },
+    "dataCollection": {
+      "title": "我们收集的信息",
+      "intro": "我们收集以下类型的信息：",
+      "voiceData": "用于处理您请求的语音录音和转录",
+      "conversationHistory": "为对话提供上下文的聊天记录",
+      "technicalData": "设备信息、IP地址和使用情况分析",
+      "authData": "来自您Google账户的认证信息"
+    },
+    "dataUsage": {
+      "title": "我们如何使用您的信息",
+      "intro": "我们使用您的信息来：",
+      "providingServices": "提供和改进我们的语音助手服务",
+      "improvingAccuracy": "提高语音识别和响应准确性",
+      "personalizing": "个性化您的体验和响应",
+      "troubleshooting": "解决问题并提供客户支持"
+    },
+    "dataSharing": {
+      "title": "信息共享",
+      "intro": "我们可能会与以下方面共享您的信息：",
+      "aiProviders": "用于处理的第三方AI服务提供商（Groq、ElevenLabs、Cartesia）",
+      "serviceProviders": "协助运营我们服务的服务提供商",
+      "legalRequirements": "法律要求时的执法部门或监管机构"
+    },
+    "dataRetention": {
+      "title": "数据保留",
+      "content": "我们只在提供服务和遵守法律义务所需的时间内保留您的数据。您可以随时请求删除您的数据。"
+    },
+    "userRights": {
+      "title": "您的权利",
+      "intro": "您有权：",
+      "access": "访问您的个人信息",
+      "correction": "更正不准确的信息",
+      "deletion": "请求删除您的数据",
+      "dataPortability": "以可移植格式导出您的数据"
+    },
+    "security": {
+      "title": "安全性",
+      "content": "我们实施适当的安全措施来保护您的信息免受未经授权的访问、更改、披露或销毁。"
+    },
+    "contact": {
+      "title": "联系我们",
+      "content": "如果您对本隐私政策有任何疑问，请通过privacy@friday-inc.com联系我们。"
+    }
   }
 }

@@ -783,7 +783,7 @@ export default function Home() {
             {t("privacy.title")}
           </a>
           <p className="text-xs text-gray-500">
-            © 2024 Friday Inc. All rights reserved.
+            © 2025 Friday Intelligence Inc. All rights reserved.
           </p>
         </div>
       </div>

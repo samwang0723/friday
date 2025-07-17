@@ -85,7 +85,7 @@ export default function PrivacyPolicy() {
 
           <section className="border-t border-gray-700 pt-8">
             <p className="text-gray-400 text-sm text-center">
-              © 2024 Friday Inc. All rights reserved.
+              © 2025 Friday Intelligence Inc. All rights reserved.
             </p>
           </section>
         </div>

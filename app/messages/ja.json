@@ -59,5 +59,56 @@
   },
   "success": {
     "signedOut": "正常にサインアウトしました"
+  },
+  "privacy": {
+    "title": "プライバシーポリシー",
+    "lastUpdated": "最終更新：2025年7月",
+    "overview": {
+      "title": "概要",
+      "content": "Friday Intelligence Inc.はお客様のプライバシー保護に努めています。このプライバシーポリシーは、お客様が当社の音声アシスタントサービスを使用する際に、当社が情報を収集、使用、保護する方法について説明しています。"
+    },
+    "dataCollection": {
+      "title": "収集する情報",
+      "intro": "以下の種類の情報を収集します：",
+      "voiceData": "リクエスト処理のための音声録音と音声転写",
+      "conversationHistory": "会話にコンテキストを提供するためのチャット履歴",
+      "technicalData": "デバイス情報、IPアドレス、使用状況分析",
+      "authData": "Googleアカウントからの認証情報"
+    },
+    "dataUsage": {
+      "title": "情報の使用方法",
+      "intro": "お客様の情報を以下の目的で使用します：",
+      "providingServices": "音声アシスタントサービスの提供と改善",
+      "improvingAccuracy": "音声認識と応答の精度向上",
+      "personalizing": "体験と応答のパーソナライゼーション",
+      "troubleshooting": "問題の解決とカスタマーサポートの提供"
+    },
+    "dataSharing": {
+      "title": "情報の共有",
+      "intro": "以下の場合に情報を共有することがあります：",
+      "aiProviders": "処理のためのサードパーティAIサービスプロバイダー（Groq、ElevenLabs、Cartesia）",
+      "serviceProviders": "サービス運営を支援するサービスプロバイダー",
+      "legalRequirements": "法的要件により法執行機関または規制当局"
+    },
+    "dataRetention": {
+      "title": "データ保持",
+      "content": "サービス提供と法的義務の遵守に必要な期間のみデータを保持します。いつでもデータの削除を要求できます。"
+    },
+    "userRights": {
+      "title": "お客様の権利",
+      "intro": "お客様には以下の権利があります：",
+      "access": "個人情報へのアクセス",
+      "correction": "不正確な情報の修正",
+      "deletion": "データの削除要求",
+      "dataPortability": "ポータブル形式でのデータエクスポート"
+    },
+    "security": {
+      "title": "セキュリティ",
+      "content": "不正アクセス、変更、開示、または破壊からお客様の情報を保護するための適切なセキュリティ対策を実施しています。"
+    },
+    "contact": {
+      "title": "お問い合わせ",
+      "content": "このプライバシーポリシーについてご質問がある場合は、privacy@friday-inc.comまでお問い合わせください。"
+    }
   }
 }
