@@ -38,7 +38,7 @@ export function useVADWithOrbControl(config: VADOrbConfig) {
   const onSpeechStart = useCallback(() => {
     const now = Date.now();
     const timeSinceAudioStart = now - audioStartTimeRef.current;
-
+    console.log("VAD: onSpeechStart");
     // Filter out speech detection that happens very soon after audio starts
     // This is likely echo from the speakers
     const isLikelyEcho = config.isStreaming && timeSinceAudioStart < 1000;
@@ -57,6 +57,7 @@ export function useVADWithOrbControl(config: VADOrbConfig) {
 
   const onSpeechEnd = useCallback(
     (audio: Float32Array) => {
+      console.log("VAD: onSpeechEnd");
       setVADState(prev => ({
         ...prev,
         actualUserSpeaking: false,
@@ -68,12 +69,71 @@ export function useVADWithOrbControl(config: VADOrbConfig) {
     [config.onSpeechEnd]
   );
 
+  const [audioStream, setAudioStream] = useState<MediaStream | undefined>();
+
+  // Create enhanced audio stream on mount
+  useEffect(() => {
+    const createEnhancedStream = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            noiseSuppression: true,
+            echoCancellation: true,
+            autoGainControl: true,
+            sampleRate: 16000,
+            channelCount: 1
+          }
+        });
+        console.log(
+          "VAD: Enhanced audio stream created with noise suppression and echo cancellation"
+        );
+        setAudioStream(stream);
+      } catch (error) {
+        console.warn(
+          "VAD: Failed to create enhanced audio stream, falling back to default:",
+          error
+        );
+        try {
+          const fallbackStream = await navigator.mediaDevices.getUserMedia({
+            audio: true
+          });
+          setAudioStream(fallbackStream);
+        } catch (fallbackError) {
+          console.error(
+            "VAD: Failed to create any audio stream:",
+            fallbackError
+          );
+        }
+      }
+    };
+
+    createEnhancedStream();
+
+    // Cleanup stream on unmount
+    return () => {
+      if (audioStream) {
+        audioStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  const onVADMisfire = useCallback(() => {
+    console.log("VAD: onVADMisfire - false positive speech detection");
+    setVADState(prev => ({
+      ...prev,
+      actualUserSpeaking: false,
+      shouldShowOrb: false
+    }));
+  }, []);
+
   const vad = useMicVAD({
     startOnLoad: false,
     onSpeechStart,
     onSpeechEnd,
+    onVADMisfire,
     positiveSpeechThreshold: config.positiveSpeechThreshold || 0.6,
-    minSpeechFrames: config.minSpeechFrames || 4
+    minSpeechFrames: config.minSpeechFrames || 4,
+    stream: audioStream
   });
 
   useEffect(() => {
