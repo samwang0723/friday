@@ -1,19 +1,161 @@
 # [Swift](https://swift-ai.vercel.app)
 
-Swift is a fast AI voice assistant.
+Swift is a fast, multilingual AI voice assistant with real-time speech processing and intelligent audio synthesis.
 
-- [Groq](https://groq.com) is used for fast inference of [OpenAI Whisper](https://github.com/openai/whisper) (for transcription) and [Meta Llama 3](https://llama.meta.com/llama3/) (for generating the text response).
-- [Cartesia](https://cartesia.ai)'s [Sonic](https://cartesia.ai/sonic) voice model is used for fast speech synthesis, which is streamed to the frontend.
-- [VAD](https://www.vad.ricky0123.com/) is used to detect when the user is talking, and run callbacks on speech segments.
-- The app is a [Next.js](https://nextjs.org) project written in TypeScript and deployed to [Vercel](https://vercel.com).
+## ✨ Key Features
 
-Thank you to the teams at Groq and Cartesia for providing access to their APIs for this demo!
+### 🗣️ **Advanced Voice Processing**
+- **Real-time Speech-to-Text**: [Groq](https://groq.com) powers fast inference of [OpenAI Whisper](https://github.com/openai/whisper) for accurate transcription
+- **Intelligent Text Generation**: [Meta Llama 3](https://llama.meta.com/llama3/) provides smart conversational responses
+- **Voice Activity Detection**: [VAD](https://www.vad.ricky0123.com/) detects speech with echo cancellation and interruption support
+
+### 🔊 **Multi-Engine Audio Synthesis**
+- **[Cartesia Sonic](https://cartesia.ai/sonic)**: High-quality streaming speech synthesis
+- **[ElevenLabs](https://elevenlabs.io)**: Premium voice generation with multilingual support
+- **Smart Engine Selection**: Automatic TTS engine switching based on language requirements
+
+### 🌍 **Multilingual Support**
+- **7 Languages**: English, Chinese (Simplified & Traditional), Japanese, Korean, Spanish, French
+- **Locale-Aware Processing**: Automatic language detection and appropriate service routing
+- **Intelligent TTS Routing**: ElevenLabs for non-English languages, flexible options for English
+
+### ⚡ **Real-Time Performance**
+- **Streaming Responses**: Character-by-character text display with smooth typing animation
+- **Low-Latency Audio**: Buffered audio streaming for seamless playback
+- **Smart Caching**: Optimized request handling with automatic cancellation
+
+### 🔧 **Customizable Experience**
+- **Persistent Settings**: User preferences saved across sessions (STT/TTS engines, streaming)
+- **OAuth Authentication**: Secure Google Sign-In integration
+- **Responsive Design**: Optimized for desktop and mobile devices
+- **Accessibility**: Full keyboard navigation and screen reader support
+
+### 🛠️ **Modern Architecture**
+- **Next.js 15**: App Router with TypeScript and server-side rendering
+- **Component Architecture**: Modular, reusable UI components
+- **External Agent Integration**: Configurable AgentCore service with streaming support
+- **Production Ready**: Deployed on [Vercel](https://vercel.com) with analytics
+
+Thank you to the teams at Groq, Cartesia, and ElevenLabs for providing access to their APIs!
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fai-ng%2Fswift&env=GROQ_API_KEY,CARTESIA_API_KEY&envDescription=Groq%20and%20Cartesia's%20APIs%20are%20used%20for%20transcription%2C%20text%20generation%2C%20and%20speech%20synthesis.&project-name=swift&repository-name=swift&demo-title=Swift&demo-description=A%20fast%2C%20open-source%20voice%20assistant%20powered%20by%20Groq%2C%20Cartesia%2C%20and%20Vercel.&demo-url=https%3A%2F%2Fswift-ai.vercel.app&demo-image=https%3A%2F%2Fswift-ai.vercel.app%2Fopengraph-image.png)
 
-## Developing
+## 🚀 Quick Start
 
-- Clone the repository
-- Copy `.env.example` to `.env.local` and fill in the environment variables.
-- Run `pnpm install` to install dependencies.
-- Run `pnpm dev` to start the development server.
+### Prerequisites
+- Node.js 18+ and pnpm
+- API keys for Groq, Cartesia, and ElevenLabs
+- Optional: AgentCore service URL for external AI integration
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/samwang0723/friday.git
+   cd friday
+   ```
+
+2. **Install dependencies**
+   ```bash
+   pnpm install
+   ```
+
+3. **Configure environment**
+   ```bash
+   cp .env.example .env.local
+   ```
+   
+   Fill in the required environment variables:
+   ```env
+   # Required APIs
+   GROQ_API_KEY=your_groq_api_key
+   CARTESIA_API_KEY=your_cartesia_api_key
+   ELEVENLABS_API_KEY=your_elevenlabs_api_key
+   
+   # Optional: External Agent Service
+   AGENT_CORE_API_URL=your_agent_core_url
+   
+   # OAuth Configuration
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
+   ```
+
+4. **Start development server**
+   ```bash
+   pnpm dev
+   ```
+
+   Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Development Commands
+
+```bash
+# Development
+pnpm dev              # Start development server
+pnpm build            # Build for production
+pnpm start            # Start production server
+
+# Code Quality
+pnpm lint             # Run ESLint
+pnpm typecheck        # Run TypeScript checks
+
+# Testing
+pnpm test             # Run tests
+pnpm test:watch       # Run tests in watch mode
+pnpm test:coverage    # Run tests with coverage
+```
+
+## 🏗️ Architecture
+
+### Core Components
+- **`app/page.tsx`**: Main voice assistant interface
+- **`app/components/`**: Reusable UI components (ChatForm, Settings, VoiceOrb)
+- **`app/lib/`**: Core services and utilities
+  - **`agentCore.ts`**: External AI service integration
+  - **`hooks/`**: Custom React hooks (useAuth, usePlayer, useVAD)
+  - **`audio/`**: Speech processing utilities
+
+### Key Features Implementation
+- **Locale Support**: `app/lib/i18n.ts` + cookie-based persistence
+- **Settings Persistence**: localStorage with graceful fallbacks
+- **Real-time Streaming**: SSE-based text and audio streaming
+- **Voice Processing**: VAD with echo cancellation and interruption handling
+
+### API Routes
+- **`/api/route.ts`**: Main voice processing pipeline
+- **Streaming Support**: Server-Sent Events for real-time responses
+- **Request Management**: Token-based cancellation and cleanup
+
+## 🌐 Internationalization
+
+The app supports 7 languages with complete UI translations:
+- English (`en`)
+- Chinese Simplified (`zh`) 
+- Chinese Traditional (`zh-TW`)
+- Japanese (`ja`)
+- Korean (`ko`)
+- Spanish (`es`)
+- French (`fr`)
+
+### Adding New Languages
+1. Add locale to `app/lib/i18n-client.ts`
+2. Create translation file in `app/messages/{locale}.json`
+3. Update AgentCore locale mapping if needed
+
+## 🔧 Configuration
+
+### TTS Engine Selection
+- **English**: User can choose between Cartesia and ElevenLabs
+- **Non-English**: Automatically uses ElevenLabs for best quality
+- **Override**: Configurable via settings with locale-aware restrictions
+
+### Voice Activity Detection
+- **Threshold**: Configurable speech detection sensitivity
+- **Echo Cancellation**: Prevents false detection during TTS playback
+- **Interruption**: Allows users to interrupt AI responses
+
+### External Agent Integration
+Configure `AGENT_CORE_API_URL` to connect with external AI services:
+- Supports streaming responses with X-Locale headers
+- Includes timezone and datetime context
+- Handles authentication and request cancellation
