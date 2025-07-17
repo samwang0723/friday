@@ -1,15 +1,17 @@
 "use client";
 
+import ChatForm from "@/components/ChatForm";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
+import MessageDisplay from "@/components/MessageDisplay";
 import Settings, { SettingsState } from "@/components/Settings";
+import SettingsButton from "@/components/SettingsButton";
+import VoiceOrb from "@/components/VoiceOrb";
 import { AgentCoreService } from "@/lib/agentCore";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useVADWithOrbControl } from "@/lib/hooks/useVADWithOrbControl";
-import { EnterIcon, LoadingIcon } from "@/lib/icons";
 import { usePlayer } from "@/lib/usePlayer";
 import { utils } from "@ricky0123/vad-react";
 import { track } from "@vercel/analytics";
-import clsx from "clsx";
 import { useTranslations } from "next-intl";
 import React, {
   startTransition,
@@ -245,7 +247,7 @@ export default function Home() {
         // Typing animation function
         const startTypingAnimation = () => {
           if (typingIntervalId) return; // Already typing
-          
+
           typingIntervalId = setInterval(() => {
             if (textQueue.length > 0) {
               const nextChar = textQueue.charAt(0);
@@ -382,10 +384,12 @@ export default function Home() {
                       case "complete":
                         finalLatency = Date.now() - submittedAt;
                         accumulatedText = data.fullText;
-                        
+
                         // Ensure all text is typed out before completing
-                        textQueue += data.fullText.substring(displayedText.length);
-                        
+                        textQueue += data.fullText.substring(
+                          displayedText.length
+                        );
+
                         // Wait for typing to complete, then reset streaming state
                         const waitForTyping = () => {
                           if (textQueue.length === 0 && !typingIntervalId) {
@@ -448,7 +452,7 @@ export default function Home() {
           } finally {
             // Clean up typing animation
             stopTypingAnimation();
-            
+
             // Clean up
             updateChatState({
               isStreaming: false,
@@ -628,148 +632,35 @@ export default function Home() {
 
       {!auth.isAuthenticated && <GoogleLoginButton disabled={auth.loading} />}
 
-      <form
-        className={clsx(
-          "rounded-full bg-neutral-200/80 dark:bg-neutral-800/80 flex items-center w-full max-w-3xl border border-transparent transition-all duration-500",
-          {
-            "hover:drop-shadow-lg hover:drop-shadow-[0_0_15px_rgba(34,211,238,0.3)] focus-within:drop-shadow-xl focus-within:drop-shadow-[0_0_25px_rgba(34,211,238,0.4)] focus-within:ring-2 focus-within:ring-cyan-500/30 dark:hover:drop-shadow-[0_0_15px_rgba(34,211,238,0.4)] dark:focus-within:drop-shadow-[0_0_25px_rgba(34,211,238,0.5)] dark:focus-within:ring-cyan-400/30":
-              auth.isAuthenticated,
-            "opacity-50 cursor-not-allowed": !auth.isAuthenticated,
-            "opacity-40 blur-sm pointer-events-none": isSettingsOpen
-          }
-        )}
+      <ChatForm
+        isAuthenticated={auth.isAuthenticated}
+        isSettingsOpen={isSettingsOpen}
+        input={chatState.input}
+        isPending={isPending}
+        isStreaming={chatState.isStreaming}
+        onInputChange={value => updateChatState({ input: value })}
         onSubmit={handleFormSubmit}
-      >
-        <input
-          type="text"
-          className="bg-transparent focus:outline-hidden pl-6 pr-4 py-4 w-full placeholder:text-neutral-600 dark:placeholder:text-neutral-400 disabled:cursor-not-allowed"
-          required
-          placeholder={
-            auth.isAuthenticated
-              ? t("assistant.placeholder")
-              : t("auth.loginToContinue")
-          }
-          value={chatState.input}
-          onChange={e => updateChatState({ input: e.target.value })}
-          ref={inputRef}
-          disabled={!auth.isAuthenticated}
-        />
-
-        <button
-          type="submit"
-          className="p-4 mr-1 text-neutral-700 hover:text-black dark:text-neutral-300 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={isPending || !auth.isAuthenticated || chatState.isStreaming}
-          aria-label="Submit"
-        >
-          {isPending || chatState.isStreaming ? <LoadingIcon /> : <EnterIcon />}
-        </button>
-      </form>
-
-      <div
-        className={clsx(
-          "text-neutral-400 dark:text-neutral-600 pt-4 text-center max-w-xl text-balance min-h-28 space-y-4 transition-all duration-500",
-          {
-            "scale-95 -translate-y-2 opacity-40 blur-sm": isSettingsOpen
-          }
-        )}
-      >
-        {auth.loading && <p>{t("auth.checkingAuth")}</p>}
-
-        {!auth.loading && !auth.isAuthenticated && (
-          <p>{t("auth.pleaseSignIn")}</p>
-        )}
-
-        {!auth.loading && auth.isAuthenticated && chatState.message && (
-          <p>{chatState.message}</p>
-        )}
-
-        {!auth.loading &&
-          auth.isAuthenticated &&
-          messages.length > 0 &&
-          !chatState.message && (
-            <p>
-              {messages.at(-1)?.content}
-              <span className="text-xs font-mono text-neutral-300 dark:text-neutral-700">
-                {" "}
-                ({messages.at(-1)?.latency}ms)
-              </span>
-            </p>
-          )}
-
-        {!auth.loading &&
-          auth.isAuthenticated &&
-          messages.length === 0 &&
-          !chatState.message && (
-            <>
-              <p>
-                A fast, open-source voice assistant powered by{" "}
-                <A href="https://groq.com">Groq</A>,{" "}
-                <A href="https://cartesia.ai">Cartesia</A>,{" "}
-                <A href="https://www.vad.ricky0123.com/">VAD</A>, and{" "}
-                <A href="https://vercel.com">Vercel</A>.{" "}
-                <A href="https://github.com/samwang0723/friday" target="_blank">
-                  Learn more
-                </A>
-                .
-              </p>
-
-              {vadState.loading ? (
-                <p>{t("assistant.loadingSpeech")}</p>
-              ) : vadState.errored ? (
-                <p>{t("assistant.speechDetectionFailed")}</p>
-              ) : (
-                <p>{t("assistant.startTalking")}</p>
-              )}
-            </>
-          )}
-      </div>
-
-      <div
-        className={clsx(
-          "absolute size-48 blur-3xl rounded-full bg-linear-to-b from-cyan-200 to-cyan-400 dark:from-cyan-600 dark:to-cyan-800 -z-50 transition ease-in-out",
-          {
-            "opacity-0":
-              !auth.isAuthenticated || vadState.loading || vadState.errored,
-            "opacity-30":
-              auth.isAuthenticated &&
-              !vadState.loading &&
-              !vadState.errored &&
-              !vadState.userSpeaking &&
-              !chatState.message,
-            "opacity-100 scale-110":
-              auth.isAuthenticated &&
-              (vadState.userSpeaking || chatState.message)
-          }
-        )}
+        inputRef={inputRef}
       />
 
-      {/* Settings Button */}
-      <button
-        onClick={() => setIsSettingsOpen(true)}
-        className="fixed bottom-6 right-6 p-3 rounded-full bg-neutral-200/80 dark:bg-neutral-800/80 backdrop-blur-md hover:bg-neutral-300/80 dark:hover:bg-neutral-700/80 transition-colors shadow-lg z-50"
-        aria-label="Settings"
-      >
-        <svg
-          className="h-6 w-6 text-neutral-700 dark:text-neutral-300"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.5"
-            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.5"
-            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-          />
-        </svg>
-      </button>
+      <MessageDisplay
+        isSettingsOpen={isSettingsOpen}
+        authLoading={auth.loading}
+        isAuthenticated={auth.isAuthenticated}
+        currentMessage={chatState.message}
+        messages={messages}
+        vadState={vadState}
+      />
+
+      <VoiceOrb
+        isAuthenticated={auth.isAuthenticated}
+        isLoading={vadState.loading}
+        isErrored={vadState.errored}
+        isUserSpeaking={vadState.userSpeaking}
+        hasMessage={!!chatState.message}
+      />
+
+      <SettingsButton onClick={() => setIsSettingsOpen(true)} />
 
       {/* Settings Component */}
       <Settings
@@ -780,14 +671,5 @@ export default function Home() {
         onSettingsChange={handleSettingsChange}
       />
     </>
-  );
-}
-
-function A(props: any) {
-  return (
-    <a
-      {...props}
-      className="text-neutral-500 dark:text-neutral-500 hover:underline font-medium"
-    />
   );
 }

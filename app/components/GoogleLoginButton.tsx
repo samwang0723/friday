@@ -34,7 +34,7 @@ export default function GoogleLoginButton({
   return (
     <button
       id="google-login-button"
-      className={`bg-white text-gray-800 font-medium py-3 px-6 mb-6 rounded-lg flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+      className={`bg-white text-gray-800 font-medium py-3 px-6 mb-6 rounded-lg flex items-center justify-center shadow-lg hover:shadow-xl active:bg-gray-200 active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${className}`}
       onClick={handleGoogleLogin}
       disabled={disabled || isLoading}
     >
