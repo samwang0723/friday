@@ -8,11 +8,12 @@ import SettingsButton from "@/components/SettingsButton";
 import VoiceOrb from "@/components/VoiceOrb";
 import { AgentCoreService } from "@/lib/agentCore";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { useVADWithOrbControl } from "@/lib/hooks/useVADWithOrbControl";
 import { usePlayer } from "@/lib/hooks/usePlayer";
+import { useVADWithOrbControl } from "@/lib/hooks/useVADWithOrbControl";
 import { utils } from "@ricky0123/vad-react";
 import { track } from "@vercel/analytics";
-import { useTranslations, useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import Image from "next/image";
 import React, {
   startTransition,
   useActionState,
@@ -38,43 +39,45 @@ interface ChatState {
 
 // Helper function to get current locale from client-side sources
 function getCurrentLocale(): string {
-  if (typeof document !== 'undefined') {
+  if (typeof document !== "undefined") {
     // Check URL parameters first
     const urlParams = new URLSearchParams(window.location.search);
-    const urlLocale = urlParams.get('locale');
+    const urlLocale = urlParams.get("locale");
     if (urlLocale) {
       console.log("Found locale in URL:", urlLocale);
       return urlLocale;
     }
-    
+
     // Check cookies
-    const cookies = document.cookie.split(';');
-    const localeCookie = cookies.find(cookie => cookie.trim().startsWith('locale='));
+    const cookies = document.cookie.split(";");
+    const localeCookie = cookies.find(cookie =>
+      cookie.trim().startsWith("locale=")
+    );
     if (localeCookie) {
-      const localeValue = localeCookie.split('=')[1];
+      const localeValue = localeCookie.split("=")[1];
       console.log("Found locale cookie:", localeValue);
       return localeValue;
     }
-    
+
     // Check localStorage as fallback
-    const storedLocale = localStorage.getItem('locale');
+    const storedLocale = localStorage.getItem("locale");
     if (storedLocale) {
       console.log("Found locale in localStorage:", storedLocale);
       return storedLocale;
     }
-    
+
     console.log("No locale found, available cookies:", document.cookie);
     console.log("Current URL:", window.location.href);
   }
   console.log("Document not available (SSR)");
-  return 'en'; // fallback to default
+  return "en"; // fallback to default
 }
 
 export default function Home() {
   const t = useTranslations();
   const locale = useLocale();
-  const [clientLocale, setClientLocale] = useState<string>('en');
-  
+  const [clientLocale, setClientLocale] = useState<string>("en");
+
   // Get locale from client-side cookie after component mounts
   useEffect(() => {
     const currentLocale = getCurrentLocale();
@@ -216,10 +219,7 @@ export default function Home() {
     }
 
     // Use current streaming setting
-    formData.append(
-      "settings",
-      JSON.stringify(settings)
-    );
+    formData.append("settings", JSON.stringify(settings));
 
     const submittedAt = Date.now();
     const accessToken = auth.getToken();
@@ -283,13 +283,13 @@ export default function Home() {
 
       // Check response type to handle streaming vs single mode
       const responseType = response.headers.get("X-Response-Type");
-      
+
       if (responseType === "single") {
         // Handle single response mode
         const responseText = decodeURIComponent(
           response.headers.get("X-Response-Text") || ""
         );
-        
+
         if (!responseText) {
           updateChatState({ isStreaming: false });
           toast.error(t("errors.noResponse"));
@@ -730,6 +730,18 @@ export default function Home() {
 
   return (
     <>
+      {/* Company Logo */}
+      <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-10">
+        <Image
+          src="/friday.png"
+          alt="Friday Intelligence Inc."
+          width={200}
+          height={200}
+          priority
+          className="object-contain w-32 h-32 sm:w-40 sm:h-40"
+        />
+      </div>
+
       <div className="pb-4 min-h-28" />
 
       {!auth.isAuthenticated && <GoogleLoginButton disabled={auth.loading} />}
@@ -776,13 +788,13 @@ export default function Home() {
       {/* Privacy Policy Link and Company Disclaimer */}
       <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-10">
         <div className="flex flex-col items-center space-y-2">
-          <a 
-            href="/privacy" 
+          <a
+            href="/privacy"
             className="text-xs text-gray-400 hover:text-gray-300 transition-colors underline"
           >
             {t("privacy.title")}
           </a>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 text-center">
             © 2025 Friday Intelligence Inc. All rights reserved.
           </p>
         </div>

@@ -8,7 +8,7 @@ export default function PrivacyPolicy() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white rounded-2xl">
       {/* Back Button */}
       <div className="fixed top-4 left-4 z-50">
-        <Link 
+        <Link
           href="/"
           className="flex items-center justify-center p-3 rounded-full bg-neutral-200/80 dark:bg-neutral-800/80 backdrop-blur-md hover:bg-neutral-300/80 dark:hover:bg-neutral-700/80 transition-colors shadow-lg"
           aria-label="Back to home"
@@ -38,14 +38,22 @@ export default function PrivacyPolicy() {
 
         <div className="space-y-8">
           <section>
-            <h2 className="text-xl font-semibold mb-3">{t("overview.title")}</h2>
-            <p className="text-gray-300 leading-relaxed text-sm">{t("overview.content")}</p>
+            <h2 className="text-xl font-semibold mb-3">
+              {t("overview.title")}
+            </h2>
+            <p className="text-gray-300 leading-relaxed text-sm">
+              {t("overview.content")}
+            </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">{t("dataCollection.title")}</h2>
+            <h2 className="text-xl font-semibold mb-3">
+              {t("dataCollection.title")}
+            </h2>
             <div className="space-y-3">
-              <p className="text-gray-300 leading-relaxed text-sm">{t("dataCollection.intro")}</p>
+              <p className="text-gray-300 leading-relaxed text-sm">
+                {t("dataCollection.intro")}
+              </p>
               <ul className="list-disc list-inside text-gray-300 space-y-1 ml-4 text-sm">
                 <li>{t("dataCollection.voiceData")}</li>
                 <li>{t("dataCollection.conversationHistory")}</li>
@@ -56,9 +64,13 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">{t("dataUsage.title")}</h2>
+            <h2 className="text-xl font-semibold mb-3">
+              {t("dataUsage.title")}
+            </h2>
             <div className="space-y-3">
-              <p className="text-gray-300 leading-relaxed text-sm">{t("dataUsage.intro")}</p>
+              <p className="text-gray-300 leading-relaxed text-sm">
+                {t("dataUsage.intro")}
+              </p>
               <ul className="list-disc list-inside text-gray-300 space-y-1 ml-4 text-sm">
                 <li>{t("dataUsage.providingServices")}</li>
                 <li>{t("dataUsage.improvingAccuracy")}</li>
@@ -69,9 +81,13 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">{t("dataSharing.title")}</h2>
+            <h2 className="text-xl font-semibold mb-3">
+              {t("dataSharing.title")}
+            </h2>
             <div className="space-y-3">
-              <p className="text-gray-300 leading-relaxed text-sm">{t("dataSharing.intro")}</p>
+              <p className="text-gray-300 leading-relaxed text-sm">
+                {t("dataSharing.intro")}
+              </p>
               <ul className="list-disc list-inside text-gray-300 space-y-1 ml-4 text-sm">
                 <li>{t("dataSharing.aiProviders")}</li>
                 <li>{t("dataSharing.serviceProviders")}</li>
@@ -81,14 +97,22 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">{t("dataRetention.title")}</h2>
-            <p className="text-gray-300 leading-relaxed text-sm">{t("dataRetention.content")}</p>
+            <h2 className="text-xl font-semibold mb-3">
+              {t("dataRetention.title")}
+            </h2>
+            <p className="text-gray-300 leading-relaxed text-sm">
+              {t("dataRetention.content")}
+            </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">{t("userRights.title")}</h2>
+            <h2 className="text-xl font-semibold mb-3">
+              {t("userRights.title")}
+            </h2>
             <div className="space-y-3">
-              <p className="text-gray-300 leading-relaxed text-sm">{t("userRights.intro")}</p>
+              <p className="text-gray-300 leading-relaxed text-sm">
+                {t("userRights.intro")}
+              </p>
               <ul className="list-disc list-inside text-gray-300 space-y-1 ml-4 text-sm">
                 <li>{t("userRights.access")}</li>
                 <li>{t("userRights.correction")}</li>
@@ -99,17 +123,24 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">{t("security.title")}</h2>
-            <p className="text-gray-300 leading-relaxed text-sm">{t("security.content")}</p>
+            <h2 className="text-xl font-semibold mb-3">
+              {t("security.title")}
+            </h2>
+            <p className="text-gray-300 leading-relaxed text-sm">
+              {t("security.content")}
+            </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold mb-3">{t("contact.title")}</h2>
-            <p className="text-gray-300 leading-relaxed text-sm">{t("contact.content")}</p>
+            <p className="text-gray-300 leading-relaxed text-sm">
+              {t("contact.content")}
+            </p>
           </section>
 
-          <section className="border-t border-gray-700 pt-8">
-            <p className="text-gray-400 text-sm text-center">
+          {/* Company Disclaimer */}
+          <section>
+            <p className="text-xs text-gray-500 text-center">
               © 2025 Friday Intelligence Inc. All rights reserved.
             </p>
           </section>

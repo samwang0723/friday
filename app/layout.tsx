@@ -1,10 +1,10 @@
-import React from "react";
-import type { Metadata } from "next";
-import clsx from "clsx";
-import "./globals.css";
-import { Toaster } from "sonner";
 import { Analytics } from "@vercel/analytics/react";
+import clsx from "clsx";
+import type { Metadata } from "next";
 import { NextIntlClientProvider } from "next-intl";
+import React from "react";
+import { Toaster } from "sonner";
+import "./globals.css";
 import { getLocale } from "./lib/i18n";
 
 export const metadata: Metadata = {
@@ -33,8 +33,9 @@ export default async function RootLayout({
       </head>
       <body
         className={clsx(
-          "py-8 px-6 lg:p-10 dark:text-white bg-white dark:bg-black min-h-dvh flex flex-col justify-between antialiased font-sans select-none"
+          "py-8 px-6 lg:p-10 dark:text-white bg-white min-h-dvh flex flex-col justify-between antialiased font-sans select-none"
         )}
+        style={{ backgroundColor: "#09051a" }}
       >
         <NextIntlClientProvider locale={locale} messages={messages}>
           <main className="flex flex-col items-center justify-center grow">
