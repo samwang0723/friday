@@ -77,7 +77,19 @@ export default function Settings({
     }
   };
 
-  const [settings, setSettings] = useState<SettingsState>(loadSettingsFromStorage);
+  const [settings, setSettings] = useState<SettingsState>({
+    sttEngine: "groq",
+    ttsEngine: "elevenlabs",
+    streaming: true
+  });
+
+  // Load settings from localStorage after component mounts
+  useEffect(() => {
+    const savedSettings = loadSettingsFromStorage();
+    setSettings(savedSettings);
+    // Call onSettingsChange with loaded settings
+    onSettingsChange(savedSettings);
+  }, []);
 
   const updateSetting = (key: string, value: any) => {
     const newSettings = {
@@ -97,10 +109,6 @@ export default function Settings({
     }
   }, [locale, isEnglishLocale, settings.ttsEngine]);
 
-  // Call onSettingsChange with initial settings
-  useEffect(() => {
-    onSettingsChange(settings);
-  }, []);
 
   const handleLogout = () => {
     if (!isAuthenticated) return;

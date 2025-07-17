@@ -90,7 +90,7 @@ export default function Home() {
   const [settings, setSettings] = useState<SettingsState>({
     sttEngine: "groq",
     ttsEngine: "elevenlabs",
-    streaming: true // Always use streaming
+    streaming: true
   });
 
   // Chat state
@@ -215,10 +215,10 @@ export default function Home() {
       formData.append("message", JSON.stringify(message));
     }
 
-    // Always use streaming
+    // Use current streaming setting
     formData.append(
       "settings",
-      JSON.stringify({ ...settings, streaming: true })
+      JSON.stringify(settings)
     );
 
     const submittedAt = Date.now();
@@ -236,7 +236,6 @@ export default function Home() {
     }
 
     try {
-      // Handle streaming mode with SSE
       updateChatState({
         isStreaming: true,
         message: ""
@@ -282,7 +281,57 @@ export default function Home() {
 
       const updatedMessages = [...prevMessages, userMessage];
 
-      // Handle SSE streaming
+      // Check response type to handle streaming vs single mode
+      const responseType = response.headers.get("X-Response-Type");
+      
+      if (responseType === "single") {
+        // Handle single response mode
+        const responseText = decodeURIComponent(
+          response.headers.get("X-Response-Text") || ""
+        );
+        
+        if (!responseText) {
+          updateChatState({ isStreaming: false });
+          toast.error(t("errors.noResponse"));
+          return prevMessages;
+        }
+
+        // Display the response text immediately
+        updateChatState({ message: responseText });
+
+        // Play the audio
+        const audioArrayBuffer = await response.arrayBuffer();
+        const audioStream = new ReadableStream({
+          start(controller) {
+            controller.enqueue(new Uint8Array(audioArrayBuffer));
+            controller.close();
+          }
+        });
+
+        player.play(audioStream, () => {
+          const isFirefox = navigator.userAgent.includes("Firefox");
+          if (isFirefox) {
+            vad.start();
+          }
+        });
+
+        // Create assistant message
+        const assistantMessage: Message = {
+          role: "assistant",
+          content: responseText,
+          latency: Date.now() - submittedAt
+        };
+
+        // Reset streaming state
+        updateChatState({
+          isStreaming: false,
+          message: ""
+        });
+
+        return [...updatedMessages, assistantMessage];
+      }
+
+      // Handle SSE streaming mode
       return new Promise<Message[]>((resolve, reject) => {
         const reader = response.body!.getReader();
         const decoder = new TextDecoder();
@@ -675,7 +724,7 @@ export default function Home() {
   };
 
   const handleSettingsChange = (newSettings: SettingsState) => {
-    setSettings({ ...newSettings, streaming: true }); // Always enable streaming
+    setSettings(newSettings);
     console.log("Settings updated:", newSettings);
   };
 

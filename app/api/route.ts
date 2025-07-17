@@ -1,5 +1,5 @@
 import { AgentCoreService } from "@/lib/agentCore";
-import { synthesizeSpeechStream, transcribeAudio } from "@/lib/audio";
+import { synthesizeSpeech, synthesizeSpeechStream, transcribeAudio } from "@/lib/audio";
 import { headers } from "next/headers";
 import { after } from "next/server";
 import { z } from "zod";
@@ -154,7 +154,53 @@ export async function POST(request: Request) {
       locale: locale
     };
 
-    // Always use streaming pipeline with SSE
+    // Check if streaming is enabled
+    if (settings.streaming === false) {
+      console.log("Using single response mode (non-streaming)");
+      
+      // Use Agent Core chat function for single response
+      const chatResponse = await agentCore.chat(
+        `
+          - User location is ${await location()}.
+          - The current time is ${await time()}.
+          ${transcript}
+          `,
+        accessToken as string,
+        clientContext
+      );
+
+      if (abortController.signal.aborted) {
+        return new Response("Request cancelled", { status: 200 });
+      }
+
+      // Generate complete audio using synthesizeSpeech
+      const audioResponse = await synthesizeSpeech(
+        chatResponse.response,
+        settings.ttsEngine,
+        abortController.signal
+      );
+
+      if (!audioResponse.ok) {
+        return new Response("TTS generation failed", { status: 500 });
+      }
+
+      const audioBuffer = await audioResponse.arrayBuffer();
+      
+      // Clean up the request from tracking
+      requestManager.completeRequest(accessToken);
+
+      // Return combined response with audio and text
+      return new Response(audioBuffer, {
+        headers: {
+          "Content-Type": "audio/raw",
+          "X-Transcript": encodeURIComponent(transcript),
+          "X-Response-Text": encodeURIComponent(chatResponse.response),
+          "X-Response-Type": "single"
+        }
+      });
+    }
+
+    // Use streaming pipeline with SSE
     console.log("Using real-time streaming pipeline with SSE");
 
     // Create SSE response stream
