@@ -42,6 +42,7 @@
     "textToSpeechNonEnglish": "英語以外の言語にはElevenLabsが必要です",
     "streaming": "ストリーミング音声",
     "streamingDescription": "音声の生成と同時に再生する",
+    "settingsButton": "設定",
     "auth": {
       "signOut": "サインアウト"
     }
@@ -51,6 +52,12 @@
     "requestFailed": "リクエストに失敗しました。もう一度お試しください。",
     "initChatFailed": "チャットセッションの初期化に失敗しました",
     "invalidAudio": "無効な音声です",
-    "requestCancelled": "リクエストがキャンセルされました"
+    "requestCancelled": "リクエストがキャンセルされました",
+    "sessionExpired": "セッションの有効期限が切れました。再度サインインしてください。",
+    "noTranscript": "音声転写を受信できませんでした",
+    "signOutFailed": "サインアウトに失敗しました。もう一度お試しください。"
+  },
+  "success": {
+    "signedOut": "正常にサインアウトしました"
   }
 }

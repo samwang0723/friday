@@ -42,6 +42,7 @@
     "textToSpeechNonEnglish": "非英语语言需要使用 ElevenLabs",
     "streaming": "流式音频",
     "streamingDescription": "在生成时播放音频",
+    "settingsButton": "设置",
     "auth": {
       "signOut": "登出"
     }
@@ -51,6 +52,12 @@
     "requestFailed": "请求失败，请重试。",
     "initChatFailed": "初始化聊天会话失败",
     "invalidAudio": "无效音频",
-    "requestCancelled": "请求已取消"
+    "requestCancelled": "请求已取消",
+    "sessionExpired": "会话已过期，请重新登录。",
+    "noTranscript": "未收到语音转录",
+    "signOutFailed": "登出失败，请重试。"
+  },
+  "success": {
+    "signedOut": "登出成功"
   }
 }

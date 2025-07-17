@@ -1,13 +1,17 @@
+import { useTranslations } from "next-intl";
+
 interface SettingsButtonProps {
   onClick: () => void;
 }
 
 export default function SettingsButton({ onClick }: SettingsButtonProps) {
+  const t = useTranslations("settings");
+  
   return (
     <button
       onClick={onClick}
       className="fixed bottom-6 right-6 p-3 rounded-full bg-neutral-200/80 dark:bg-neutral-800/80 backdrop-blur-md hover:bg-neutral-300/80 dark:hover:bg-neutral-700/80 transition-colors shadow-lg z-50"
-      aria-label="Settings"
+      aria-label={t("settingsButton")}
     >
       <svg
         className="h-6 w-6 text-neutral-700 dark:text-neutral-300"

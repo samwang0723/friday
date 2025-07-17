@@ -42,6 +42,7 @@
     "textToSpeechNonEnglish": "ElevenLabs required for non-English locales",
     "streaming": "Streaming Audio",
     "streamingDescription": "Play audio as it's generated",
+    "settingsButton": "Settings",
     "auth": {
       "signOut": "Sign out"
     }
@@ -51,6 +52,12 @@
     "requestFailed": "Request failed. Please try again.",
     "initChatFailed": "Failed to initialize chat session",
     "invalidAudio": "Invalid audio",
-    "requestCancelled": "Request was cancelled"
+    "requestCancelled": "Request was cancelled",
+    "sessionExpired": "Session expired. Please sign in again.",
+    "noTranscript": "No transcript received",
+    "signOutFailed": "Failed to sign out. Please try again."
+  },
+  "success": {
+    "signedOut": "Signed out successfully"
   }
 }

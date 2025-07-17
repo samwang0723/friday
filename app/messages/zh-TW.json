@@ -42,6 +42,7 @@
     "textToSpeechNonEnglish": "非英語語言需要使用 ElevenLabs",
     "streaming": "串流音訊",
     "streamingDescription": "在生成時播放音訊",
+    "settingsButton": "設定",
     "auth": {
       "signOut": "登出"
     }
@@ -51,6 +52,12 @@
     "requestFailed": "請求失敗，請重試。",
     "initChatFailed": "初始化聊天會話失敗",
     "invalidAudio": "無效音訊",
-    "requestCancelled": "請求已取消"
+    "requestCancelled": "請求已取消",
+    "sessionExpired": "會話已過期，請重新登入。",
+    "noTranscript": "未收到語音轉錄",
+    "signOutFailed": "登出失敗，請重試。"
+  },
+  "success": {
+    "signedOut": "登出成功"
   }
 }

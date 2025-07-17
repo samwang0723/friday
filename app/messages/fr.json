@@ -42,6 +42,7 @@
     "textToSpeechNonEnglish": "ElevenLabs requis pour les langues non-anglaises",
     "streaming": "Audio en streaming",
     "streamingDescription": "Lire l'audio au fur et à mesure de sa génération",
+    "settingsButton": "Paramètres",
     "auth": {
       "signOut": "Se déconnecter"
     }
@@ -51,6 +52,12 @@
     "requestFailed": "Échec de la requête. Veuillez réessayer.",
     "initChatFailed": "Échec de l'initialisation de la session de chat",
     "invalidAudio": "Audio invalide",
-    "requestCancelled": "La requête a été annulée"
+    "requestCancelled": "La requête a été annulée",
+    "sessionExpired": "Session expirée. Veuillez vous reconnecter.",
+    "noTranscript": "Aucune transcription reçue",
+    "signOutFailed": "Échec de la déconnexion. Veuillez réessayer."
+  },
+  "success": {
+    "signedOut": "Déconnexion réussie"
   }
 }

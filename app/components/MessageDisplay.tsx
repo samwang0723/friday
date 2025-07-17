@@ -70,15 +70,13 @@ export default function MessageDisplay({
         !currentMessage && (
           <>
             <p>
-              A fast, open-source voice assistant powered by{" "}
-              <Link href="https://groq.com">Groq</Link>,{" "}
-              <Link href="https://cartesia.ai">Cartesia</Link>,{" "}
-              <Link href="https://www.vad.ricky0123.com/">VAD</Link>, and{" "}
-              <Link href="https://vercel.com">Vercel</Link>.{" "}
-              <Link href="https://github.com/samwang0723/friday" target="_blank">
-                Learn more
-              </Link>
-              .
+              {t("assistant.description", {
+                groq: <Link href="https://groq.com">Groq</Link>,
+                cartesia: <Link href="https://cartesia.ai">Cartesia</Link>,
+                vad: <Link href="https://www.vad.ricky0123.com/">VAD</Link>,
+                vercel: <Link href="https://vercel.com">Vercel</Link>,
+                learnMore: <Link href="https://github.com/samwang0723/friday" target="_blank">{t("assistant.learnMore")}</Link>
+              })}
             </p>
 
             {vadState.loading ? (

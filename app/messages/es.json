@@ -42,6 +42,7 @@
     "textToSpeechNonEnglish": "ElevenLabs requerido para idiomas no ingleses",
     "streaming": "Audio en Transmisión",
     "streamingDescription": "Reproduce audio mientras se genera",
+    "settingsButton": "Configuración",
     "auth": {
       "signOut": "Cerrar sesión"
     }
@@ -51,6 +52,12 @@
     "requestFailed": "La solicitud falló. Por favor intenta de nuevo.",
     "initChatFailed": "Error al inicializar la sesión de chat",
     "invalidAudio": "Audio inválido",
-    "requestCancelled": "Solicitud cancelada"
+    "requestCancelled": "Solicitud cancelada",
+    "sessionExpired": "Sesión expirada. Por favor inicia sesión de nuevo.",
+    "noTranscript": "No se recibió transcripción",
+    "signOutFailed": "Error al cerrar sesión. Por favor intenta de nuevo."
+  },
+  "success": {
+    "signedOut": "Sesión cerrada exitosamente"
   }
 }

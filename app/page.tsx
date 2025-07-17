@@ -253,7 +253,7 @@ export default function Home() {
         updateChatState({ isStreaming: false });
         if (response.status === 401) {
           await auth.logout();
-          toast.error("Session expired. Please sign in again.");
+          toast.error(t("errors.sessionExpired"));
         } else if (response.status === 429) {
           toast.error(t("errors.tooManyRequests"));
         } else {
@@ -268,7 +268,7 @@ export default function Home() {
 
       if (!transcript) {
         updateChatState({ isStreaming: false });
-        toast.error("No transcript received");
+        toast.error(t("errors.noTranscript"));
         return prevMessages;
       }
 
@@ -538,7 +538,7 @@ export default function Home() {
       }
 
       console.error("Request failed:", error);
-      toast.error("Request failed. Please try again.");
+      toast.error(t("errors.requestFailed"));
       return prevMessages;
     }
   }, []);
@@ -667,10 +667,10 @@ export default function Home() {
       stopCurrentRequest();
       startTransition(() => submit("__reset__"));
       await auth.logout();
-      toast.success("Signed out successfully");
+      toast.success(t("success.signedOut"));
     } catch (error) {
       console.error("Failed to logout:", error);
-      toast.error("Failed to sign out. Please try again.");
+      toast.error(t("errors.signOutFailed"));
     }
   };
 
