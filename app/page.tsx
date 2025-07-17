@@ -9,7 +9,7 @@ import VoiceOrb from "@/components/VoiceOrb";
 import { AgentCoreService } from "@/lib/agentCore";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useVADWithOrbControl } from "@/lib/hooks/useVADWithOrbControl";
-import { usePlayer } from "@/lib/usePlayer";
+import { usePlayer } from "@/lib/hooks/usePlayer";
 import { utils } from "@ricky0123/vad-react";
 import { track } from "@vercel/analytics";
 import { useTranslations } from "next-intl";
