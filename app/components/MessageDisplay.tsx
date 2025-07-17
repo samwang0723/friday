@@ -1,6 +1,6 @@
 import Link from "./Link";
 import clsx from "clsx";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 
 type Message = {
   role: "user" | "assistant";
@@ -31,6 +31,7 @@ export default function MessageDisplay({
   vadState
 }: MessageDisplayProps) {
   const t = useTranslations();
+  const locale = useLocale();
 
   return (
     <div
@@ -70,13 +71,53 @@ export default function MessageDisplay({
         !currentMessage && (
           <>
             <p>
-              {t("assistant.description", {
-                groq: <Link href="https://groq.com">Groq</Link>,
-                cartesia: <Link href="https://cartesia.ai">Cartesia</Link>,
-                vad: <Link href="https://www.vad.ricky0123.com/">VAD</Link>,
-                vercel: <Link href="https://vercel.com">Vercel</Link>,
-                learnMore: <Link href="https://github.com/samwang0723/friday" target="_blank">{t("assistant.learnMore")}</Link>
-              })}
+              {locale === 'zh' || locale === 'zh-TW' ? (
+                <>
+                  {t("assistant.description")}{" "}
+                  <Link href="https://groq.com">Groq</Link>、{" "}
+                  <Link href="https://cartesia.ai">Cartesia</Link>、{" "}
+                  <Link href="https://www.vad.ricky0123.com/">VAD</Link> 和{" "}
+                  <Link href="https://vercel.com">Vercel</Link> 驱动的快速开源语音助手。{" "}
+                  <Link href="https://github.com/samwang0723/friday" target="_blank">
+                    {t("assistant.learnMore")}
+                  </Link>
+                  。
+                </>
+              ) : locale === 'ja' ? (
+                <>
+                  <Link href="https://groq.com">Groq</Link>、{" "}
+                  <Link href="https://cartesia.ai">Cartesia</Link>、{" "}
+                  <Link href="https://www.vad.ricky0123.com/">VAD</Link>、{" "}
+                  <Link href="https://vercel.com">Vercel</Link> によって駆動される{t("assistant.description")}{" "}
+                  <Link href="https://github.com/samwang0723/friday" target="_blank">
+                    {t("assistant.learnMore")}
+                  </Link>
+                  。
+                </>
+              ) : locale === 'ko' ? (
+                <>
+                  <Link href="https://groq.com">Groq</Link>、{" "}
+                  <Link href="https://cartesia.ai">Cartesia</Link>、{" "}
+                  <Link href="https://www.vad.ricky0123.com/">VAD</Link>、{" "}
+                  <Link href="https://vercel.com">Vercel</Link> 로 구동되는 {t("assistant.description")}{" "}
+                  <Link href="https://github.com/samwang0723/friday" target="_blank">
+                    {t("assistant.learnMore")}
+                  </Link>
+                  .
+                </>
+              ) : (
+                <>
+                  {t("assistant.description")}{" "}
+                  <Link href="https://groq.com">Groq</Link>,{" "}
+                  <Link href="https://cartesia.ai">Cartesia</Link>,{" "}
+                  <Link href="https://www.vad.ricky0123.com/">VAD</Link>, and{" "}
+                  <Link href="https://vercel.com">Vercel</Link>.{" "}
+                  <Link href="https://github.com/samwang0723/friday" target="_blank">
+                    {t("assistant.learnMore")}
+                  </Link>
+                  .
+                </>
+              )}
             </p>
 
             {vadState.loading ? (

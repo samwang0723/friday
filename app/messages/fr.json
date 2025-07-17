@@ -27,7 +27,7 @@
     "startTalking": "Commencez à parler pour discuter.",
     "loadingSpeech": "Chargement de la détection vocale...",
     "speechDetectionFailed": "Échec du chargement de la détection vocale.",
-    "description": "Un assistant vocal rapide et open-source alimenté par {groq}, {cartesia}, {vad}, et {vercel}. {learnMore}.",
+    "description": "Un assistant vocal rapide et open-source alimenté par",
     "learnMore": "En savoir plus",
     "latency": "({latency}ms)"
   },

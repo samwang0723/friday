@@ -27,7 +27,7 @@
     "startTalking": "開始說話聊天。",
     "loadingSpeech": "正在載入語音識別...",
     "speechDetectionFailed": "語音識別載入失敗。",
-    "description": "一個由 {groq}、{cartesia}、{vad} 和 {vercel} 驅動的快速開源語音助手。{learnMore}。",
+    "description": "一個由",
     "learnMore": "了解更多",
     "latency": "({latency}毫秒)"
   },

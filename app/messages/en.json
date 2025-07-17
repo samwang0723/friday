@@ -27,7 +27,7 @@
     "startTalking": "Start talking to chat.",
     "loadingSpeech": "Loading speech detection...",
     "speechDetectionFailed": "Failed to load speech detection.",
-    "description": "A fast, open-source voice assistant powered by {groq}, {cartesia}, {vad}, and {vercel}. {learnMore}.",
+    "description": "A fast, open-source voice assistant powered by",
     "learnMore": "Learn more",
     "latency": "({latency}ms)"
   },

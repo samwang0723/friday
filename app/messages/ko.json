@@ -27,7 +27,7 @@
     "startTalking": "대화를 시작하려면 말씀해 주세요.",
     "loadingSpeech": "음성 인식 로딩 중...",
     "speechDetectionFailed": "음성 인식 로드에 실패했습니다.",
-    "description": "{groq}, {cartesia}, {vad}, {vercel}로 구동되는 빠르고 오픈소스인 음성 어시스턴트입니다. {learnMore}.",
+    "description": "빠르고 오픈소스인 음성 어시스턴트입니다.",
     "learnMore": "자세히 알아보기",
     "latency": "({latency}ms)"
   },

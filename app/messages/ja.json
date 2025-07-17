@@ -27,7 +27,7 @@
     "startTalking": "話しかけてチャットを開始してください。",
     "loadingSpeech": "音声認識を読み込み中...",
     "speechDetectionFailed": "音声認識の読み込みに失敗しました。",
-    "description": "{groq}、{cartesia}、{vad}、{vercel}によって駆動される高速でオープンソースの音声アシスタントです。{learnMore}。",
+    "description": "高速でオープンソースの音声アシスタントです。",
     "learnMore": "詳細を見る",
     "latency": "({latency}ms)"
   },

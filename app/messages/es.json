@@ -27,7 +27,7 @@
     "startTalking": "Empieza a hablar para chatear.",
     "loadingSpeech": "Cargando detección de voz...",
     "speechDetectionFailed": "Error al cargar la detección de voz.",
-    "description": "Un asistente de voz rápido y de código abierto impulsado por {groq}, {cartesia}, {vad} y {vercel}. {learnMore}.",
+    "description": "Un asistente de voz rápido y de código abierto impulsado por",
     "learnMore": "Saber más",
     "latency": "({latency}ms)"
   },
