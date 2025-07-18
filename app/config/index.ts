@@ -80,9 +80,9 @@ export const ttsConfigs: Record<string, TextToSpeechConfig> = {
     provider: "minimax",
     modelName: process.env.MINIMAX_TTS_MODEL || "speech-02-hd",
     apiKey: process.env.MINIMAX_API_KEY,
-    voiceId: process.env.MINIMAX_VOICE_ID,
+    voiceId: process.env.MINIMAX_VOICE_ID || "male-qn-qingse",
     groupId: process.env.MINIMAX_GROUP_ID,
-    baseURL: "https://api.minimaxi.chat"
+    baseURL: "https://api.minimax.io"
   }
 };
 

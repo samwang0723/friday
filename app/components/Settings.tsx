@@ -31,6 +31,8 @@ export default function Settings({
 
   // Check if current locale is English
   const isEnglishLocale = locale === "en";
+  // Check if current locale is Chinese (Traditional or Simplified)
+  const isChineseLocale = locale === "zh" || locale === "zh-TW" || locale === "zh-CN";
 
   // Helper functions for localStorage persistence
   const loadSettingsFromStorage = (): SettingsState => {
@@ -38,7 +40,7 @@ export default function Settings({
       // Server-side rendering fallback
       return {
         sttEngine: "groq",
-        ttsEngine: "elevenlabs",
+        ttsEngine: "elevenlabs", // Will be updated by useEffect based on locale
         streaming: true
       };
     }
@@ -104,13 +106,20 @@ export default function Settings({
     onSettingsChange(newSettings);
   };
 
-  // Force TTS engine to ElevenLabs for non-English locales
+  // Handle TTS engine selection based on locale
   useEffect(() => {
-    if (!isEnglishLocale && settings.ttsEngine !== "elevenlabs") {
+    if (isChineseLocale) {
+      // For Chinese locales, default to Minimax if not already set to a valid Chinese option
+      if (!["minimax", "elevenlabs"].includes(settings.ttsEngine)) {
+        console.log(`Setting TTS engine to Minimax for Chinese locale: ${locale}`);
+        updateSetting("ttsEngine", "minimax");
+      }
+    } else if (!isEnglishLocale && settings.ttsEngine !== "elevenlabs") {
+      // For other non-English locales, force ElevenLabs
       console.log(`Forcing TTS engine to ElevenLabs for locale: ${locale}`);
       updateSetting("ttsEngine", "elevenlabs");
     }
-  }, [locale, isEnglishLocale, settings.ttsEngine]);
+  }, [locale, isEnglishLocale, isChineseLocale, settings.ttsEngine]);
 
   const handleLogout = () => {
     if (!isAuthenticated) return;
@@ -221,6 +230,8 @@ export default function Settings({
                 <span className="text-gray-400 text-xs">
                   {isEnglishLocale
                     ? t("textToSpeechDescription")
+                    : isChineseLocale
+                    ? t("textToSpeechChinese")
                     : t("textToSpeechNonEnglish")}
                 </span>
               </div>
@@ -230,11 +241,11 @@ export default function Settings({
               name="ttsEngine"
               value={settings.ttsEngine}
               onChange={e => updateSetting("ttsEngine", e.target.value)}
-              disabled={!isEnglishLocale}
+              disabled={!isEnglishLocale && !isChineseLocale}
               className={clsx(
                 "bg-white/10 text-white text-sm rounded-md px-3 py-1 border-none focus:ring-2 focus:ring-blue-500 focus:outline-none appearance-none bg-no-repeat bg-right pr-8",
                 {
-                  "opacity-50 cursor-not-allowed": !isEnglishLocale
+                  "opacity-50 cursor-not-allowed": !isEnglishLocale && !isChineseLocale
                 }
               )}
               style={{
@@ -246,6 +257,9 @@ export default function Settings({
               <option value="elevenlabs">ElevenLabs</option>
               <option value="cartesia" disabled={!isEnglishLocale}>
                 Cartesia{!isEnglishLocale ? " (English)" : ""}
+              </option>
+              <option value="minimax" disabled={!isChineseLocale}>
+                Minimax{!isChineseLocale ? " (Chinese)" : ""}
               </option>
             </select>
           </div>

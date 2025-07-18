@@ -75,7 +75,7 @@ function isSpeechLike(audioData: Float32Array, config: VADOrbConfig): boolean {
   return true;
 }
 
-interface VADOrbConfig {
+export interface VADOrbConfig {
   onSpeechStart?: () => void;
   onSpeechEnd?: (audio: Float32Array) => void;
   isStreaming?: boolean;

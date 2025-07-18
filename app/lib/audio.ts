@@ -198,6 +198,79 @@ export async function synthesizeSpeech(
       return new Response(f32leData, { status: 200 });
     }
 
+    if (engine === "minimax") {
+      const config = ttsConfigs.minimax as TextToSpeechConfig;
+      if (!config || !config.apiKey || !config.groupId) {
+        console.error("Minimax API key or Group ID is not configured for TTS.");
+        return new Response("Minimax TTS not configured", { status: 500 });
+      }
+
+      if (abortSignal?.aborted) {
+        return new Response("TTS operation cancelled", { status: 200 });
+      }
+
+      // Additional validation for voice ID
+      if (!config.voiceId?.trim()) {
+        console.error("Minimax voice ID is empty");
+        return new Response("Invalid voice configuration", { status: 500 });
+      }
+
+      try {
+        const url = `https://api.minimax.io/v1/t2a_v2?GroupId=${config.groupId}`;
+        const headers = {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${config.apiKey}`
+        };
+
+        const body = {
+          model: config.modelName,
+          text: sanitizedText,
+          stream: false,
+          voice_setting: {
+            voice_id: config.voiceId,
+            speed: 1.0,
+            vol: 1.0,
+            pitch: 0
+          },
+          audio_setting: {
+            sample_rate: 24000,
+            bitrate: 128000,
+            format: "pcm",
+            channel: 1
+          }
+        };
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body),
+          signal: abortSignal
+        });
+
+        if (!response.ok) {
+          throw new Error(`Minimax API error: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (result.data && result.data.audio) {
+          // Decode hex audio data (PCM format from Minimax)
+          const audioHex = result.data.audio;
+          const pcmBuffer = Buffer.from(audioHex, "hex");
+
+          // Convert to F32LE format to match other vendors
+          const f32leData = convertS16LEToF32LE(pcmBuffer);
+
+          return new Response(f32leData, { status: 200 });
+        } else {
+          throw new Error("No audio data received from Minimax");
+        }
+      } catch (error) {
+        console.error("Minimax TTS synthesis failed:", error);
+        return new Response("Minimax TTS synthesis failed", { status: 500 });
+      }
+    }
+
     throw new Error(`Unsupported TTS engine: ${engine}`);
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
@@ -240,6 +313,19 @@ export function synthesizeSpeechStream(
           }
           console.log("ElevenLabs TTS config validated:", {
             hasApiKey: !!config.apiKey,
+            voiceId: config.voiceId,
+            modelName: config.modelName
+          });
+        } else if (engine === "minimax") {
+          const config = ttsConfigs.minimax as TextToSpeechConfig;
+          if (!config || !config.apiKey || !config.groupId) {
+            throw new Error(
+              "Minimax API key or Group ID is not configured for TTS."
+            );
+          }
+          console.log("Minimax TTS config validated:", {
+            hasApiKey: !!config.apiKey,
+            hasGroupId: !!config.groupId,
             voiceId: config.voiceId,
             modelName: config.modelName
           });
@@ -448,6 +534,130 @@ export function synthesizeSpeechStream(
                 } else {
                   console.error("Error processing text chunk:", error);
                 }
+              }
+            }
+          };
+
+          await processTextChunks(processTextChunk);
+        } else if (engine === "minimax") {
+          const config = ttsConfigs.minimax as TextToSpeechConfig;
+          if (!config || !config.apiKey || !config.groupId) {
+            throw new Error(
+              "Minimax API key or Group ID is not configured for TTS."
+            );
+          }
+
+          const processTextChunk = async (text: string) => {
+            if (abortSignal?.aborted) return;
+
+            // Validate and sanitize text content
+            const sanitizedText = sanitizeTextForTTS(text);
+            if (!sanitizedText) return;
+
+            try {
+              // Validate configuration before making API call
+              if (!config.voiceId || config.voiceId.trim() === "") {
+                throw new Error("Minimax voice ID is not configured or empty");
+              }
+
+              const url = `https://api.minimax.io/v1/t2a_v2?GroupId=${config.groupId}`;
+              const headers = {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${config.apiKey}`
+              };
+
+              const body = {
+                model: config.modelName,
+                text: sanitizedText,
+                stream: true,
+                voice_setting: {
+                  voice_id: config.voiceId,
+                  speed: 1.0,
+                  vol: 1.0,
+                  pitch: 0
+                },
+                audio_setting: {
+                  sample_rate: 24000,
+                  bitrate: 128000,
+                  format: "pcm",
+                  channel: 1
+                }
+              };
+
+              const response = await fetch(url, {
+                method: "POST",
+                headers,
+                body: JSON.stringify(body),
+                signal: abortSignal
+              });
+
+              if (!response.ok) {
+                throw new Error(`Minimax API error: ${response.status}`);
+              }
+
+              if (!response.body) {
+                throw new Error("No response body from Minimax");
+              }
+
+              const reader = response.body.getReader();
+              const decoder = new TextDecoder();
+              let buffer = "";
+
+              try {
+                while (true) {
+                  if (abortSignal?.aborted) return;
+
+                  const { done, value } = await reader.read();
+                  if (done) break;
+
+                  buffer += decoder.decode(value, { stream: true });
+                  
+                  // Split by newlines to process complete JSON objects
+                  const lines = buffer.split("\n");
+                  
+                  // Keep the last incomplete line in buffer
+                  buffer = lines.pop() || "";
+
+                  for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    if (trimmedLine === "" || !trimmedLine.startsWith("data: ")) continue;
+
+                    try {
+                      // Extract JSON from SSE format: "data: {...}"
+                      const jsonStr = trimmedLine.slice(6); // Remove "data: " prefix
+                      const data = JSON.parse(jsonStr);
+                      
+                      // Process audio chunks with status: 1 (intermediate chunks)
+                      if (data.data && data.data.audio && data.data.status === 1) {
+                        // Decode hex audio data (PCM format from Minimax)
+                        const audioHex = data.data.audio;
+                        const pcmBuffer = Buffer.from(audioHex, "hex");
+
+                        // Convert to F32LE format to match other vendors
+                        const f32leData = convertS16LEToF32LE(pcmBuffer);
+                        controller.enqueue(f32leData);
+                      }
+                      // Status 2 indicates final chunk with extra_info - we can ignore it
+                    } catch (parseError) {
+                      console.warn("Minimax streaming parse error:", parseError, "Line:", trimmedLine);
+                      continue;
+                    }
+                  }
+                }
+              } finally {
+                reader.releaseLock();
+              }
+            } catch (error) {
+              if (error instanceof Error && error.name !== "AbortError") {
+                console.error("Error processing Minimax text chunk:", {
+                  originalText: text,
+                  sanitizedText: sanitizedText,
+                  textLength: sanitizedText.length,
+                  voiceId: config.voiceId,
+                  groupId: config.groupId,
+                  modelName: config.modelName,
+                  error: error.message
+                });
               }
             }
           };
