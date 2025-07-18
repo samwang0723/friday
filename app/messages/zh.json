@@ -39,7 +39,7 @@
     "speechToTextDescription": "选择您首选的语音转文本引擎",
     "textToSpeech": "文本转语音引擎",
     "textToSpeechDescription": "选择您首选的文本转语音引擎",
-    "textToSpeechChinese": "中文语音支持 Minimax 和 ElevenLabs",
+    "textToSpeechChineseOnly": "专为中文优化的 Minimax 语音",
     "textToSpeechNonEnglish": "非英语语言需要使用 ElevenLabs",
     "streaming": "流式音频",
     "streamingDescription": "在生成时播放音频",

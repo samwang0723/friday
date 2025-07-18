@@ -87,7 +87,7 @@ export default function Home() {
       "TTS generation failed": t("errors.ttsGenerationFailed"),
       "Request failed": t("errors.requestFailed")
     };
-    
+
     return errorMap[apiErrorMessage] || apiErrorMessage || t("common.error");
   };
   const [clientLocale, setClientLocale] = useState<string>("en");

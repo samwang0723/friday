@@ -52,11 +52,17 @@ function calculateSpectralCentroid(
 }
 
 // Check if audio has speech-like characteristics
-function isSpeechLike(audioData: Float32Array, config: VADOrbConfig): boolean {
-  // RMS energy check
+function isSpeechLike(audioData: Float32Array, config: VADOrbConfig, isAudioPlaying: boolean = false): boolean {
+  // RMS energy check with dynamic threshold during TTS playback
   if (config.rmsEnergyThreshold !== undefined) {
     const rmsLevel = calculateRMSdBFS(audioData);
-    if (rmsLevel < config.rmsEnergyThreshold) {
+    // Increase threshold during TTS playback to prevent audio feedback loops
+    const threshold = isAudioPlaying 
+      ? config.rmsEnergyThreshold * 3 
+      : config.rmsEnergyThreshold;
+    
+    if (rmsLevel < threshold) {
+      console.log(`VAD: RMS ${rmsLevel.toFixed(2)}dBFS below threshold ${threshold.toFixed(2)}dBFS (${isAudioPlaying ? 'TTS playing' : 'normal'})`);
       return false;
     }
   }
@@ -168,7 +174,7 @@ export function useVADWithOrbControl(config: VADOrbConfig) {
         }
 
         // Apply comprehensive speech-like analysis
-        if (speechAnalysis.isValid && !isSpeechLike(audio, config)) {
+        if (speechAnalysis.isValid && !isSpeechLike(audio, config, config.isStreaming)) {
           console.log(`VAD: Audio failed speech-like analysis`);
           speechAnalysis.isValid = false;
         }

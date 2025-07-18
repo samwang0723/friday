@@ -39,7 +39,7 @@
     "speechToTextDescription": "Choose your preferred STT engine",
     "textToSpeech": "Text to Speech Engine",
     "textToSpeechDescription": "Choose your preferred TTS engine",
-    "textToSpeechChinese": "Chinese voice support via Minimax and ElevenLabs",
+    "textToSpeechChineseOnly": "Optimized Chinese voice via Minimax",
     "textToSpeechNonEnglish": "ElevenLabs required for non-English locales",
     "streaming": "Streaming Audio",
     "streamingDescription": "Play audio as it's generated",

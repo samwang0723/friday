@@ -109,8 +109,8 @@ export default function Settings({
   // Handle TTS engine selection based on locale
   useEffect(() => {
     if (isChineseLocale) {
-      // For Chinese locales, default to Minimax if not already set to a valid Chinese option
-      if (!["minimax", "elevenlabs"].includes(settings.ttsEngine)) {
+      // For Chinese locales, force Minimax only
+      if (settings.ttsEngine !== "minimax") {
         console.log(`Setting TTS engine to Minimax for Chinese locale: ${locale}`);
         updateSetting("ttsEngine", "minimax");
       }
@@ -231,7 +231,7 @@ export default function Settings({
                   {isEnglishLocale
                     ? t("textToSpeechDescription")
                     : isChineseLocale
-                    ? t("textToSpeechChinese")
+                    ? t("textToSpeechChineseOnly")
                     : t("textToSpeechNonEnglish")}
                 </span>
               </div>
@@ -254,13 +254,15 @@ export default function Settings({
                 backgroundSize: "1.25em"
               }}
             >
-              <option value="elevenlabs">ElevenLabs</option>
-              <option value="cartesia" disabled={!isEnglishLocale}>
-                Cartesia{!isEnglishLocale ? " (English)" : ""}
-              </option>
-              <option value="minimax" disabled={!isChineseLocale}>
-                Minimax{!isChineseLocale ? " (Chinese)" : ""}
-              </option>
+              {!isChineseLocale && (
+                <option value="elevenlabs">ElevenLabs</option>
+              )}
+              {isEnglishLocale && (
+                <option value="cartesia">Cartesia</option>
+              )}
+              {isChineseLocale && (
+                <option value="minimax">Minimax</option>
+              )}
             </select>
           </div>
 
