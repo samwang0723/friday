@@ -676,6 +676,7 @@ export default function Home() {
     onSpeechStart,
     onSpeechEnd,
     isStreaming: chatState.isStreaming,
+    isAuthenticated: auth.isAuthenticated,
     positiveSpeechThreshold: 0.7,
     minSpeechFrames: 6,
     rmsEnergyThreshold: -35,
@@ -699,8 +700,10 @@ export default function Home() {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (auth.isAuthenticated && !vadState.loading && !vadState.errored) {
+        console.log("VAD: Starting VAD after successful authentication");
         vad.start();
       } else if (!auth.isAuthenticated) {
+        console.log("VAD: Pausing VAD due to authentication loss");
         vad.pause();
       }
     }, 100); // Small delay to ensure VAD is ready

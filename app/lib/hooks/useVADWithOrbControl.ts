@@ -52,17 +52,23 @@ function calculateSpectralCentroid(
 }
 
 // Check if audio has speech-like characteristics
-function isSpeechLike(audioData: Float32Array, config: VADOrbConfig, isAudioPlaying: boolean = false): boolean {
+function isSpeechLike(
+  audioData: Float32Array,
+  config: VADOrbConfig,
+  isAudioPlaying: boolean = false
+): boolean {
   // RMS energy check with dynamic threshold during TTS playback
   if (config.rmsEnergyThreshold !== undefined) {
     const rmsLevel = calculateRMSdBFS(audioData);
     // Increase threshold during TTS playback to prevent audio feedback loops
-    const threshold = isAudioPlaying 
-      ? config.rmsEnergyThreshold * 3 
+    const threshold = isAudioPlaying
+      ? config.rmsEnergyThreshold * 3
       : config.rmsEnergyThreshold;
-    
+
     if (rmsLevel < threshold) {
-      console.log(`VAD: RMS ${rmsLevel.toFixed(2)}dBFS below threshold ${threshold.toFixed(2)}dBFS (${isAudioPlaying ? 'TTS playing' : 'normal'})`);
+      console.log(
+        `VAD: RMS ${rmsLevel.toFixed(2)}dBFS below threshold ${threshold.toFixed(2)}dBFS (${isAudioPlaying ? "TTS playing" : "normal"})`
+      );
       return false;
     }
   }
@@ -85,6 +91,7 @@ export interface VADOrbConfig {
   onSpeechStart?: () => void;
   onSpeechEnd?: (audio: Float32Array) => void;
   isStreaming?: boolean;
+  isAuthenticated?: boolean; // Add authentication state
   positiveSpeechThreshold?: number;
   minSpeechFrames?: number;
   rmsEnergyThreshold?: number; // RMS energy threshold in dBFS (e.g., -40)
@@ -144,7 +151,7 @@ export function useVADWithOrbControl(config: VADOrbConfig) {
     if (!isLikelyEcho) {
       config.onSpeechStart?.();
     }
-  }, [config.isStreaming, config.onSpeechStart]);
+  }, [config]);
 
   const onSpeechEnd = useCallback(
     (audio: Float32Array) => {
@@ -174,7 +181,10 @@ export function useVADWithOrbControl(config: VADOrbConfig) {
         }
 
         // Apply comprehensive speech-like analysis
-        if (speechAnalysis.isValid && !isSpeechLike(audio, config, config.isStreaming)) {
+        if (
+          speechAnalysis.isValid &&
+          !isSpeechLike(audio, config, config.isStreaming)
+        ) {
           console.log(`VAD: Audio failed speech-like analysis`);
           speechAnalysis.isValid = false;
         }
@@ -211,9 +221,17 @@ export function useVADWithOrbControl(config: VADOrbConfig) {
 
   const [audioStream, setAudioStream] = useState<MediaStream | undefined>();
 
-  // Create enhanced audio stream on mount
+  // Create enhanced audio stream only when authenticated
   useEffect(() => {
     const createEnhancedStream = async () => {
+      // Only create audio stream if authenticated
+      if (!config.isAuthenticated) {
+        console.log(
+          "VAD: User not authenticated, skipping audio stream creation"
+        );
+        return;
+      }
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
@@ -247,15 +265,25 @@ export function useVADWithOrbControl(config: VADOrbConfig) {
       }
     };
 
-    createEnhancedStream();
-
-    // Cleanup stream on unmount
-    return () => {
+    const cleanupStream = () => {
       if (audioStream) {
+        console.log("VAD: Cleaning up audio stream");
         audioStream.getTracks().forEach(track => track.stop());
+        setAudioStream(undefined);
       }
     };
-  }, []);
+
+    if (config.isAuthenticated) {
+      createEnhancedStream();
+    } else {
+      cleanupStream();
+    }
+
+    // Cleanup stream on unmount or when authentication changes
+    return () => {
+      cleanupStream();
+    };
+  }, [config.isAuthenticated]);
 
   const onVADMisfire = useCallback(() => {
     console.log("VAD: onVADMisfire - false positive speech detection");
@@ -290,8 +318,18 @@ export function useVADWithOrbControl(config: VADOrbConfig) {
     errored: vadState.errored,
     userSpeaking: vadState.shouldShowOrb, // Use filtered state for UI
     actualUserSpeaking: vadState.actualUserSpeaking, // Real detection for logic
-    start: () => vadRef.current?.start(),
-    pause: () => vadRef.current?.pause(),
+    start: () => {
+      if (config.isAuthenticated) {
+        console.log("VAD: Starting VAD (authenticated)");
+        vadRef.current?.start();
+      } else {
+        console.log("VAD: Cannot start VAD - user not authenticated");
+      }
+    },
+    pause: () => {
+      console.log("VAD: Pausing VAD");
+      vadRef.current?.pause();
+    },
     vad: vadRef.current
   };
 }
