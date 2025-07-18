@@ -713,8 +713,9 @@ export default function Home() {
     },
     {
       isStreaming: chatState.isStreaming,
-      isAuthenticated: auth.isAuthenticated && settingsLoaded,
-      audioEnabled: settings.audioEnabled
+      isAuthenticated: auth.isAuthenticated,
+      audioEnabled: settings.audioEnabled,
+      settingsLoaded: settingsLoaded
     }
   );
 

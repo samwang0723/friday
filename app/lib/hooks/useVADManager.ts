@@ -15,23 +15,47 @@ function calculateRMSdBFS(audioData: Float32Array): number {
 function calculateSpectralCentroid(audioData: Float32Array): number {
   const fftSize = 2048;
   const sampleRate = 16000;
-  const fft = new Float32Array(fftSize);
+  const halfSize = fftSize / 2;
   
+  // Pad or truncate audio data to match FFT size
+  const paddedData = new Float32Array(fftSize);
   for (let i = 0; i < Math.min(audioData.length, fftSize); i++) {
-    fft[i] = audioData[i];
-  }
-
-  let magnitude = 0;
-  let weightedSum = 0;
-
-  for (let i = 0; i < fftSize / 2; i++) {
-    const freq = (i * sampleRate) / fftSize;
-    const mag = Math.abs(fft[i]);
-    magnitude += mag;
-    weightedSum += freq * mag;
+    paddedData[i] = audioData[i];
   }
   
-  return magnitude > 0 ? weightedSum / magnitude : 0;
+  // Apply windowing function (Hamming window)
+  for (let i = 0; i < fftSize; i++) {
+    paddedData[i] *= 0.54 - 0.46 * Math.cos(2 * Math.PI * i / (fftSize - 1));
+  }
+  
+  // Compute FFT using DFT (simplified for this use case)
+  const magnitudes = new Float32Array(halfSize);
+  
+  for (let k = 0; k < halfSize; k++) {
+    let real = 0;
+    let imag = 0;
+    
+    for (let n = 0; n < fftSize; n++) {
+      const angle = (-2 * Math.PI * k * n) / fftSize;
+      real += paddedData[n] * Math.cos(angle);
+      imag += paddedData[n] * Math.sin(angle);
+    }
+    
+    magnitudes[k] = Math.sqrt(real * real + imag * imag);
+  }
+  
+  // Calculate spectral centroid
+  let numerator = 0;
+  let denominator = 0;
+  
+  for (let i = 1; i < halfSize; i++) { // Skip DC component
+    const freq = (i * sampleRate) / fftSize;
+    const mag = magnitudes[i];
+    numerator += freq * mag;
+    denominator += mag;
+  }
+  
+  return denominator > 0 ? numerator / denominator : 0;
 }
 
 // Enhanced speech detection using multiple audio features
@@ -43,17 +67,27 @@ function isSpeechLike(
   const rmsLevel = calculateRMSdBFS(audio);
   const spectralCentroid = calculateSpectralCentroid(audio);
 
+  // RMS energy threshold: speech needs sufficient energy (higher than threshold)
   const rmsThreshold = isStreaming ? -40 : config.rmsEnergyThreshold || -35;
-  const centroidThreshold = isStreaming
-    ? 800
-    : config.spectralCentroidThreshold || 1000;
-
   if (rmsLevel < rmsThreshold) {
-    return false;
+    return false; // Too quiet, likely silence or background noise
   }
 
+  // Spectral centroid threshold: speech has characteristic frequency distribution
+  // Human speech typically has centroid between 1000-3000 Hz
+  // Lower values (< 1000 Hz) are often low-frequency noise, breathing, or rumble
+  const centroidThreshold = isStreaming
+    ? 800  // More lenient during streaming to allow interruptions
+    : config.spectralCentroidThreshold || 1000;
+    
   if (spectralCentroid < centroidThreshold) {
-    return false;
+    return false; // Too low frequency, likely not speech
+  }
+
+  // Optional: Also filter out very high frequency content (> 4000 Hz)
+  // which is typically noise, clicks, or artifacts
+  if (spectralCentroid > 4000) {
+    return false; // Too high frequency, likely noise or artifacts
   }
 
   return true;
@@ -76,6 +110,7 @@ export interface VADContext {
   isStreaming?: boolean;
   isAuthenticated?: boolean;
   audioEnabled?: boolean;
+  settingsLoaded?: boolean;
 }
 
 export interface VADState {
@@ -202,11 +237,23 @@ export function useVADManager(
 
   // Create enhanced audio stream
   const [audioStream, setAudioStream] = useState<MediaStream | undefined>();
+  const audioStreamRef = useRef<MediaStream | undefined>(undefined);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    audioStreamRef.current = audioStream;
+  }, [audioStream]);
 
   useEffect(() => {
     const createEnhancedStream = async () => {
-      if (!context.isAuthenticated || !context.audioEnabled) {
+      // Clean up existing stream first
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop());
+        audioStreamRef.current = undefined;
         setAudioStream(undefined);
+      }
+
+      if (!context.isAuthenticated || !context.audioEnabled || !context.settingsLoaded) {
         return;
       }
 
@@ -220,6 +267,7 @@ export function useVADManager(
             autoGainControl: true
           }
         });
+        audioStreamRef.current = stream;
         setAudioStream(stream);
       } catch (error) {
         console.error("VAD: Failed to create audio stream:", error);
@@ -230,11 +278,13 @@ export function useVADManager(
     createEnhancedStream();
 
     return () => {
-      if (audioStream) {
-        audioStream.getTracks().forEach(track => track.stop());
+      // Use ref to ensure we clean up the current stream
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop());
+        audioStreamRef.current = undefined;
       }
     };
-  }, [context.isAuthenticated, context.audioEnabled]);
+  }, [context.isAuthenticated, context.audioEnabled, context.settingsLoaded]);
 
   // Initialize VAD with error handling
   const vad = useMicVAD({
@@ -260,9 +310,9 @@ export function useVADManager(
 
   // Auto-manage VAD based on context
   useEffect(() => {
-    if (!context.isAuthenticated || !context.audioEnabled) {
+    if (!context.isAuthenticated || !context.audioEnabled || !context.settingsLoaded) {
       if (isActiveRef.current) {
-        console.log("VAD: Pausing due to authentication/audio disabled");
+        console.log("VAD: Pausing due to authentication/audio disabled/settings not loaded");
         vad.pause();
         isActiveRef.current = false;
       }
@@ -278,11 +328,11 @@ export function useVADManager(
       vad.start();
       isActiveRef.current = true;
     }
-  }, [context.isAuthenticated, context.audioEnabled, vad.loading, vad.errored]);
+  }, [context.isAuthenticated, context.audioEnabled, context.settingsLoaded, vad.loading, vad.errored]);
 
   const start = useCallback(() => {
-    if (!context.isAuthenticated || !context.audioEnabled) {
-      console.log("VAD: Cannot start - not authenticated or audio disabled");
+    if (!context.isAuthenticated || !context.audioEnabled || !context.settingsLoaded) {
+      console.log("VAD: Cannot start - not authenticated, audio disabled, or settings not loaded");
       return;
     }
 
@@ -296,7 +346,7 @@ export function useVADManager(
       vad.start();
       isActiveRef.current = true;
     }
-  }, [context.isAuthenticated, context.audioEnabled, vad.loading, vad.errored]);
+  }, [context.isAuthenticated, context.audioEnabled, context.settingsLoaded, vad.loading, vad.errored]);
 
   const pause = useCallback(() => {
     if (isActiveRef.current) {

@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import LanguageSwitcher from "./LanguageSwitcher";
 
 interface SettingsProps {
@@ -38,13 +38,13 @@ export default function Settings({
   const isChineseLocale =
     locale === "zh" || locale === "zh-TW" || locale === "zh-CN";
 
-  const updateSetting = (key: string, value: unknown) => {
+  const updateSetting = useCallback((key: string, value: unknown) => {
     const newSettings = {
       ...settings,
       [key]: value
     };
     onSettingsChange(newSettings);
-  };
+  }, [settings, onSettingsChange]);
 
   // Auto-switch TTS engine based on locale
   useEffect(() => {
