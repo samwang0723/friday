@@ -13,7 +13,6 @@ import { useVADWithOrbControl } from "@/lib/hooks/useVADWithOrbControl";
 import { utils } from "@ricky0123/vad-react";
 import { track } from "@vercel/analytics";
 import { useLocale, useTranslations } from "next-intl";
-import Image from "next/image";
 import React, {
   startTransition,
   useActionState,
@@ -730,18 +729,6 @@ export default function Home() {
 
   return (
     <>
-      {/* Company Logo */}
-      <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-10">
-        <Image
-          src="/friday.png"
-          alt="Friday Intelligence Inc."
-          width={200}
-          height={200}
-          priority
-          className="object-contain w-32 h-32 sm:w-40 sm:h-40"
-        />
-      </div>
-
       <div className="pb-4 min-h-28" />
 
       {!auth.isAuthenticated && <GoogleLoginButton disabled={auth.loading} />}
