@@ -21,11 +21,12 @@ export default function LanguageSwitcher({
     if (newLocale === locale) return;
 
     startTransition(() => {
-      // Set locale cookie via URL parameter
-      const url = new URL(window.location.href);
-      url.searchParams.set("locale", newLocale);
+      // Set locale cookie directly
+      document.cookie = `locale=${newLocale}; path=/; max-age=${365 * 24 * 60 * 60}`;
 
       // Navigate to current page with new locale parameter
+      const url = new URL(window.location.href);
+      url.searchParams.set("locale", newLocale);
       router.push(url.pathname + url.search);
 
       // Refresh to apply new locale
