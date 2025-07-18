@@ -57,6 +57,7 @@ export function useSettings() {
         console.error("Failed to load settings from localStorage:", error);
       }
 
+      console.log("No saved settings found, using defaults");
       return DEFAULT_SETTINGS;
     };
 

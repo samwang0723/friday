@@ -864,6 +864,7 @@ export default function Home() {
         onLogout={handleLogout}
         isAuthenticated={auth.isAuthenticated}
         settings={settings}
+        settingsLoaded={settingsLoaded}
         onSettingsChange={handleSettingsChange}
       />
 

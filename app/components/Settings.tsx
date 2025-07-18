@@ -16,6 +16,7 @@ interface SettingsProps {
     streaming: boolean;
     audioEnabled: boolean;
   };
+  settingsLoaded: boolean;
   onSettingsChange: (settings: SettingsProps["settings"]) => void;
 }
 
@@ -25,6 +26,7 @@ export default function Settings({
   onLogout,
   isAuthenticated,
   settings,
+  settingsLoaded,
   onSettingsChange
 }: SettingsProps) {
   const t = useTranslations("settings");
@@ -44,23 +46,46 @@ export default function Settings({
     onSettingsChange(newSettings);
   };
 
-  // Handle TTS engine selection based on locale
+  // Handle TTS engine selection based on locale - only for first-time users
   useEffect(() => {
-    if (isChineseLocale) {
-      // For Chinese locales, force Minimax only
-      if (settings.ttsEngine !== "minimax") {
+    // Only apply locale-based defaults if settings have been loaded
+    // and this is the first time (no saved settings existed)
+    if (!settingsLoaded) return;
+
+    // Check if this is a fresh installation (using default settings)
+    const isDefaultSettings =
+      settings.sttEngine === "groq" &&
+      settings.ttsEngine === "elevenlabs" &&
+      settings.streaming === true &&
+      settings.audioEnabled === true;
+
+    // Only apply locale-based defaults for fresh installations
+    if (isDefaultSettings) {
+      if (isChineseLocale && settings.ttsEngine !== "minimax") {
         console.log(
-          "Setting TTS engine to Minimax for Chinese locale:",
+          "Setting TTS engine to Minimax for Chinese locale (first-time user):",
           locale
         );
         updateSetting("ttsEngine", "minimax");
+      } else if (
+        !isEnglishLocale &&
+        !isChineseLocale &&
+        settings.ttsEngine !== "elevenlabs"
+      ) {
+        console.log(
+          "Setting TTS engine to ElevenLabs for locale (first-time user):",
+          locale
+        );
+        updateSetting("ttsEngine", "elevenlabs");
       }
-    } else if (!isEnglishLocale && settings.ttsEngine !== "elevenlabs") {
-      // For other non-English locales, force ElevenLabs
-      console.log("Forcing TTS engine to ElevenLabs for locale:", locale);
-      updateSetting("ttsEngine", "elevenlabs");
     }
-  }, [locale, isEnglishLocale, isChineseLocale, settings.ttsEngine]);
+  }, [
+    locale,
+    isEnglishLocale,
+    isChineseLocale,
+    settings.ttsEngine,
+    settingsLoaded
+  ]);
 
   const handleLogout = () => {
     if (!isAuthenticated) return;
