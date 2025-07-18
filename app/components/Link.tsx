@@ -1,4 +1,4 @@
-interface LinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {}
+type LinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement>;
 
 export default function Link(props: LinkProps) {
   return (

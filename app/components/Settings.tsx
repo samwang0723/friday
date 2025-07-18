@@ -33,7 +33,8 @@ export default function Settings({
   // Check if current locale is English
   const isEnglishLocale = locale === "en";
   // Check if current locale is Chinese (Traditional or Simplified)
-  const isChineseLocale = locale === "zh" || locale === "zh-TW" || locale === "zh-CN";
+  const isChineseLocale =
+    locale === "zh" || locale === "zh-TW" || locale === "zh-CN";
 
   // Helper functions for localStorage persistence
   const loadSettingsFromStorage = (): SettingsState => {
@@ -56,7 +57,8 @@ export default function Settings({
           sttEngine: parsed.sttEngine || "groq",
           ttsEngine: parsed.ttsEngine || "elevenlabs",
           streaming: parsed.streaming !== undefined ? parsed.streaming : true,
-          audioEnabled: parsed.audioEnabled !== undefined ? parsed.audioEnabled : true
+          audioEnabled:
+            parsed.audioEnabled !== undefined ? parsed.audioEnabled : true
         };
       }
     } catch (error) {
@@ -116,7 +118,9 @@ export default function Settings({
     if (isChineseLocale) {
       // For Chinese locales, force Minimax only
       if (settings.ttsEngine !== "minimax") {
-        console.log(`Setting TTS engine to Minimax for Chinese locale: ${locale}`);
+        console.log(
+          `Setting TTS engine to Minimax for Chinese locale: ${locale}`
+        );
         updateSetting("ttsEngine", "minimax");
       }
     } else if (!isEnglishLocale && settings.ttsEngine !== "elevenlabs") {
@@ -236,8 +240,8 @@ export default function Settings({
                   {isEnglishLocale
                     ? t("textToSpeechDescription")
                     : isChineseLocale
-                    ? t("textToSpeechChineseOnly")
-                    : t("textToSpeechNonEnglish")}
+                      ? t("textToSpeechChineseOnly")
+                      : t("textToSpeechNonEnglish")}
                 </span>
               </div>
             </div>
@@ -250,7 +254,8 @@ export default function Settings({
               className={clsx(
                 "bg-white/10 text-white text-sm rounded-md px-3 py-1 border-none focus:ring-2 focus:ring-blue-500 focus:outline-none appearance-none bg-no-repeat bg-right pr-8",
                 {
-                  "opacity-50 cursor-not-allowed": !isEnglishLocale && !isChineseLocale
+                  "opacity-50 cursor-not-allowed":
+                    !isEnglishLocale && !isChineseLocale
                 }
               )}
               style={{
@@ -262,12 +267,8 @@ export default function Settings({
               {!isChineseLocale && (
                 <option value="elevenlabs">ElevenLabs</option>
               )}
-              {isEnglishLocale && (
-                <option value="cartesia">Cartesia</option>
-              )}
-              {isChineseLocale && (
-                <option value="minimax">Minimax</option>
-              )}
+              {isEnglishLocale && <option value="cartesia">Cartesia</option>}
+              {isChineseLocale && <option value="minimax">Minimax</option>}
             </select>
           </div>
 
@@ -342,7 +343,9 @@ export default function Settings({
               </div>
             </div>
             <button
-              onClick={() => updateSetting("audioEnabled", !settings.audioEnabled)}
+              onClick={() =>
+                updateSetting("audioEnabled", !settings.audioEnabled)
+              }
               className={clsx(
                 "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
                 {

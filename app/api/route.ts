@@ -209,7 +209,7 @@ export async function POST(request: Request) {
       } else {
         // Return text-only response when audio is disabled
         requestManager.completeRequest(accessToken);
-        
+
         return new Response("", {
           headers: {
             "Content-Type": "text/plain",
@@ -340,13 +340,14 @@ export async function POST(request: Request) {
           }
 
           // Create audio stream from text only if audioEnabled is true
-          const audioStream = settings.audioEnabled !== false
-            ? synthesizeSpeechStream(
-                textWithSSE(),
-                settings.ttsEngine,
-                abortController.signal
-              )
-            : null;
+          const audioStream =
+            settings.audioEnabled !== false
+              ? synthesizeSpeechStream(
+                  textWithSSE(),
+                  settings.ttsEngine,
+                  abortController.signal
+                )
+              : null;
 
           // Stream audio with buffering for better performance (only if audio is enabled)
           const reader = audioStream?.getReader();
@@ -358,13 +359,14 @@ export async function POST(request: Request) {
           // Handle text-only mode when audio is disabled
           if (!audioStream || !reader) {
             // For text-only mode, we still need to consume the text stream
-            for await (const chunk of textWithSSE()) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            for await (const _chunk of textWithSSE()) {
               if (abortController.signal.aborted || isControllerClosed) {
                 break;
               }
               // Text chunks are already sent via SSE in textWithSSE()
             }
-            
+
             // Send complete event for text-only mode
             if (!isControllerClosed && !abortController.signal.aborted) {
               const completeEvent = `event: complete\ndata: ${JSON.stringify({
@@ -382,69 +384,71 @@ export async function POST(request: Request) {
 
               const { done, value } = await reader.read();
 
-            if (done) {
-              // Send any remaining buffered audio
+              if (done) {
+                // Send any remaining buffered audio
+                if (
+                  audioBuffer.length > 0 &&
+                  !isControllerClosed &&
+                  !abortController.signal.aborted
+                ) {
+                  const combinedBuffer = new Uint8Array(currentBufferSize);
+                  let offset = 0;
+                  for (const chunk of audioBuffer) {
+                    combinedBuffer.set(chunk, offset);
+                    offset += chunk.length;
+                  }
+
+                  const audioEvent = `event: audio\ndata: ${JSON.stringify({
+                    chunk: Buffer.from(combinedBuffer).toString("base64"),
+                    index: audioChunkIndex++
+                  })}\n\n`;
+                  safeEnqueue(encoder.encode(audioEvent));
+                }
+
+                // Send complete event
+                if (!isControllerClosed && !abortController.signal.aborted) {
+                  const completeEvent = `event: complete\ndata: ${JSON.stringify(
+                    {
+                      fullText: textChunks.join("")
+                    }
+                  )}\n\n`;
+                  safeEnqueue(encoder.encode(completeEvent));
+                }
+                break;
+              }
+
               if (
-                audioBuffer.length > 0 &&
+                value &&
                 !isControllerClosed &&
                 !abortController.signal.aborted
               ) {
-                const combinedBuffer = new Uint8Array(currentBufferSize);
-                let offset = 0;
-                for (const chunk of audioBuffer) {
-                  combinedBuffer.set(chunk, offset);
-                  offset += chunk.length;
+                // Buffer audio chunks
+                audioBuffer.push(new Uint8Array(value));
+                currentBufferSize += value.byteLength;
+                // Send buffered audio when buffer is full
+                if (currentBufferSize >= BUFFER_SIZE) {
+                  const combinedBuffer = new Uint8Array(currentBufferSize);
+                  let offset = 0;
+                  for (const chunk of audioBuffer) {
+                    combinedBuffer.set(chunk, offset);
+                    offset += chunk.length;
+                  }
+
+                  const audioEvent = `event: audio\ndata: ${JSON.stringify({
+                    chunk: Buffer.from(combinedBuffer).toString("base64"),
+                    index: audioChunkIndex++
+                  })}\n\n`;
+
+                  if (!safeEnqueue(encoder.encode(audioEvent))) {
+                    break; // Stop if we can't enqueue (controller closed)
+                  }
+
+                  // Clear buffer
+                  audioBuffer.length = 0;
+                  currentBufferSize = 0;
                 }
-
-                const audioEvent = `event: audio\ndata: ${JSON.stringify({
-                  chunk: Buffer.from(combinedBuffer).toString("base64"),
-                  index: audioChunkIndex++
-                })}\n\n`;
-                safeEnqueue(encoder.encode(audioEvent));
-              }
-
-              // Send complete event
-              if (!isControllerClosed && !abortController.signal.aborted) {
-                const completeEvent = `event: complete\ndata: ${JSON.stringify({
-                  fullText: textChunks.join("")
-                })}\n\n`;
-                safeEnqueue(encoder.encode(completeEvent));
-              }
-              break;
-            }
-
-            if (
-              value &&
-              !isControllerClosed &&
-              !abortController.signal.aborted
-            ) {
-              // Buffer audio chunks
-              audioBuffer.push(new Uint8Array(value));
-              currentBufferSize += value.byteLength;
-              // Send buffered audio when buffer is full
-              if (currentBufferSize >= BUFFER_SIZE) {
-                const combinedBuffer = new Uint8Array(currentBufferSize);
-                let offset = 0;
-                for (const chunk of audioBuffer) {
-                  combinedBuffer.set(chunk, offset);
-                  offset += chunk.length;
-                }
-
-                const audioEvent = `event: audio\ndata: ${JSON.stringify({
-                  chunk: Buffer.from(combinedBuffer).toString("base64"),
-                  index: audioChunkIndex++
-                })}\n\n`;
-
-                if (!safeEnqueue(encoder.encode(audioEvent))) {
-                  break; // Stop if we can't enqueue (controller closed)
-                }
-
-                // Clear buffer
-                audioBuffer.length = 0;
-                currentBufferSize = 0;
               }
             }
-          }
           }
 
           safeClose();

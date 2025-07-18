@@ -611,24 +611,29 @@ export function synthesizeSpeechStream(
                   if (done) break;
 
                   buffer += decoder.decode(value, { stream: true });
-                  
+
                   // Split by newlines to process complete JSON objects
                   const lines = buffer.split("\n");
-                  
+
                   // Keep the last incomplete line in buffer
                   buffer = lines.pop() || "";
 
                   for (const line of lines) {
                     const trimmedLine = line.trim();
-                    if (trimmedLine === "" || !trimmedLine.startsWith("data: ")) continue;
+                    if (trimmedLine === "" || !trimmedLine.startsWith("data: "))
+                      continue;
 
                     try {
                       // Extract JSON from SSE format: "data: {...}"
                       const jsonStr = trimmedLine.slice(6); // Remove "data: " prefix
                       const data = JSON.parse(jsonStr);
-                      
+
                       // Process audio chunks with status: 1 (intermediate chunks)
-                      if (data.data && data.data.audio && data.data.status === 1) {
+                      if (
+                        data.data &&
+                        data.data.audio &&
+                        data.data.status === 1
+                      ) {
                         // Decode hex audio data (PCM format from Minimax)
                         const audioHex = data.data.audio;
                         const pcmBuffer = Buffer.from(audioHex, "hex");
@@ -639,7 +644,12 @@ export function synthesizeSpeechStream(
                       }
                       // Status 2 indicates final chunk with extra_info - we can ignore it
                     } catch (parseError) {
-                      console.warn("Minimax streaming parse error:", parseError, "Line:", trimmedLine);
+                      console.warn(
+                        "Minimax streaming parse error:",
+                        parseError,
+                        "Line:",
+                        trimmedLine
+                      );
                       continue;
                     }
                   }
