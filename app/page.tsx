@@ -10,7 +10,7 @@ import VoiceOrb from "@/components/VoiceOrb";
 import { AgentCoreService } from "@/lib/agentCore";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { usePlayer } from "@/lib/hooks/usePlayer";
-import { useVADWithOrbControl } from "@/lib/hooks/useVADWithOrbControl";
+import { useVADManager } from "@/lib/hooks/useVADManager";
 import { utils } from "@ricky0123/vad-react";
 import { track } from "@vercel/analytics";
 import { useLocale, useTranslations } from "next-intl";
@@ -323,7 +323,7 @@ export default function Home() {
         player.play(audioStream, () => {
           const isFirefox = navigator.userAgent.includes("Firefox");
           if (isFirefox) {
-            vad.start();
+            vadManager.start();
           }
         });
 
@@ -451,7 +451,7 @@ export default function Home() {
               player.play(audioStream, () => {
                 const isFirefox = navigator.userAgent.includes("Firefox");
                 if (isFirefox) {
-                  vad.start();
+                  vadManager.start();
                 }
               });
             }
@@ -612,7 +612,7 @@ export default function Home() {
             const isFirefox = navigator.userAgent.includes("Firefox");
             if (isFirefox) {
               setTimeout(() => {
-                vad.start();
+                vadManager.start();
               }, 100);
             }
           }
@@ -694,71 +694,32 @@ export default function Home() {
 
     const isFirefox = navigator.userAgent.includes("Firefox");
     if (isFirefox) {
-      vad.pause();
+      vadManager.pause();
     }
   }, []);
 
-  const vadRef = useRef<any>(null);
+  // VAD Manager setup
+  const vadManager = useVADManager(
+    {
+      positiveSpeechThreshold: 0.7,
+      minSpeechFrames: 6,
+      rmsEnergyThreshold: -35,
+      minSpeechDuration: 400,
+      spectralCentroidThreshold: 1000
+    },
+    {
+      onSpeechStart,
+      onSpeechEnd
+    },
+    {
+      isStreaming: chatState.isStreaming,
+      isAuthenticated: auth.isAuthenticated,
+      audioEnabled: settings.audioEnabled,
+      settingsLoaded: settingsLoaded
+    }
+  );
 
-  const vad = useVADWithOrbControl({
-    onSpeechStart,
-    onSpeechEnd,
-    isStreaming: chatState.isStreaming,
-    isAuthenticated: auth.isAuthenticated,
-    audioEnabled: settings.audioEnabled,
-    positiveSpeechThreshold: 0.7,
-    minSpeechFrames: 6,
-    rmsEnergyThreshold: -35,
-    minSpeechDuration: 400,
-    spectralCentroidThreshold: 1000
-  });
-
-  // VAD state is now managed by the custom hook
-  const vadState = {
-    loading: vad.loading,
-    errored: vad.errored,
-    userSpeaking: vad.userSpeaking
-  };
-
-  // Store VAD instance in ref
-  useEffect(() => {
-    vadRef.current = vad.vad;
-  }, [vad.vad]);
-
-  // VAD management with timeout to avoid circular dependency
-  useEffect(() => {
-    // Wait for settings to be loaded before managing VAD
-    if (!settingsLoaded) return;
-
-    const timeoutId = setTimeout(() => {
-      if (
-        auth.isAuthenticated &&
-        settings.audioEnabled &&
-        !vadState.loading &&
-        !vadState.errored
-      ) {
-        console.log(
-          "VAD: Starting VAD after successful authentication and audio enabled"
-        );
-        vad.start();
-      } else if (!auth.isAuthenticated) {
-        console.log("VAD: Pausing VAD due to authentication loss");
-        vad.pause();
-      } else if (!settings.audioEnabled) {
-        console.log("VAD: Pausing VAD due to audio mode disabled");
-        vad.pause();
-      }
-    }, 100); // Small delay to ensure VAD is ready
-
-    return () => clearTimeout(timeoutId);
-  }, [
-    auth.isAuthenticated,
-    settings.audioEnabled,
-    vadState.loading,
-    vadState.errored,
-    vad,
-    settingsLoaded
-  ]);
+  const vadState = vadManager.state;
 
   // Global error handler for VAD worker errors
   useEffect(() => {
@@ -773,7 +734,7 @@ export default function Home() {
         // Try to restart VAD after a delay
         setTimeout(() => {
           if (auth.isAuthenticated && settings.audioEnabled) {
-            vad.start();
+            vadManager.start();
           }
         }, 2000);
       }
@@ -781,7 +742,7 @@ export default function Home() {
 
     window.addEventListener("error", handleError);
     return () => window.removeEventListener("error", handleError);
-  }, [auth.isAuthenticated, settings.audioEnabled, vad]);
+  }, [auth.isAuthenticated, settings.audioEnabled]);
 
   // Keyboard shortcuts
   useEffect(() => {

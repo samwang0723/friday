@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import LanguageSwitcher from "./LanguageSwitcher";
 
 interface SettingsProps {
@@ -38,54 +38,26 @@ export default function Settings({
   const isChineseLocale =
     locale === "zh" || locale === "zh-TW" || locale === "zh-CN";
 
-  const updateSetting = (key: string, value: unknown) => {
+  const updateSetting = useCallback((key: string, value: unknown) => {
     const newSettings = {
       ...settings,
       [key]: value
     };
     onSettingsChange(newSettings);
-  };
+  }, [settings, onSettingsChange]);
 
-  // Handle TTS engine selection based on locale - only for first-time users
+  // Auto-switch TTS engine based on locale
   useEffect(() => {
-    // Only apply locale-based defaults if settings have been loaded
-    // and this is the first time (no saved settings existed)
     if (!settingsLoaded) return;
 
-    // Check if this is a fresh installation (using default settings)
-    const isDefaultSettings =
-      settings.sttEngine === "groq" &&
-      settings.ttsEngine === "elevenlabs" &&
-      settings.streaming === true &&
-      settings.audioEnabled === true;
-
-    // Only apply locale-based defaults for fresh installations
-    if (isDefaultSettings) {
-      if (isChineseLocale && settings.ttsEngine !== "minimax") {
-        console.log(
-          "Setting TTS engine to Minimax for Chinese locale (first-time user):",
-          locale
-        );
-        updateSetting("ttsEngine", "minimax");
-      } else if (
-        !isEnglishLocale &&
-        !isChineseLocale &&
-        settings.ttsEngine !== "elevenlabs"
-      ) {
-        console.log(
-          "Setting TTS engine to ElevenLabs for locale (first-time user):",
-          locale
-        );
-        updateSetting("ttsEngine", "elevenlabs");
-      }
+    // Simple rule: Chinese locales always use minimax, others always use elevenlabs
+    const expectedEngine = isChineseLocale ? "minimax" : "elevenlabs";
+    
+    if (settings.ttsEngine !== expectedEngine) {
+      console.log(`Switching TTS engine to ${expectedEngine} for locale: ${locale}`);
+      updateSetting("ttsEngine", expectedEngine);
     }
-  }, [
-    locale,
-    isEnglishLocale,
-    isChineseLocale,
-    settings.ttsEngine,
-    settingsLoaded
-  ]);
+  }, [locale, isChineseLocale, settingsLoaded, updateSetting]);
 
   const handleLogout = () => {
     if (!isAuthenticated) return;
