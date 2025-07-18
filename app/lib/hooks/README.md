@@ -56,56 +56,56 @@ graph TB
     %% Flow Connections
     MainComp --> VADManagerHook
     VADManagerHook --> VADHook
-    
+
     %% Context Updates
     Auth --> VADHook
     Settings --> VADHook
     Stream --> VADHook
-    
+
     %% VAD Hook Internal Flow
     VADHook --> VADState
     VADHook --> AudioStream
     VADHook --> MicVAD
     VADHook --> AutoManagement
-    
+
     %% Audio Stream Creation
     AudioStream --> Microphone
     AudioStream --> AudioContext
-    
+
     %% MicVAD Integration
     MicVAD --> VADLib
     VADLib --> VADWorker
     VADWorker --> AudioProcessing
-    
+
     %% Speech Detection Flow
     AudioProcessing --> SpeechStartHandler
     AudioProcessing --> SpeechEndHandler
-    
+
     %% Speech Start Flow
     SpeechStartHandler --> EchoFilter
     EchoFilter --> OnSpeechStart
     OnSpeechStart --> Player
     Player -.-> |Stop Playback| Stream
-    
+
     %% Speech End Flow
     SpeechEndHandler --> SpeechAnalysis
     SpeechAnalysis --> OnSpeechEnd
     OnSpeechEnd --> |Submit Audio| API[API Route]
-    
+
     %% Auto Management
     AutoManagement --> |Start/Pause| VADLib
-    
+
     %% State Updates
     VADState --> MainComp
     VADWorker --> VADState
-    
+
     %% Styling
     classDef userAction fill:#e1f5fe
     classDef mainComponent fill:#f3e5f5
     classDef vadHook fill:#e8f5e8
     classDef vadLibrary fill:#fff3e0
     classDef audioSystem fill:#fce4ec
-    
+
     class User,Auth,Settings,Speech,Stream userAction
     class MainComp,OnSpeechStart,OnSpeechEnd,VADManagerHook mainComponent
     class VADHook,VADState,AudioStream,SpeechStartHandler,SpeechEndHandler,EchoFilter,SpeechAnalysis,AutoManagement vadHook
@@ -134,7 +134,7 @@ const vadManager = useVADManager(
   {
     // Callbacks
     onSpeechStart: () => console.log("Speech started"),
-    onSpeechEnd: (audio) => console.log("Speech ended", audio)
+    onSpeechEnd: audio => console.log("Speech ended", audio)
   },
   {
     // Context
@@ -154,54 +154,59 @@ vadManager.pause();
 
 #### Configuration Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `positiveSpeechThreshold` | `number` | `0.7` | Threshold for positive speech detection |
-| `minSpeechFrames` | `number` | `6` | Minimum number of frames for speech |
-| `rmsEnergyThreshold` | `number` | `-35` | RMS energy threshold in dBFS |
-| `minSpeechDuration` | `number` | `400` | Minimum speech duration in ms |
-| `spectralCentroidThreshold` | `number` | `1000` | Spectral centroid threshold in Hz |
+| Option                      | Type     | Default | Description                             |
+| --------------------------- | -------- | ------- | --------------------------------------- |
+| `positiveSpeechThreshold`   | `number` | `0.7`   | Threshold for positive speech detection |
+| `minSpeechFrames`           | `number` | `6`     | Minimum number of frames for speech     |
+| `rmsEnergyThreshold`        | `number` | `-35`   | RMS energy threshold in dBFS            |
+| `minSpeechDuration`         | `number` | `400`   | Minimum speech duration in ms           |
+| `spectralCentroidThreshold` | `number` | `1000`  | Spectral centroid threshold in Hz       |
 
 #### Context Options
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `isStreaming` | `boolean` | Whether AI is currently streaming audio |
-| `isAuthenticated` | `boolean` | Whether user is authenticated |
-| `audioEnabled` | `boolean` | Whether audio features are enabled |
+| Option            | Type      | Description                             |
+| ----------------- | --------- | --------------------------------------- |
+| `isStreaming`     | `boolean` | Whether AI is currently streaming audio |
+| `isAuthenticated` | `boolean` | Whether user is authenticated           |
+| `audioEnabled`    | `boolean` | Whether audio features are enabled      |
 
 #### State Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `loading` | `boolean` | Whether VAD is initializing |
-| `errored` | `boolean` | Whether VAD has encountered an error |
-| `userSpeaking` | `boolean` | Whether user is speaking (UI indicator) |
-| `actualUserSpeaking` | `boolean` | Raw speech detection (for logic) |
+| Property             | Type      | Description                             |
+| -------------------- | --------- | --------------------------------------- |
+| `loading`            | `boolean` | Whether VAD is initializing             |
+| `errored`            | `boolean` | Whether VAD has encountered an error    |
+| `userSpeaking`       | `boolean` | Whether user is speaking (UI indicator) |
+| `actualUserSpeaking` | `boolean` | Raw speech detection (for logic)        |
 
 ### Key Flow Patterns
 
 #### 1. Initialization Flow
+
 ```
 Main Component → useVADManager → Audio Stream → useMicVAD → VAD Worker
 ```
 
 #### 2. Speech Start Flow
+
 ```
 User Speaks → VAD Detection → Echo Filter → onSpeechStart → Stop Playback
 ```
 
 #### 3. Speech End Flow
+
 ```
 User Stops → VAD Detection → Speech Analysis → onSpeechEnd → Submit to API
 ```
 
 #### 4. Context Management
+
 ```
 Auth/Settings Change → useVADManager → Auto Start/Pause → VAD Worker
 ```
 
 #### 5. State Updates
+
 ```
 VAD Worker → VAD State → Main Component → UI Updates
 ```
@@ -209,32 +214,38 @@ VAD Worker → VAD State → Main Component → UI Updates
 ### Features
 
 #### ✅ **Single VAD Instance**
+
 - Guaranteed single VAD instance per application
 - No duplicate initialization or memory leaks
 - Clean lifecycle management
 
 #### ✅ **Automatic Management**
+
 - Auto-starts when authenticated and audio enabled
 - Auto-pauses when unauthenticated or audio disabled
 - Respects streaming state for echo prevention
 
 #### ✅ **Echo Prevention**
+
 - Filters out speech detection during AI audio playback
 - Prevents feedback loops from speakers
 - Smart timing-based echo detection
 
 #### ✅ **Speech Analysis**
+
 - Multi-layer speech filtering
 - RMS energy analysis
 - Spectral centroid analysis
 - Duration-based filtering
 
 #### ✅ **Error Handling**
+
 - Graceful error recovery
 - Automatic retry mechanisms
 - Proper cleanup on errors
 
 #### ✅ **Audio Stream Management**
+
 - Enhanced audio stream with noise suppression
 - Automatic stream cleanup
 - Proper microphone permissions handling
@@ -242,22 +253,26 @@ VAD Worker → VAD State → Main Component → UI Updates
 ### Browser Compatibility
 
 #### Firefox-Specific Handling
+
 - Special restart logic for Firefox VAD issues
 - Timeout-based recovery mechanisms
 - Enhanced error handling for Firefox quirks
 
 #### Chrome/Safari
+
 - Standard VAD behavior
 - Optimal performance and reliability
 
 ### Performance Considerations
 
 #### Memory Management
+
 - Automatic cleanup of audio streams
 - Proper event listener cleanup
 - No memory leaks from VAD instances
 
 #### CPU Usage
+
 - Efficient audio processing
 - Minimal overhead during idle state
 - Optimized speech analysis algorithms
@@ -265,11 +280,13 @@ VAD Worker → VAD State → Main Component → UI Updates
 ### Debugging
 
 #### Logging
+
 - Comprehensive console logging for all VAD events
 - Speech analysis metrics logging
 - State transition logging
 
 #### Common Issues
+
 1. **VAD not starting**: Check authentication and audio permissions
 2. **Echo detection**: Verify streaming state and timing
 3. **Performance issues**: Check audio stream configuration
@@ -280,13 +297,14 @@ VAD Worker → VAD State → Main Component → UI Updates
 The old `useVADWithOrbControl` hook has been replaced with `useVADManager`. Key differences:
 
 #### Before (Complex)
+
 ```typescript
 const vad = useVADWithOrbControl({
   onSpeechStart,
   onSpeechEnd,
   isStreaming: chatState.isStreaming,
   isAuthenticated: auth.isAuthenticated,
-  audioEnabled: settings.audioEnabled,
+  audioEnabled: settings.audioEnabled
   // ... 8 more config options
 });
 
@@ -298,12 +316,18 @@ const vadState = {
 };
 
 // Manual lifecycle management
-useEffect(() => {
-  // Complex logic for starting/stopping VAD
-}, [/* many dependencies */]);
+useEffect(
+  () => {
+    // Complex logic for starting/stopping VAD
+  },
+  [
+    /* many dependencies */
+  ]
+);
 ```
 
 #### After (Simple)
+
 ```typescript
 const vadManager = useVADManager(config, callbacks, context);
 const vadState = vadManager.state;

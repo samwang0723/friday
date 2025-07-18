@@ -38,13 +38,16 @@ export default function Settings({
   const isChineseLocale =
     locale === "zh" || locale === "zh-TW" || locale === "zh-CN";
 
-  const updateSetting = useCallback((key: string, value: unknown) => {
-    const newSettings = {
-      ...settings,
-      [key]: value
-    };
-    onSettingsChange(newSettings);
-  }, [settings, onSettingsChange]);
+  const updateSetting = useCallback(
+    (key: string, value: unknown) => {
+      const newSettings = {
+        ...settings,
+        [key]: value
+      };
+      onSettingsChange(newSettings);
+    },
+    [settings, onSettingsChange]
+  );
 
   // Auto-switch TTS engine based on locale
   useEffect(() => {
@@ -52,9 +55,14 @@ export default function Settings({
 
     // Simple rule: Chinese locales always use minimax, others always use elevenlabs
     const expectedEngine = isChineseLocale ? "minimax" : "elevenlabs";
-    
+
     if (settings.ttsEngine !== expectedEngine) {
-      console.log(`Switching TTS engine to ${expectedEngine} for locale: ${locale}`);
+      if (isEnglishLocale && settings.ttsEngine === "cartesia") {
+        return;
+      }
+      console.log(
+        `Switching TTS engine to ${expectedEngine} for locale: ${locale}`
+      );
       updateSetting("ttsEngine", expectedEngine);
     }
   }, [locale, isChineseLocale, settingsLoaded, updateSetting]);

@@ -16,45 +16,46 @@ function calculateSpectralCentroid(audioData: Float32Array): number {
   const fftSize = 2048;
   const sampleRate = 16000;
   const halfSize = fftSize / 2;
-  
+
   // Pad or truncate audio data to match FFT size
   const paddedData = new Float32Array(fftSize);
   for (let i = 0; i < Math.min(audioData.length, fftSize); i++) {
     paddedData[i] = audioData[i];
   }
-  
+
   // Apply windowing function (Hamming window)
   for (let i = 0; i < fftSize; i++) {
-    paddedData[i] *= 0.54 - 0.46 * Math.cos(2 * Math.PI * i / (fftSize - 1));
+    paddedData[i] *= 0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (fftSize - 1));
   }
-  
+
   // Compute FFT using DFT (simplified for this use case)
   const magnitudes = new Float32Array(halfSize);
-  
+
   for (let k = 0; k < halfSize; k++) {
     let real = 0;
     let imag = 0;
-    
+
     for (let n = 0; n < fftSize; n++) {
       const angle = (-2 * Math.PI * k * n) / fftSize;
       real += paddedData[n] * Math.cos(angle);
       imag += paddedData[n] * Math.sin(angle);
     }
-    
+
     magnitudes[k] = Math.sqrt(real * real + imag * imag);
   }
-  
+
   // Calculate spectral centroid
   let numerator = 0;
   let denominator = 0;
-  
-  for (let i = 1; i < halfSize; i++) { // Skip DC component
+
+  for (let i = 1; i < halfSize; i++) {
+    // Skip DC component
     const freq = (i * sampleRate) / fftSize;
     const mag = magnitudes[i];
     numerator += freq * mag;
     denominator += mag;
   }
-  
+
   return denominator > 0 ? numerator / denominator : 0;
 }
 
@@ -77,9 +78,9 @@ function isSpeechLike(
   // Human speech typically has centroid between 1000-3000 Hz
   // Lower values (< 1000 Hz) are often low-frequency noise, breathing, or rumble
   const centroidThreshold = isStreaming
-    ? 800  // More lenient during streaming to allow interruptions
+    ? 800 // More lenient during streaming to allow interruptions
     : config.spectralCentroidThreshold || 1000;
-    
+
   if (spectralCentroid < centroidThreshold) {
     return false; // Too low frequency, likely not speech
   }
@@ -253,7 +254,11 @@ export function useVADManager(
         setAudioStream(undefined);
       }
 
-      if (!context.isAuthenticated || !context.audioEnabled || !context.settingsLoaded) {
+      if (
+        !context.isAuthenticated ||
+        !context.audioEnabled ||
+        !context.settingsLoaded
+      ) {
         return;
       }
 
@@ -310,9 +315,15 @@ export function useVADManager(
 
   // Auto-manage VAD based on context
   useEffect(() => {
-    if (!context.isAuthenticated || !context.audioEnabled || !context.settingsLoaded) {
+    if (
+      !context.isAuthenticated ||
+      !context.audioEnabled ||
+      !context.settingsLoaded
+    ) {
       if (isActiveRef.current) {
-        console.log("VAD: Pausing due to authentication/audio disabled/settings not loaded");
+        console.log(
+          "VAD: Pausing due to authentication/audio disabled/settings not loaded"
+        );
         vad.pause();
         isActiveRef.current = false;
       }
@@ -328,11 +339,23 @@ export function useVADManager(
       vad.start();
       isActiveRef.current = true;
     }
-  }, [context.isAuthenticated, context.audioEnabled, context.settingsLoaded, vad.loading, vad.errored]);
+  }, [
+    context.isAuthenticated,
+    context.audioEnabled,
+    context.settingsLoaded,
+    vad.loading,
+    vad.errored
+  ]);
 
   const start = useCallback(() => {
-    if (!context.isAuthenticated || !context.audioEnabled || !context.settingsLoaded) {
-      console.log("VAD: Cannot start - not authenticated, audio disabled, or settings not loaded");
+    if (
+      !context.isAuthenticated ||
+      !context.audioEnabled ||
+      !context.settingsLoaded
+    ) {
+      console.log(
+        "VAD: Cannot start - not authenticated, audio disabled, or settings not loaded"
+      );
       return;
     }
 
@@ -346,7 +369,13 @@ export function useVADManager(
       vad.start();
       isActiveRef.current = true;
     }
-  }, [context.isAuthenticated, context.audioEnabled, context.settingsLoaded, vad.loading, vad.errored]);
+  }, [
+    context.isAuthenticated,
+    context.audioEnabled,
+    context.settingsLoaded,
+    vad.loading,
+    vad.errored
+  ]);
 
   const pause = useCallback(() => {
     if (isActiveRef.current) {
