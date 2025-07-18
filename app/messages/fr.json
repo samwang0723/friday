@@ -40,8 +40,10 @@
     "textToSpeech": "Moteur de synthèse vocale",
     "textToSpeechDescription": "Choisissez votre moteur TTS préféré",
     "textToSpeechNonEnglish": "ElevenLabs requis pour les langues non-anglaises",
-    "streaming": "Audio en streaming",
-    "streamingDescription": "Lire l'audio au fur et à mesure de sa génération",
+    "streaming": "Streaming",
+    "streamingDescription": "Diffuser les réponses au fur et à mesure de leur génération",
+    "audioEnabled": "Mode Parole à Parole",
+    "audioEnabledDescription": "Activer les réponses vocales avec synthèse vocale",
     "settingsButton": "Paramètres",
     "auth": {
       "signOut": "Se déconnecter"

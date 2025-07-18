@@ -41,8 +41,10 @@
     "textToSpeechDescription": "選擇您偏好的文字轉語音引擎",
     "textToSpeechChineseOnly": "專為中文優化的 Minimax 語音",
     "textToSpeechNonEnglish": "非英語語言需要使用 ElevenLabs",
-    "streaming": "串流音訊",
-    "streamingDescription": "在生成時播放音訊",
+    "streaming": "串流",
+    "streamingDescription": "在生成時串流響應",
+    "audioEnabled": "語音對話模式",
+    "audioEnabledDescription": "啟用語音響應與文字轉語音",
     "settingsButton": "設定",
     "auth": {
       "signOut": "登出"

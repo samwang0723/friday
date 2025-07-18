@@ -92,6 +92,7 @@ export interface VADOrbConfig {
   onSpeechEnd?: (audio: Float32Array) => void;
   isStreaming?: boolean;
   isAuthenticated?: boolean; // Add authentication state
+  audioEnabled?: boolean; // Add audio mode state
   positiveSpeechThreshold?: number;
   minSpeechFrames?: number;
   rmsEnergyThreshold?: number; // RMS energy threshold in dBFS (e.g., -40)
@@ -224,11 +225,16 @@ export function useVADWithOrbControl(config: VADOrbConfig) {
   // Create enhanced audio stream only when authenticated
   useEffect(() => {
     const createEnhancedStream = async () => {
-      // Only create audio stream if authenticated
+      // Only create audio stream if authenticated and audio is enabled
       if (!config.isAuthenticated) {
         console.log(
           "VAD: User not authenticated, skipping audio stream creation"
         );
+        return;
+      }
+
+      if (config.audioEnabled === false) {
+        console.log("VAD: Audio disabled, skipping audio stream creation");
         return;
       }
 
@@ -273,17 +279,17 @@ export function useVADWithOrbControl(config: VADOrbConfig) {
       }
     };
 
-    if (config.isAuthenticated) {
+    if (config.isAuthenticated && config.audioEnabled !== false) {
       createEnhancedStream();
     } else {
       cleanupStream();
     }
 
-    // Cleanup stream on unmount or when authentication changes
+    // Cleanup stream on unmount or when authentication/audio settings change
     return () => {
       cleanupStream();
     };
-  }, [config.isAuthenticated]);
+  }, [config.isAuthenticated, config.audioEnabled]);
 
   const onVADMisfire = useCallback(() => {
     console.log("VAD: onVADMisfire - false positive speech detection");
@@ -319,11 +325,13 @@ export function useVADWithOrbControl(config: VADOrbConfig) {
     userSpeaking: vadState.shouldShowOrb, // Use filtered state for UI
     actualUserSpeaking: vadState.actualUserSpeaking, // Real detection for logic
     start: () => {
-      if (config.isAuthenticated) {
-        console.log("VAD: Starting VAD (authenticated)");
+      if (config.isAuthenticated && config.audioEnabled !== false) {
+        console.log("VAD: Starting VAD (authenticated and audio enabled)");
         vadRef.current?.start();
-      } else {
+      } else if (!config.isAuthenticated) {
         console.log("VAD: Cannot start VAD - user not authenticated");
+      } else if (config.audioEnabled === false) {
+        console.log("VAD: Cannot start VAD - audio mode disabled");
       }
     },
     pause: () => {

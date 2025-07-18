@@ -40,8 +40,10 @@
     "textToSpeech": "텍스트를 음성으로 변환 엔진",
     "textToSpeechDescription": "선호하는 TTS 엔진을 선택하세요",
     "textToSpeechNonEnglish": "영어가 아닌 언어에는 ElevenLabs가 필요합니다",
-    "streaming": "스트리밍 오디오",
-    "streamingDescription": "생성되는 동안 오디오 재생",
+    "streaming": "스트리밍",
+    "streamingDescription": "응답이 생성되는 동안 스트리밍",
+    "audioEnabled": "음성 대화 모드",
+    "audioEnabledDescription": "텍스트 음성 변환으로 음성 응답 활성화",
     "settingsButton": "설정",
     "auth": {
       "signOut": "로그아웃"

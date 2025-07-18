@@ -74,7 +74,8 @@ const schema = zfd.formData({
       z.object({
         sttEngine: z.string(),
         ttsEngine: z.string(),
-        streaming: z.boolean().optional() // Add streaming support
+        streaming: z.boolean().optional(),
+        audioEnabled: z.boolean().optional()
       })
     )
     .optional()
@@ -114,7 +115,8 @@ export async function POST(request: Request) {
     const settings = data.settings || {
       sttEngine: "groq",
       ttsEngine: "elevenlabs",
-      streaming: false
+      streaming: false,
+      audioEnabled: true
     };
 
     console.log("Using settings:", settings);
@@ -177,31 +179,46 @@ export async function POST(request: Request) {
         return new Response("Request cancelled", { status: 200 });
       }
 
-      // Generate complete audio using synthesizeSpeech
-      const audioResponse = await synthesizeSpeech(
-        chatResponse.response,
-        settings.ttsEngine,
-        abortController.signal
-      );
+      // Generate audio only if audioEnabled is true
+      if (settings.audioEnabled !== false) {
+        // Generate complete audio using synthesizeSpeech
+        const audioResponse = await synthesizeSpeech(
+          chatResponse.response,
+          settings.ttsEngine,
+          abortController.signal
+        );
 
-      if (!audioResponse.ok) {
-        return new Response("TTS generation failed", { status: 500 });
-      }
-
-      const audioBuffer = await audioResponse.arrayBuffer();
-
-      // Clean up the request from tracking
-      requestManager.completeRequest(accessToken);
-
-      // Return combined response with audio and text
-      return new Response(audioBuffer, {
-        headers: {
-          "Content-Type": "audio/raw",
-          "X-Transcript": encodeURIComponent(transcript),
-          "X-Response-Text": encodeURIComponent(chatResponse.response),
-          "X-Response-Type": "single"
+        if (!audioResponse.ok) {
+          return new Response("TTS generation failed", { status: 500 });
         }
-      });
+
+        const audioBuffer = await audioResponse.arrayBuffer();
+
+        // Clean up the request from tracking
+        requestManager.completeRequest(accessToken);
+
+        // Return combined response with audio and text
+        return new Response(audioBuffer, {
+          headers: {
+            "Content-Type": "audio/raw",
+            "X-Transcript": encodeURIComponent(transcript),
+            "X-Response-Text": encodeURIComponent(chatResponse.response),
+            "X-Response-Type": "single"
+          }
+        });
+      } else {
+        // Return text-only response when audio is disabled
+        requestManager.completeRequest(accessToken);
+        
+        return new Response("", {
+          headers: {
+            "Content-Type": "text/plain",
+            "X-Transcript": encodeURIComponent(transcript),
+            "X-Response-Text": encodeURIComponent(chatResponse.response),
+            "X-Response-Type": "text-only"
+          }
+        });
+      }
     }
 
     // Use streaming pipeline with SSE
@@ -322,27 +339,48 @@ export async function POST(request: Request) {
             }
           }
 
-          // Create audio stream from text
-          const audioStream = synthesizeSpeechStream(
-            textWithSSE(),
-            settings.ttsEngine,
-            abortController.signal
-          );
+          // Create audio stream from text only if audioEnabled is true
+          const audioStream = settings.audioEnabled !== false
+            ? synthesizeSpeechStream(
+                textWithSSE(),
+                settings.ttsEngine,
+                abortController.signal
+              )
+            : null;
 
-          // Stream audio with buffering for better performance
-          const reader = audioStream.getReader();
+          // Stream audio with buffering for better performance (only if audio is enabled)
+          const reader = audioStream?.getReader();
           const audioBuffer: Uint8Array[] = [];
           const BUFFER_SIZE = 16384; // 16KB buffer
           let currentBufferSize = 0;
           let audioChunkIndex = 0;
 
-          while (true) {
-            // Check abort signal and controller state before each iteration
-            if (abortController.signal.aborted || isControllerClosed) {
-              break;
+          // Handle text-only mode when audio is disabled
+          if (!audioStream || !reader) {
+            // For text-only mode, we still need to consume the text stream
+            for await (const chunk of textWithSSE()) {
+              if (abortController.signal.aborted || isControllerClosed) {
+                break;
+              }
+              // Text chunks are already sent via SSE in textWithSSE()
             }
+            
+            // Send complete event for text-only mode
+            if (!isControllerClosed && !abortController.signal.aborted) {
+              const completeEvent = `event: complete\ndata: ${JSON.stringify({
+                fullText: textChunks.join("")
+              })}\n\n`;
+              safeEnqueue(encoder.encode(completeEvent));
+            }
+          } else {
+            // Handle audio + text streaming mode
+            while (true) {
+              // Check abort signal and controller state before each iteration
+              if (abortController.signal.aborted || isControllerClosed) {
+                break;
+              }
 
-            const { done, value } = await reader.read();
+              const { done, value } = await reader.read();
 
             if (done) {
               // Send any remaining buffered audio
@@ -406,6 +444,7 @@ export async function POST(request: Request) {
                 currentBufferSize = 0;
               }
             }
+          }
           }
 
           safeClose();

@@ -40,8 +40,10 @@
     "textToSpeech": "Motor de Texto a Voz",
     "textToSpeechDescription": "Elige tu motor de texto a voz preferido",
     "textToSpeechNonEnglish": "ElevenLabs requerido para idiomas no ingleses",
-    "streaming": "Audio en Transmisión",
-    "streamingDescription": "Reproduce audio mientras se genera",
+    "streaming": "Transmisión",
+    "streamingDescription": "Transmitir respuestas mientras se generan",
+    "audioEnabled": "Modo Voz a Voz",
+    "audioEnabledDescription": "Habilitar respuestas de voz con texto a voz",
     "settingsButton": "Configuración",
     "auth": {
       "signOut": "Cerrar sesión"

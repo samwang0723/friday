@@ -41,8 +41,10 @@
     "textToSpeechDescription": "选择您首选的文本转语音引擎",
     "textToSpeechChineseOnly": "专为中文优化的 Minimax 语音",
     "textToSpeechNonEnglish": "非英语语言需要使用 ElevenLabs",
-    "streaming": "流式音频",
-    "streamingDescription": "在生成时播放音频",
+    "streaming": "流式传输",
+    "streamingDescription": "在生成时流式传输响应",
+    "audioEnabled": "语音对话模式",
+    "audioEnabledDescription": "启用语音响应与文本转语音",
     "settingsButton": "设置",
     "auth": {
       "signOut": "登出"

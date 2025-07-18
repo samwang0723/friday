@@ -41,8 +41,10 @@
     "textToSpeechDescription": "Choose your preferred TTS engine",
     "textToSpeechChineseOnly": "Optimized Chinese voice via Minimax",
     "textToSpeechNonEnglish": "ElevenLabs required for non-English locales",
-    "streaming": "Streaming Audio",
-    "streamingDescription": "Play audio as it's generated",
+    "streaming": "Streaming",
+    "streamingDescription": "Stream responses as they're generated",
+    "audioEnabled": "Speech to Speech Mode",
+    "audioEnabledDescription": "Enable voice responses with text-to-speech",
     "settingsButton": "Settings",
     "auth": {
       "signOut": "Sign out"

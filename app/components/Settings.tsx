@@ -17,6 +17,7 @@ export interface SettingsState {
   sttEngine: string;
   ttsEngine: string;
   streaming: boolean;
+  audioEnabled: boolean;
 }
 
 export default function Settings({
@@ -41,7 +42,8 @@ export default function Settings({
       return {
         sttEngine: "groq",
         ttsEngine: "elevenlabs", // Will be updated by useEffect based on locale
-        streaming: true
+        streaming: true,
+        audioEnabled: true
       };
     }
 
@@ -53,7 +55,8 @@ export default function Settings({
         return {
           sttEngine: parsed.sttEngine || "groq",
           ttsEngine: parsed.ttsEngine || "elevenlabs",
-          streaming: parsed.streaming !== undefined ? parsed.streaming : true
+          streaming: parsed.streaming !== undefined ? parsed.streaming : true,
+          audioEnabled: parsed.audioEnabled !== undefined ? parsed.audioEnabled : true
         };
       }
     } catch (error) {
@@ -64,7 +67,8 @@ export default function Settings({
     return {
       sttEngine: "groq",
       ttsEngine: "elevenlabs",
-      streaming: true
+      streaming: true,
+      audioEnabled: true
     };
   };
 
@@ -85,7 +89,8 @@ export default function Settings({
   const [settings, setSettings] = useState<SettingsState>({
     sttEngine: "groq",
     ttsEngine: "elevenlabs",
-    streaming: true
+    streaming: true,
+    audioEnabled: true
   });
 
   // Load settings from localStorage after component mounts
@@ -306,6 +311,52 @@ export default function Settings({
                   {
                     "translate-x-5": settings.streaming,
                     "translate-x-0": !settings.streaming
+                  }
+                )}
+              />
+            </button>
+          </div>
+
+          {/* Audio Toggle */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <svg
+                className="h-5 w-5 text-orange-400"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.5"
+                  d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M9.464 15.536a5 5 0 01-7.072-7.072m9.9-2.828a9 9 0 00-12.728 0"
+                />
+              </svg>
+              <div className="flex flex-col">
+                <span className="text-white text-sm">{t("audioEnabled")}</span>
+                <span className="text-gray-400 text-xs">
+                  {t("audioEnabledDescription")}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => updateSetting("audioEnabled", !settings.audioEnabled)}
+              className={clsx(
+                "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+                {
+                  "bg-blue-600": settings.audioEnabled,
+                  "bg-gray-600": !settings.audioEnabled
+                }
+              )}
+            >
+              <span
+                className={clsx(
+                  "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                  {
+                    "translate-x-5": settings.audioEnabled,
+                    "translate-x-0": !settings.audioEnabled
                   }
                 )}
               />

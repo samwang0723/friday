@@ -107,7 +107,8 @@ export default function Home() {
   const [settings, setSettings] = useState<SettingsState>({
     sttEngine: "groq",
     ttsEngine: "elevenlabs",
-    streaming: true
+    streaming: true,
+    audioEnabled: true
   });
 
   // Chat state
@@ -300,7 +301,7 @@ export default function Home() {
       const responseType = response.headers.get("X-Response-Type");
 
       if (responseType === "single") {
-        // Handle single response mode
+        // Handle single response mode with audio
         const responseText = decodeURIComponent(
           response.headers.get("X-Response-Text") || ""
         );
@@ -329,6 +330,37 @@ export default function Home() {
             vad.start();
           }
         });
+
+        // Create assistant message
+        const assistantMessage: Message = {
+          role: "assistant",
+          content: responseText,
+          latency: Date.now() - submittedAt
+        };
+
+        // Reset streaming state
+        updateChatState({
+          isStreaming: false,
+          message: ""
+        });
+
+        return [...updatedMessages, assistantMessage];
+      }
+
+      if (responseType === "text-only") {
+        // Handle text-only response mode (no audio)
+        const responseText = decodeURIComponent(
+          response.headers.get("X-Response-Text") || ""
+        );
+
+        if (!responseText) {
+          updateChatState({ isStreaming: false });
+          toast.error(t("errors.noResponse"));
+          return prevMessages;
+        }
+
+        // Display the response text immediately
+        updateChatState({ message: responseText });
 
         // Create assistant message
         const assistantMessage: Message = {
@@ -677,6 +709,7 @@ export default function Home() {
     onSpeechEnd,
     isStreaming: chatState.isStreaming,
     isAuthenticated: auth.isAuthenticated,
+    audioEnabled: settings.audioEnabled,
     positiveSpeechThreshold: 0.7,
     minSpeechFrames: 6,
     rmsEnergyThreshold: -35,
@@ -699,17 +732,33 @@ export default function Home() {
   // VAD management with timeout to avoid circular dependency
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (auth.isAuthenticated && !vadState.loading && !vadState.errored) {
-        console.log("VAD: Starting VAD after successful authentication");
+      if (
+        auth.isAuthenticated &&
+        settings.audioEnabled &&
+        !vadState.loading &&
+        !vadState.errored
+      ) {
+        console.log(
+          "VAD: Starting VAD after successful authentication and audio enabled"
+        );
         vad.start();
       } else if (!auth.isAuthenticated) {
         console.log("VAD: Pausing VAD due to authentication loss");
+        vad.pause();
+      } else if (!settings.audioEnabled) {
+        console.log("VAD: Pausing VAD due to audio mode disabled");
         vad.pause();
       }
     }, 100); // Small delay to ensure VAD is ready
 
     return () => clearTimeout(timeoutId);
-  }, [auth.isAuthenticated, vadState.loading, vadState.errored, vad]);
+  }, [
+    auth.isAuthenticated,
+    settings.audioEnabled,
+    vadState.loading,
+    vadState.errored,
+    vad
+  ]);
 
   // Keyboard shortcuts
   useEffect(() => {
