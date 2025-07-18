@@ -75,6 +75,21 @@ function getCurrentLocale(): string {
 export default function Home() {
   const t = useTranslations();
   const locale = useLocale();
+
+  // Map API error messages to translation keys
+  const getTranslatedError = (apiErrorMessage: string): string => {
+    const errorMap: Record<string, string> = {
+      "Invalid audio": t("errors.invalidAudio"),
+      "Request cancelled": t("errors.requestCancelled"),
+      "Authorization required": t("errors.authRequired"),
+      "Valid Bearer token required": t("errors.tokenRequired"),
+      "Invalid request": t("errors.invalidRequest"),
+      "TTS generation failed": t("errors.ttsGenerationFailed"),
+      "Request failed": t("errors.requestFailed")
+    };
+    
+    return errorMap[apiErrorMessage] || apiErrorMessage || t("common.error");
+  };
   const [clientLocale, setClientLocale] = useState<string>("en");
 
   // Get locale from client-side cookie after component mounts
@@ -255,7 +270,8 @@ export default function Home() {
         } else if (response.status === 429) {
           toast.error(t("errors.tooManyRequests"));
         } else {
-          toast.error((await response.text()) || t("common.error"));
+          const apiErrorMessage = await response.text();
+          toast.error(getTranslatedError(apiErrorMessage));
         }
         return prevMessages;
       }

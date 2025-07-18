@@ -55,6 +55,11 @@
     "requestCancelled": "La requête a été annulée",
     "sessionExpired": "Session expirée. Veuillez vous reconnecter.",
     "noTranscript": "Aucune transcription reçue",
+    "noResponse": "Aucune réponse reçue",
+    "authRequired": "Autorisation requise",
+    "tokenRequired": "Token Bearer valide requis",
+    "invalidRequest": "Requête invalide",
+    "ttsGenerationFailed": "Échec de la génération TTS",
     "signOutFailed": "Échec de la déconnexion. Veuillez réessayer."
   },
   "success": {

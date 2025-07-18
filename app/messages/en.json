@@ -56,6 +56,11 @@
     "requestCancelled": "Request was cancelled",
     "sessionExpired": "Session expired. Please sign in again.",
     "noTranscript": "No transcript received",
+    "noResponse": "No response received",
+    "authRequired": "Authorization required",
+    "tokenRequired": "Valid Bearer token required",
+    "invalidRequest": "Invalid request",
+    "ttsGenerationFailed": "TTS generation failed",
     "signOutFailed": "Failed to sign out. Please try again."
   },
   "success": {

@@ -55,6 +55,11 @@
     "requestCancelled": "Solicitud cancelada",
     "sessionExpired": "Sesión expirada. Por favor inicia sesión de nuevo.",
     "noTranscript": "No se recibió transcripción",
+    "noResponse": "No se recibió respuesta",
+    "authRequired": "Se requiere autorización",
+    "tokenRequired": "Se requiere un token Bearer válido",
+    "invalidRequest": "Solicitud inválida",
+    "ttsGenerationFailed": "Error en la generación de TTS",
     "signOutFailed": "Error al cerrar sesión. Por favor intenta de nuevo."
   },
   "success": {

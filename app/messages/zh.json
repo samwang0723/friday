@@ -56,6 +56,11 @@
     "requestCancelled": "请求已取消",
     "sessionExpired": "会话已过期，请重新登录。",
     "noTranscript": "未收到语音转录",
+    "noResponse": "未收到回应",
+    "authRequired": "需要授权",
+    "tokenRequired": "需要有效的Bearer令牌",
+    "invalidRequest": "无效的请求",
+    "ttsGenerationFailed": "语音合成失败",
     "signOutFailed": "登出失败，请重试。"
   },
   "success": {

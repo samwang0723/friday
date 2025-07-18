@@ -55,6 +55,11 @@
     "requestCancelled": "リクエストがキャンセルされました",
     "sessionExpired": "セッションの有効期限が切れました。再度サインインしてください。",
     "noTranscript": "音声転写を受信できませんでした",
+    "noResponse": "応答を受信できませんでした",
+    "authRequired": "認証が必要です",
+    "tokenRequired": "有効なBearerトークンが必要です",
+    "invalidRequest": "無効なリクエストです",
+    "ttsGenerationFailed": "TTS生成に失敗しました",
     "signOutFailed": "サインアウトに失敗しました。もう一度お試しください。"
   },
   "success": {
