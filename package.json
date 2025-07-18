@@ -1,6 +1,6 @@
 {
-  "name": "swift",
-  "version": "0.1.0",
+  "name": "friday",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

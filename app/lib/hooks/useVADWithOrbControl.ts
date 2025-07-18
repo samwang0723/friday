@@ -91,8 +91,8 @@ export interface VADOrbConfig {
   onSpeechStart?: () => void;
   onSpeechEnd?: (audio: Float32Array) => void;
   isStreaming?: boolean;
-  isAuthenticated?: boolean; // Add authentication state
-  audioEnabled?: boolean; // Add audio mode state
+  isAuthenticated?: boolean;
+  audioEnabled?: boolean;
   positiveSpeechThreshold?: number;
   minSpeechFrames?: number;
   rmsEnergyThreshold?: number; // RMS energy threshold in dBFS (e.g., -40)
