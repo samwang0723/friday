@@ -300,6 +300,7 @@ export function useVADWithOrbControl(config: VADOrbConfig) {
     }));
   }, []);
 
+  // Initialize VAD with error handling
   const vad = useMicVAD({
     startOnLoad: false,
     onSpeechStart,
@@ -327,7 +328,19 @@ export function useVADWithOrbControl(config: VADOrbConfig) {
     start: () => {
       if (config.isAuthenticated && config.audioEnabled !== false) {
         console.log("VAD: Starting VAD (authenticated and audio enabled)");
-        vadRef.current?.start();
+        try {
+          vadRef.current?.start();
+        } catch (error) {
+          console.error("VAD: Error starting VAD:", error);
+          // Attempt to restart VAD after a delay
+          setTimeout(() => {
+            try {
+              vadRef.current?.start();
+            } catch (retryError) {
+              console.error("VAD: Retry failed:", retryError);
+            }
+          }, 2000);
+        }
       } else if (!config.isAuthenticated) {
         console.log("VAD: Cannot start VAD - user not authenticated");
       } else if (config.audioEnabled === false) {
@@ -336,7 +349,11 @@ export function useVADWithOrbControl(config: VADOrbConfig) {
     },
     pause: () => {
       console.log("VAD: Pausing VAD");
-      vadRef.current?.pause();
+      try {
+        vadRef.current?.pause();
+      } catch (error) {
+        console.error("VAD: Error pausing VAD:", error);
+      }
     },
     vad: vadRef.current
   };

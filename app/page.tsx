@@ -760,6 +760,29 @@ export default function Home() {
     vad
   ]);
 
+  // Global error handler for VAD worker errors
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      if (
+        event.message &&
+        event.message.includes("replace is not a function")
+      ) {
+        console.log("VAD: Caught worker error, attempting to restart VAD");
+        event.preventDefault();
+
+        // Try to restart VAD after a delay
+        setTimeout(() => {
+          if (auth.isAuthenticated && settings.audioEnabled) {
+            vad.start();
+          }
+        }, 2000);
+      }
+    };
+
+    window.addEventListener("error", handleError);
+    return () => window.removeEventListener("error", handleError);
+  }, [auth.isAuthenticated, settings.audioEnabled, vad]);
+
   // Keyboard shortcuts
   useEffect(() => {
     function keyDown(e: KeyboardEvent) {
