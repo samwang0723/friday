@@ -44,9 +44,7 @@ export default function MessageDisplay({
     >
       {authLoading && <p>{t("auth.checkingAuth")}</p>}
 
-      {!authLoading && !isAuthenticated && (
-        <p>{t("auth.pleaseSignIn")}</p>
-      )}
+      {!authLoading && !isAuthenticated && <p>{t("auth.pleaseSignIn")}</p>}
 
       {!authLoading && isAuthenticated && currentMessage && (
         <p>{currentMessage}</p>
@@ -71,60 +69,78 @@ export default function MessageDisplay({
         !currentMessage && (
           <>
             <p>
-              {locale === 'zh' || locale === 'zh-TW' ? (
+              {locale === "zh" || locale === "zh-TW" ? (
                 <>
                   {t("assistant.description")}{" "}
                   <Link href="https://groq.com">Groq</Link>、{" "}
                   <Link href="https://cartesia.ai">Cartesia</Link>、{" "}
                   <Link href="https://www.vad.ricky0123.com/">VAD</Link> 和{" "}
-                  <Link href="https://vercel.com">Vercel</Link> 驱动的快速开源语音助手。{" "}
-                  <Link href="https://github.com/samwang0723/friday" target="_blank">
+                  <Link href="https://vercel.com">Vercel</Link>{" "}
+                  驱动的快速开源语音助手。{" "}
+                  <Link
+                    href="https://github.com/samwang0723/friday"
+                    target="_blank"
+                  >
                     {t("assistant.learnMore")}
                   </Link>
                   。
                 </>
-              ) : locale === 'ja' ? (
+              ) : locale === "ja" ? (
                 <>
                   <Link href="https://groq.com">Groq</Link>、{" "}
                   <Link href="https://cartesia.ai">Cartesia</Link>、{" "}
                   <Link href="https://www.vad.ricky0123.com/">VAD</Link>、{" "}
-                  <Link href="https://vercel.com">Vercel</Link> によって駆動される{t("assistant.description")}{" "}
-                  <Link href="https://github.com/samwang0723/friday" target="_blank">
+                  <Link href="https://vercel.com">Vercel</Link>{" "}
+                  によって駆動される{t("assistant.description")}{" "}
+                  <Link
+                    href="https://github.com/samwang0723/friday"
+                    target="_blank"
+                  >
                     {t("assistant.learnMore")}
                   </Link>
                   。
                 </>
-              ) : locale === 'ko' ? (
+              ) : locale === "ko" ? (
                 <>
                   <Link href="https://groq.com">Groq</Link>、{" "}
                   <Link href="https://cartesia.ai">Cartesia</Link>、{" "}
                   <Link href="https://www.vad.ricky0123.com/">VAD</Link>、{" "}
-                  <Link href="https://vercel.com">Vercel</Link> 로 구동되는 {t("assistant.description")}{" "}
-                  <Link href="https://github.com/samwang0723/friday" target="_blank">
+                  <Link href="https://vercel.com">Vercel</Link> 로 구동되는{" "}
+                  {t("assistant.description")}{" "}
+                  <Link
+                    href="https://github.com/samwang0723/friday"
+                    target="_blank"
+                  >
                     {t("assistant.learnMore")}
                   </Link>
                   .
                 </>
-              ) : locale === 'es' ? (
+              ) : locale === "es" ? (
                 <>
                   {t("assistant.description")}{" "}
                   <Link href="https://groq.com">Groq</Link>,{" "}
                   <Link href="https://cartesia.ai">Cartesia</Link>,{" "}
                   <Link href="https://www.vad.ricky0123.com/">VAD</Link> y{" "}
                   <Link href="https://vercel.com">Vercel</Link>.{" "}
-                  <Link href="https://github.com/samwang0723/friday" target="_blank">
+                  <Link
+                    href="https://github.com/samwang0723/friday"
+                    target="_blank"
+                  >
                     {t("assistant.learnMore")}
                   </Link>
                   .
                 </>
-              ) : locale === 'fr' ? (
+              ) : locale === "fr" ? (
                 <>
                   {t("assistant.description")}{" "}
                   <Link href="https://groq.com">Groq</Link>,{" "}
                   <Link href="https://cartesia.ai">Cartesia</Link>,{" "}
                   <Link href="https://www.vad.ricky0123.com/">VAD</Link> et{" "}
                   <Link href="https://vercel.com">Vercel</Link>.{" "}
-                  <Link href="https://github.com/samwang0723/friday" target="_blank">
+                  <Link
+                    href="https://github.com/samwang0723/friday"
+                    target="_blank"
+                  >
                     {t("assistant.learnMore")}
                   </Link>
                   .
@@ -136,7 +152,10 @@ export default function MessageDisplay({
                   <Link href="https://cartesia.ai">Cartesia</Link>,{" "}
                   <Link href="https://www.vad.ricky0123.com/">VAD</Link>, and{" "}
                   <Link href="https://vercel.com">Vercel</Link>.{" "}
-                  <Link href="https://github.com/samwang0723/friday" target="_blank">
+                  <Link
+                    href="https://github.com/samwang0723/friday"
+                    target="_blank"
+                  >
                     {t("assistant.learnMore")}
                   </Link>
                   .

@@ -1,5 +1,9 @@
 import { AgentCoreService } from "@/lib/agentCore";
-import { synthesizeSpeech, synthesizeSpeechStream, transcribeAudio } from "@/lib/audio";
+import {
+  synthesizeSpeech,
+  synthesizeSpeechStream,
+  transcribeAudio
+} from "@/lib/audio";
 import { headers } from "next/headers";
 import { after } from "next/server";
 import { z } from "zod";
@@ -157,7 +161,7 @@ export async function POST(request: Request) {
     // Check if streaming is enabled
     if (settings.streaming === false) {
       console.log("Using single response mode (non-streaming)");
-      
+
       // Use Agent Core chat function for single response
       const chatResponse = await agentCore.chat(
         `
@@ -185,7 +189,7 @@ export async function POST(request: Request) {
       }
 
       const audioBuffer = await audioResponse.arrayBuffer();
-      
+
       // Clean up the request from tracking
       requestManager.completeRequest(accessToken);
 

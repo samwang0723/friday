@@ -34,20 +34,20 @@ export default function Settings({
 
   // Helper functions for localStorage persistence
   const loadSettingsFromStorage = (): SettingsState => {
-    if (typeof window === 'undefined') {
+    if (typeof window === "undefined") {
       // Server-side rendering fallback
       return {
         sttEngine: "groq",
-        ttsEngine: "elevenlabs", 
+        ttsEngine: "elevenlabs",
         streaming: true
       };
     }
 
     try {
-      const savedSettings = localStorage.getItem('voiceAssistantSettings');
+      const savedSettings = localStorage.getItem("voiceAssistantSettings");
       if (savedSettings) {
         const parsed = JSON.parse(savedSettings);
-        console.log('Loaded settings from localStorage:', parsed);
+        console.log("Loaded settings from localStorage:", parsed);
         return {
           sttEngine: parsed.sttEngine || "groq",
           ttsEngine: parsed.ttsEngine || "elevenlabs",
@@ -55,7 +55,7 @@ export default function Settings({
         };
       }
     } catch (error) {
-      console.error('Failed to load settings from localStorage:', error);
+      console.error("Failed to load settings from localStorage:", error);
     }
 
     // Return defaults if no saved settings or error
@@ -67,12 +67,15 @@ export default function Settings({
   };
 
   const saveSettingsToStorage = (newSettings: SettingsState) => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       try {
-        localStorage.setItem('voiceAssistantSettings', JSON.stringify(newSettings));
-        console.log('Saved settings to localStorage:', newSettings);
+        localStorage.setItem(
+          "voiceAssistantSettings",
+          JSON.stringify(newSettings)
+        );
+        console.log("Saved settings to localStorage:", newSettings);
       } catch (error) {
-        console.error('Failed to save settings to localStorage:', error);
+        console.error("Failed to save settings to localStorage:", error);
       }
     }
   };
@@ -108,7 +111,6 @@ export default function Settings({
       updateSetting("ttsEngine", "elevenlabs");
     }
   }, [locale, isEnglishLocale, settings.ttsEngine]);
-
 
   const handleLogout = () => {
     if (!isAuthenticated) return;

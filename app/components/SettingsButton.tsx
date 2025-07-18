@@ -6,7 +6,7 @@ interface SettingsButtonProps {
 
 export default function SettingsButton({ onClick }: SettingsButtonProps) {
   const t = useTranslations("settings");
-  
+
   return (
     <button
       onClick={onClick}

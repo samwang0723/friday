@@ -660,8 +660,11 @@ export default function Home() {
     onSpeechStart,
     onSpeechEnd,
     isStreaming: chatState.isStreaming,
-    positiveSpeechThreshold: 0.6,
-    minSpeechFrames: 4
+    positiveSpeechThreshold: 0.7, // Increased from 0.6 for more strictness
+    minSpeechFrames: 6, // Increased from 4 for more strictness
+    rmsEnergyThreshold: -35, // Increased from -40 dBFS for higher volume requirement
+    minSpeechDuration: 400, // Minimum 400ms to filter out coughs, clicks, short sounds
+    spectralCentroidThreshold: 1000 // Enable frequency analysis for speech detection
   });
 
   // VAD state is now managed by the custom hook
