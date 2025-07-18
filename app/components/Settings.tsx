@@ -103,7 +103,7 @@ export default function Settings({
     onSettingsChange(savedSettings);
   }, []);
 
-  const updateSetting = (key: string, value: any) => {
+  const updateSetting = (key: string, value: unknown) => {
     const newSettings = {
       ...settings,
       [key]: value
@@ -119,13 +119,14 @@ export default function Settings({
       // For Chinese locales, force Minimax only
       if (settings.ttsEngine !== "minimax") {
         console.log(
-          `Setting TTS engine to Minimax for Chinese locale: ${locale}`
+          "Setting TTS engine to Minimax for Chinese locale:",
+          locale
         );
         updateSetting("ttsEngine", "minimax");
       }
     } else if (!isEnglishLocale && settings.ttsEngine !== "elevenlabs") {
       // For other non-English locales, force ElevenLabs
-      console.log(`Forcing TTS engine to ElevenLabs for locale: ${locale}`);
+      console.log("Forcing TTS engine to ElevenLabs for locale:", locale);
       updateSetting("ttsEngine", "elevenlabs");
     }
   }, [locale, isEnglishLocale, isChineseLocale, settings.ttsEngine]);
