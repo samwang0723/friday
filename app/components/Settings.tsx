@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import LanguageSwitcher from "./LanguageSwitcher";
 
 interface SettingsProps {
@@ -10,14 +10,13 @@ interface SettingsProps {
   onClose: () => void;
   onLogout: () => void;
   isAuthenticated: boolean;
-  onSettingsChange: (settings: SettingsState) => void;
-}
-
-export interface SettingsState {
-  sttEngine: string;
-  ttsEngine: string;
-  streaming: boolean;
-  audioEnabled: boolean;
+  settings: {
+    sttEngine: string;
+    ttsEngine: string;
+    streaming: boolean;
+    audioEnabled: boolean;
+  };
+  onSettingsChange: (settings: SettingsProps["settings"]) => void;
 }
 
 export default function Settings({
@@ -25,6 +24,7 @@ export default function Settings({
   onClose,
   onLogout,
   isAuthenticated,
+  settings,
   onSettingsChange
 }: SettingsProps) {
   const t = useTranslations("settings");
@@ -36,80 +36,11 @@ export default function Settings({
   const isChineseLocale =
     locale === "zh" || locale === "zh-TW" || locale === "zh-CN";
 
-  // Helper functions for localStorage persistence
-  const loadSettingsFromStorage = (): SettingsState => {
-    if (typeof window === "undefined") {
-      // Server-side rendering fallback
-      return {
-        sttEngine: "groq",
-        ttsEngine: "elevenlabs", // Will be updated by useEffect based on locale
-        streaming: true,
-        audioEnabled: true
-      };
-    }
-
-    try {
-      const savedSettings = localStorage.getItem("voiceAssistantSettings");
-      if (savedSettings) {
-        const parsed = JSON.parse(savedSettings);
-        console.log("Loaded settings from localStorage:", parsed);
-        return {
-          sttEngine: parsed.sttEngine || "groq",
-          ttsEngine: parsed.ttsEngine || "elevenlabs",
-          streaming: parsed.streaming !== undefined ? parsed.streaming : true,
-          audioEnabled:
-            parsed.audioEnabled !== undefined ? parsed.audioEnabled : true
-        };
-      }
-    } catch (error) {
-      console.error("Failed to load settings from localStorage:", error);
-    }
-
-    // Return defaults if no saved settings or error
-    return {
-      sttEngine: "groq",
-      ttsEngine: "elevenlabs",
-      streaming: true,
-      audioEnabled: true
-    };
-  };
-
-  const saveSettingsToStorage = (newSettings: SettingsState) => {
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem(
-          "voiceAssistantSettings",
-          JSON.stringify(newSettings)
-        );
-        console.log("Saved settings to localStorage:", newSettings);
-      } catch (error) {
-        console.error("Failed to save settings to localStorage:", error);
-      }
-    }
-  };
-
-  const [settings, setSettings] = useState<SettingsState>({
-    sttEngine: "groq",
-    ttsEngine: "elevenlabs",
-    streaming: true,
-    audioEnabled: true
-  });
-
-  // Load settings from localStorage after component mounts
-  useEffect(() => {
-    const savedSettings = loadSettingsFromStorage();
-    setSettings(savedSettings);
-    // Call onSettingsChange with loaded settings
-    onSettingsChange(savedSettings);
-  }, []);
-
   const updateSetting = (key: string, value: unknown) => {
     const newSettings = {
       ...settings,
       [key]: value
     };
-    setSettings(newSettings);
-    saveSettingsToStorage(newSettings);
     onSettingsChange(newSettings);
   };
 

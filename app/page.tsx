@@ -3,7 +3,8 @@
 import ChatForm from "@/components/ChatForm";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import MessageDisplay from "@/components/MessageDisplay";
-import Settings, { SettingsState } from "@/components/Settings";
+import Settings from "@/components/Settings";
+import { useSettings } from "@/lib/hooks/useSettings";
 import SettingsButton from "@/components/SettingsButton";
 import VoiceOrb from "@/components/VoiceOrb";
 import { AgentCoreService } from "@/lib/agentCore";
@@ -104,12 +105,7 @@ export default function Home() {
 
   // UI state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settings, setSettings] = useState<SettingsState>({
-    sttEngine: "groq",
-    ttsEngine: "elevenlabs",
-    streaming: true,
-    audioEnabled: true
-  });
+  const { settings, updateSettings, isLoaded: settingsLoaded } = useSettings();
 
   // Chat state
   const [chatState, setChatState] = useState<ChatState>({
@@ -731,6 +727,9 @@ export default function Home() {
 
   // VAD management with timeout to avoid circular dependency
   useEffect(() => {
+    // Wait for settings to be loaded before managing VAD
+    if (!settingsLoaded) return;
+
     const timeoutId = setTimeout(() => {
       if (
         auth.isAuthenticated &&
@@ -757,7 +756,8 @@ export default function Home() {
     settings.audioEnabled,
     vadState.loading,
     vadState.errored,
-    vad
+    vad,
+    settingsLoaded
   ]);
 
   // Global error handler for VAD worker errors
@@ -816,8 +816,8 @@ export default function Home() {
     }
   };
 
-  const handleSettingsChange = (newSettings: SettingsState) => {
-    setSettings(newSettings);
+  const handleSettingsChange = (newSettings: typeof settings) => {
+    updateSettings(newSettings);
     console.log("Settings updated:", newSettings);
   };
 
@@ -863,6 +863,7 @@ export default function Home() {
         onClose={() => setIsSettingsOpen(false)}
         onLogout={handleLogout}
         isAuthenticated={auth.isAuthenticated}
+        settings={settings}
         onSettingsChange={handleSettingsChange}
       />
 
