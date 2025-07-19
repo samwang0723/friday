@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import Pusher from "pusher-js";
 import { agentCoreConfig } from "@/config";
 import type {
-  PusherConfig,
   ChannelInfo,
   ConnectionStatus,
+  PusherConfig,
   PusherEventHandlers
 } from "@/lib/types/pusher";
+import Pusher, { Channel } from "pusher-js";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface UsePusherProps {
   isAuthenticated: boolean;
@@ -22,8 +22,8 @@ export function usePusher({
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
   const [statusText, setStatusText] = useState("Disconnected");
 
-  const pusherRef = useRef<any>(null);
-  const userChannelRef = useRef<any>(null);
+  const pusherRef = useRef<Pusher | null>(null);
+  const userChannelRef = useRef<Channel | null>(null);
   const connectionRetriesRef = useRef(0);
   const isInitializingRef = useRef(false);
 
@@ -54,7 +54,7 @@ export function usePusher({
       console.error("Max Pusher connection retries reached");
       updateStatus("disconnected", "Connection failed");
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, updateStatus]);
 
   const disconnectPusher = useCallback(() => {
     if (userChannelRef.current) {
@@ -145,7 +145,7 @@ export function usePusher({
         isInitializingRef.current = false;
       });
 
-      pusherRef.current.connection.bind("error", (error: any) => {
+      pusherRef.current.connection.bind("error", (error: Error | unknown) => {
         console.error("Pusher connection error:", error);
         updateStatus("disconnected", "Connection error");
         isInitializingRef.current = false;
@@ -158,12 +158,15 @@ export function usePusher({
         updateStatus("connected", "Connected");
       });
 
-      userChannelRef.current.bind("pusher:subscription_error", (error: any) => {
-        console.error("Channel subscription error:", error);
-        updateStatus("disconnected", "Subscription failed");
-        isInitializingRef.current = false;
-        handlePusherError();
-      });
+      userChannelRef.current.bind(
+        "pusher:subscription_error",
+        (error: Error | unknown) => {
+          console.error("Channel subscription error:", error);
+          updateStatus("disconnected", "Subscription failed");
+          isInitializingRef.current = false;
+          handlePusherError();
+        }
+      );
 
       // Bind to specific event types
       userChannelRef.current.bind(
