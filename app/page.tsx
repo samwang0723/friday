@@ -3,6 +3,7 @@
 import ChatForm from "@/components/ChatForm";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import MessageDisplay from "@/components/MessageDisplay";
+import NotificationStatus from "@/components/NotificationStatus";
 import Settings from "@/components/Settings";
 import { useSettings } from "@/lib/hooks/useSettings";
 import SettingsButton from "@/components/SettingsButton";
@@ -10,7 +11,14 @@ import VoiceOrb from "@/components/VoiceOrb";
 import { AgentCoreService } from "@/lib/agentCore";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { usePlayer } from "@/lib/hooks/usePlayer";
+import { usePusher } from "@/lib/hooks/usePusher";
 import { useVADManager } from "@/lib/hooks/useVADManager";
+import type {
+  EmailNotificationData,
+  CalendarEventData,
+  SystemNotificationData,
+  ChatMessageData
+} from "@/lib/types/pusher";
 import { utils } from "@ricky0123/vad-react";
 import { track } from "@vercel/analytics";
 import { useLocale, useTranslations } from "next-intl";
@@ -721,6 +729,70 @@ export default function Home() {
 
   const vadState = vadManager.state;
 
+  // Pusher event handlers
+  const handleEmailNotification = useCallback((data: EmailNotificationData) => {
+    console.log("Important email event:", data);
+    toast.info(`Important Email: ${data.subject} from ${data.fromAddress}`, {
+      duration: 10000
+    });
+  }, []);
+
+  const handleCalendarUpcoming = useCallback((data: CalendarEventData) => {
+    console.log("Upcoming calendar event:", data);
+    const timeText =
+      data.timeUntilStart && data.timeUntilStart <= 15
+        ? "starting soon"
+        : `in ${data.timeUntilStart} minutes`;
+    toast.info(`Upcoming Event: ${data.title} ${timeText}`, {
+      duration: 10000
+    });
+  }, []);
+
+  const handleCalendarNew = useCallback((data: CalendarEventData) => {
+    console.log("New calendar event:", data);
+    const eventDate = data.startTime
+      ? new Date(data.startTime).toLocaleDateString()
+      : "soon";
+    toast.info(`New Event Added: ${data.title} on ${eventDate}`, {
+      duration: 8000
+    });
+  }, []);
+
+  const handleSystemNotification = useCallback(
+    (data: SystemNotificationData) => {
+      console.log("System notification:", data);
+      toast.info(data.title ? `${data.title}: ${data.message}` : data.message, {
+        duration: 8000
+      });
+    },
+    []
+  );
+
+  const handleChatMessage = useCallback((data: ChatMessageData) => {
+    console.log("Proactive chat message:", data);
+    // For now, we'll use toast to show the message and let the user know there's a new message
+    // TODO: In the future, this could be integrated to add messages directly to the chat
+    toast.info(
+      `New message: ${data.message.substring(0, 100)}${data.message.length > 100 ? "..." : ""}`,
+      {
+        duration: 10000
+      }
+    );
+  }, []);
+
+  // Pusher hook
+  const pusher = usePusher({
+    isAuthenticated: auth.isAuthenticated,
+    getToken: auth.getToken,
+    eventHandlers: {
+      onEmailNotification: handleEmailNotification,
+      onCalendarUpcoming: handleCalendarUpcoming,
+      onCalendarNew: handleCalendarNew,
+      onSystemNotification: handleSystemNotification,
+      onChatMessage: handleChatMessage
+    }
+  });
+
   // Global error handler for VAD worker errors
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
@@ -817,6 +889,16 @@ export default function Home() {
       />
 
       <SettingsButton onClick={() => setIsSettingsOpen(true)} />
+
+      {/* Notification Status */}
+      {auth.isAuthenticated && (
+        <div className="fixed top-4 right-4 z-10">
+          <NotificationStatus
+            status={pusher.status}
+            statusText={pusher.statusText}
+          />
+        </div>
+      )}
 
       {/* Settings Component */}
       <Settings
