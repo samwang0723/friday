@@ -297,7 +297,13 @@ export function useVADManager(
     onSpeechStart,
     onSpeechEnd,
     onVADMisfire: () => {
-      console.log("VAD: Misfire detected");
+      console.log("VAD: Misfire detected, resetting Orb state");
+      setVADState(prev => ({
+        ...prev,
+        actualUserSpeaking: false,
+        userSpeaking: false,
+        shouldShowOrb: false
+      }));
     },
     positiveSpeechThreshold: config.positiveSpeechThreshold || 0.7,
     minSpeechFrames: config.minSpeechFrames || 6,

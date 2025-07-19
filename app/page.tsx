@@ -677,10 +677,9 @@ export default function Home() {
       // Stop audio playback immediately
       playerRef.current.stop();
 
-      // Reset streaming state immediately
+      // Reset streaming state but preserve message
       updateChatStateRef.current({
-        isStreaming: false,
-        message: ""
+        isStreaming: false
       });
     }
   }, []);
@@ -709,11 +708,11 @@ export default function Home() {
   // VAD Manager setup
   const vadManager = useVADManager(
     {
-      positiveSpeechThreshold: 0.7,
+      positiveSpeechThreshold: 0.6,
       minSpeechFrames: 6,
-      rmsEnergyThreshold: -35,
+      rmsEnergyThreshold: -40,
       minSpeechDuration: 400,
-      spectralCentroidThreshold: 1000
+      spectralCentroidThreshold: 900
     },
     {
       onSpeechStart,
