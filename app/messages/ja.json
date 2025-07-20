@@ -17,7 +17,7 @@
     "sessionExpired": "セッションの有効期限が切れました。再度サインインしてください。",
     "authError": "認証エラーです。ページを更新してください。",
     "checkingAuth": "認証を確認中...",
-    "pleaseSignIn": "音声アシスタントを使用するにはGoogleでサインインしてください。",
+    "pleaseSignIn": "Fridayの音声アシスタントを使用するにはGoogleでサインインしてください。",
     "loginToContinue": "続行するにはログインしてください"
   },
   "assistant": {

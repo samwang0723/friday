@@ -17,7 +17,7 @@
     "sessionExpired": "会话已过期，请重新登录。",
     "authError": "认证错误，请刷新页面。",
     "checkingAuth": "正在检查认证状态...",
-    "pleaseSignIn": "请使用 Google 登录以使用语音助手。",
+    "pleaseSignIn": "请使用 Google 登录以使用 Friday 语音助手。",
     "loginToContinue": "请登录以继续"
   },
   "assistant": {

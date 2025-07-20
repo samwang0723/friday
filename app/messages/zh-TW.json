@@ -17,7 +17,7 @@
     "sessionExpired": "會話已過期，請重新登入。",
     "authError": "認證錯誤，請重新整理頁面。",
     "checkingAuth": "正在檢查認證狀態...",
-    "pleaseSignIn": "請使用 Google 登入以使用語音助手。",
+    "pleaseSignIn": "請使用 Google 登入以使用 Friday 語音助手。",
     "loginToContinue": "請登入以繼續"
   },
   "assistant": {

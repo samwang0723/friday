@@ -17,7 +17,7 @@
     "sessionExpired": "Session expired. Please sign in again.",
     "authError": "Authentication error. Please refresh the page.",
     "checkingAuth": "Checking authentication...",
-    "pleaseSignIn": "Please sign in with Google to use the voice assistant.",
+    "pleaseSignIn": "Please sign in with Google to use the Friday voice assistant.",
     "loginToContinue": "Please login to continue"
   },
   "assistant": {
