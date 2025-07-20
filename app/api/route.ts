@@ -190,11 +190,7 @@ export async function POST(request: Request) {
       } else {
         // Use Agent Core chat function for user input
         chatResponse = await agentCore.chat(
-          `
-            - User location is ${await location()}.
-            - The current time is ${await time()}.
-            ${transcript}
-            `,
+          transcript,
           accessToken as string,
           clientContext
         );
@@ -335,11 +331,7 @@ export async function POST(request: Request) {
                 yield data.transcript;
               })()
             : agentCore.chatStream(
-                `
-                  - User location is ${await location()}.
-                  - The current time is ${await time()}.
-                  ${transcript}
-                  `,
+                transcript,
                 accessToken as string,
                 clientContext,
                 abortController.signal
