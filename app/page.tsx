@@ -718,11 +718,11 @@ export default function Home() {
   // VAD Manager setup
   const vadManager = useVADManager(
     {
-      positiveSpeechThreshold: 0.6,
-      minSpeechFrames: 7,
-      rmsEnergyThreshold: -40,
-      minSpeechDuration: 800,
-      spectralCentroidThreshold: 600
+      positiveSpeechThreshold: 0.7,
+      minSpeechFrames: 6,
+      rmsEnergyThreshold: -35,
+      minSpeechDuration: 400,
+      spectralCentroidThreshold: 1000
     },
     {
       onSpeechStart,
