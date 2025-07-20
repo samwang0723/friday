@@ -3,14 +3,22 @@
 import ChatForm from "@/components/ChatForm";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import MessageDisplay from "@/components/MessageDisplay";
+import NotificationStatus from "@/components/NotificationStatus";
 import Settings from "@/components/Settings";
-import { useSettings } from "@/lib/hooks/useSettings";
 import SettingsButton from "@/components/SettingsButton";
 import VoiceOrb from "@/components/VoiceOrb";
 import { AgentCoreService } from "@/lib/agentCore";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { usePlayer } from "@/lib/hooks/usePlayer";
+import { usePusher } from "@/lib/hooks/usePusher";
+import { useSettings } from "@/lib/hooks/useSettings";
 import { useVADManager } from "@/lib/hooks/useVADManager";
+import type {
+  CalendarEventData,
+  ChatMessageData,
+  EmailNotificationData,
+  SystemNotificationData
+} from "@/lib/types/pusher";
 import { utils } from "@ricky0123/vad-react";
 import { track } from "@vercel/analytics";
 import { useLocale, useTranslations } from "next-intl";
@@ -190,7 +198,7 @@ export default function Home() {
   // Define the action state
   const [messages, submit, isPending] = useActionState<
     Array<Message>,
-    string | Blob
+    string | Blob | { transcript: string }
   >(async (prevMessages, data) => {
     // Handle reset case for logout
     if (typeof data === "string" && data === "__reset__") {
@@ -217,12 +225,22 @@ export default function Home() {
 
     const formData = new FormData();
 
+    console.log("Submit action called with data:", data, "type:", typeof data);
+
     if (typeof data === "string") {
+      console.log("Processing as string input");
       formData.append("input", data);
       track("Text input");
-    } else {
+    } else if (data instanceof Blob) {
+      console.log("Processing as blob input");
       formData.append("input", data, "audio.wav");
       track("Speech input");
+    } else if (data && typeof data === "object" && "transcript" in data) {
+      console.log("Processing as transcript object:", data.transcript);
+      formData.append("transcript", data.transcript);
+      track("Transcript input");
+    } else {
+      console.error("Unknown data type:", data, typeof data);
     }
 
     for (const message of prevMessages) {
@@ -669,10 +687,9 @@ export default function Home() {
       // Stop audio playback immediately
       playerRef.current.stop();
 
-      // Reset streaming state immediately
+      // Reset streaming state but preserve message
       updateChatStateRef.current({
-        isStreaming: false,
-        message: ""
+        isStreaming: false
       });
     }
   }, []);
@@ -702,10 +719,10 @@ export default function Home() {
   const vadManager = useVADManager(
     {
       positiveSpeechThreshold: 0.7,
-      minSpeechFrames: 6,
-      rmsEnergyThreshold: -35,
-      minSpeechDuration: 400,
-      spectralCentroidThreshold: 1000
+      minSpeechFrames: 8,
+      rmsEnergyThreshold: -40,
+      minSpeechDuration: 1000,
+      spectralCentroidThreshold: 900
     },
     {
       onSpeechStart,
@@ -720,6 +737,79 @@ export default function Home() {
   );
 
   const vadState = vadManager.state;
+
+  // Pusher event handlers
+  const handleEmailNotification = useCallback((data: EmailNotificationData) => {
+    console.log("Important email event:", data);
+    toast.info(`Important Email: ${data.subject} from ${data.fromAddress}`, {
+      duration: 180000
+    });
+  }, []);
+
+  const handleCalendarUpcoming = useCallback((data: CalendarEventData) => {
+    console.log("Upcoming calendar event:", data);
+    const timeText =
+      data.timeUntilStart && data.timeUntilStart <= 15
+        ? "starting soon"
+        : `in ${data.timeUntilStart} minutes`;
+    toast.info(`Upcoming Event: ${data.title} ${timeText}`, {
+      duration: 180000
+    });
+  }, []);
+
+  const handleCalendarNew = useCallback((data: CalendarEventData) => {
+    console.log("New calendar event:", data);
+    const eventDate = data.startTime
+      ? new Date(data.startTime).toLocaleDateString()
+      : "soon";
+    toast.info(`New Event Added: ${data.title} on ${eventDate}`, {
+      duration: 180000
+    });
+  }, []);
+
+  const handleSystemNotification = useCallback(
+    (data: SystemNotificationData) => {
+      console.log("System notification:", data);
+      toast.info(data.title ? `${data.title}: ${data.message}` : data.message, {
+        duration: 180000
+      });
+    },
+    []
+  );
+
+  const handleChatMessage = useCallback(
+    (data: ChatMessageData) => {
+      console.log("Proactive chat message:", data);
+
+      if (!auth.isAuthenticated) {
+        toast.error(t("auth.loginToContinue"));
+        return;
+      }
+
+      // Use the existing submit function with transcript object to leverage full SSE/audio pipeline
+      console.log("Submitting transcript:", data.message);
+      startTransition(() => {
+        console.log("Inside transition, calling submit with:", {
+          transcript: data.message
+        });
+        submit({ transcript: data.message });
+      });
+    },
+    [auth, submit, t]
+  );
+
+  // Pusher hook
+  const pusher = usePusher({
+    isAuthenticated: auth.isAuthenticated,
+    getToken: auth.getToken,
+    eventHandlers: {
+      onEmailNotification: handleEmailNotification,
+      onCalendarUpcoming: handleCalendarUpcoming,
+      onCalendarNew: handleCalendarNew,
+      onSystemNotification: handleSystemNotification,
+      onChatMessage: handleChatMessage
+    }
+  });
 
   // Global error handler for VAD worker errors
   useEffect(() => {
@@ -817,6 +907,16 @@ export default function Home() {
       />
 
       <SettingsButton onClick={() => setIsSettingsOpen(true)} />
+
+      {/* Notification Status */}
+      {auth.isAuthenticated && (
+        <div className="fixed top-4 right-4 z-10">
+          <NotificationStatus
+            status={pusher.status}
+            statusText={pusher.statusText}
+          />
+        </div>
+      )}
 
       {/* Settings Component */}
       <Settings

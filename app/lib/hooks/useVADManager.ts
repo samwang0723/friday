@@ -297,10 +297,20 @@ export function useVADManager(
     onSpeechStart,
     onSpeechEnd,
     onVADMisfire: () => {
-      console.log("VAD: Misfire detected");
+      console.log("VAD: Misfire detected, resetting Orb state");
+      setVADState(prev => ({
+        ...prev,
+        actualUserSpeaking: false,
+        userSpeaking: false,
+        shouldShowOrb: false
+      }));
     },
-    positiveSpeechThreshold: config.positiveSpeechThreshold || 0.7,
-    minSpeechFrames: config.minSpeechFrames || 6,
+    positiveSpeechThreshold: config.positiveSpeechThreshold || 0.8,
+    minSpeechFrames: config.minSpeechFrames || 10,
+    negativeSpeechThreshold: 0.6, // Increased from 0.5 for cleaner cutoffs
+    redemptionFrames: 4, // Reduced from 4 for shorter speech tails
+    preSpeechPadFrames: 1,
+    // frameSamples: 480, // Aligned with RNNoise frame size
     stream: audioStream
   });
 

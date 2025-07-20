@@ -59,27 +59,32 @@ class RequestManager {
 // Global request manager instance
 const requestManager = new RequestManager();
 
-const schema = zfd.formData({
-  input: z.union([zfd.text(), zfd.file()]),
-  message: zfd.repeatableOfType(
-    zfd.json(
-      z.object({
-        role: z.enum(["user", "assistant"]),
-        content: z.string()
-      })
-    )
-  ),
-  settings: zfd
-    .json(
-      z.object({
-        sttEngine: z.string(),
-        ttsEngine: z.string(),
-        streaming: z.boolean().optional(),
-        audioEnabled: z.boolean().optional()
-      })
-    )
-    .optional()
-});
+const schema = zfd
+  .formData({
+    input: z.union([zfd.text(), zfd.file()]).optional(),
+    transcript: zfd.text().optional(),
+    message: zfd.repeatableOfType(
+      zfd.json(
+        z.object({
+          role: z.enum(["user", "assistant"]),
+          content: z.string()
+        })
+      )
+    ),
+    settings: zfd
+      .json(
+        z.object({
+          sttEngine: z.string(),
+          ttsEngine: z.string(),
+          streaming: z.boolean().optional(),
+          audioEnabled: z.boolean().optional()
+        })
+      )
+      .optional()
+  })
+  .refine(data => data.input !== undefined || data.transcript !== undefined, {
+    message: "Either input or transcript must be provided"
+  });
 
 export async function POST(request: Request) {
   console.time("transcribe " + request.headers.get("x-vercel-id") || "local");
@@ -108,8 +113,17 @@ export async function POST(request: Request) {
   const abortController = requestManager.createRequest(accessToken);
 
   try {
-    const { data, success } = schema.safeParse(await request.formData());
-    if (!success) return new Response("Invalid request", { status: 400 });
+    const formData = await request.formData();
+    console.log("FormData entries:");
+    for (const [key, value] of formData.entries()) {
+      console.log(`  ${key}:`, value);
+    }
+
+    const { data, success, error } = schema.safeParse(formData);
+    if (!success) {
+      console.log("Schema validation failed:", error);
+      return new Response("Invalid request", { status: 400 });
+    }
 
     // Get settings with defaults
     const settings = data.settings || {
@@ -127,8 +141,12 @@ export async function POST(request: Request) {
       return new Response("Request cancelled", { status: 200 });
     }
 
-    const transcript = await getTranscript(data.input, settings.sttEngine);
-    if (!transcript) return new Response("Invalid audio", { status: 400 });
+    // Handle transcript processing
+    const transcript =
+      data.transcript ||
+      (data.input ? await getTranscript(data.input, settings.sttEngine) : null);
+    if (!transcript)
+      return new Response("Invalid audio or transcript", { status: 400 });
 
     console.log("Transcript:", transcript);
 
@@ -164,16 +182,23 @@ export async function POST(request: Request) {
     if (settings.streaming === false) {
       console.log("Using single response mode (non-streaming)");
 
-      // Use Agent Core chat function for single response
-      const chatResponse = await agentCore.chat(
-        `
-          - User location is ${await location()}.
-          - The current time is ${await time()}.
-          ${transcript}
-          `,
-        accessToken as string,
-        clientContext
-      );
+      // Handle direct transcript vs user input
+      let chatResponse;
+      if (data.transcript) {
+        console.log("Direct transcript provided, skipping AgentCore");
+        chatResponse = { response: data.transcript };
+      } else {
+        // Use Agent Core chat function for user input
+        chatResponse = await agentCore.chat(
+          `
+            - User location is ${await location()}.
+            - The current time is ${await time()}.
+            ${transcript}
+            `,
+          accessToken as string,
+          clientContext
+        );
+      }
 
       if (abortController.signal.aborted) {
         return new Response("Request cancelled", { status: 200 });
@@ -201,7 +226,9 @@ export async function POST(request: Request) {
         return new Response(audioBuffer, {
           headers: {
             "Content-Type": "audio/raw",
-            "X-Transcript": encodeURIComponent(transcript),
+            "X-Transcript": encodeURIComponent(
+              data.transcript ? data.transcript : transcript
+            ),
             "X-Response-Text": encodeURIComponent(chatResponse.response),
             "X-Response-Type": "single"
           }
@@ -213,7 +240,9 @@ export async function POST(request: Request) {
         return new Response("", {
           headers: {
             "Content-Type": "text/plain",
-            "X-Transcript": encodeURIComponent(transcript),
+            "X-Transcript": encodeURIComponent(
+              data.transcript ? data.transcript : transcript
+            ),
             "X-Response-Text": encodeURIComponent(chatResponse.response),
             "X-Response-Type": "text-only"
           }
@@ -300,17 +329,21 @@ export async function POST(request: Request) {
         };
 
         try {
-          // Create Agent Core text stream
-          const textStream = agentCore.chatStream(
-            `
-              - User location is ${await location()}.
-              - The current time is ${await time()}.
-              ${transcript}
-              `,
-            accessToken as string,
-            clientContext,
-            abortController.signal
-          );
+          // Create text stream - either from AgentCore or direct transcript
+          const textStream = data.transcript
+            ? (async function* () {
+                yield data.transcript;
+              })()
+            : agentCore.chatStream(
+                `
+                  - User location is ${await location()}.
+                  - The current time is ${await time()}.
+                  ${transcript}
+                  `,
+                accessToken as string,
+                clientContext,
+                abortController.signal
+              );
 
           // Use simplified TTS streaming
 
@@ -322,6 +355,11 @@ export async function POST(request: Request) {
             for await (const chunk of textStream) {
               if (abortController.signal.aborted || isControllerClosed) {
                 break;
+              }
+
+              // Skip undefined chunks
+              if (chunk === undefined) {
+                continue;
               }
 
               // Store and send text chunk via SSE
@@ -383,7 +421,6 @@ export async function POST(request: Request) {
               }
 
               const { done, value } = await reader.read();
-
               if (done) {
                 // Send any remaining buffered audio
                 if (
@@ -484,7 +521,9 @@ export async function POST(request: Request) {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
-        "X-Transcript": encodeURIComponent(transcript),
+        "X-Transcript": encodeURIComponent(
+          data.transcript ? data.transcript : transcript
+        ),
         "X-Response-Type": "sse-stream"
       }
     });
