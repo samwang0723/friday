@@ -36,7 +36,7 @@ export default function MessageDisplay({
   return (
     <div
       className={clsx(
-        "text-neutral-400 dark:text-neutral-500 pt-4 text-center max-w-xl text-balance min-h-28 space-y-4 transition-all duration-500",
+        "text-neutral-400 dark:text-neutral-500 pt-4 text-center max-w-lg text-balance min-h-28 space-y-4 transition-all duration-500",
         {
           "scale-95 -translate-y-2 opacity-40 blur-sm": isSettingsOpen
         }
