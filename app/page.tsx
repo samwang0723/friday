@@ -718,10 +718,10 @@ export default function Home() {
   // VAD Manager setup
   const vadManager = useVADManager(
     {
-      positiveSpeechThreshold: 0.8,
-      minSpeechFrames: 10,
+      positiveSpeechThreshold: 0.7,
+      minSpeechFrames: 8,
       rmsEnergyThreshold: -40,
-      minSpeechDuration: 400,
+      minSpeechDuration: 1000,
       spectralCentroidThreshold: 900
     },
     {
@@ -789,7 +789,9 @@ export default function Home() {
       // Use the existing submit function with transcript object to leverage full SSE/audio pipeline
       console.log("Submitting transcript:", data.message);
       startTransition(() => {
-        console.log("Inside transition, calling submit with:", { transcript: data.message });
+        console.log("Inside transition, calling submit with:", {
+          transcript: data.message
+        });
         submit({ transcript: data.message });
       });
     },
