@@ -80,7 +80,7 @@
       "voiceData": "リクエスト処理のための音声録音と音声転写",
       "conversationHistory": "会話にコンテキストを提供するためのチャット履歴",
       "technicalData": "デバイス情報、IPアドレス、使用状況分析",
-      "authData": "Googleアカウントからの認証情報"
+      "authData": "Googleアカウントからの認証情報（カレンダーイベントとGmailコンテンツを含む）"
     },
     "dataUsage": {
       "title": "情報の使用方法",

@@ -81,7 +81,7 @@
       "voiceData": "Voice recordings and transcriptions for processing your requests",
       "conversationHistory": "Chat history to provide context for conversations",
       "technicalData": "Device information, IP address, and usage analytics",
-      "authData": "Authentication information from your Google account"
+      "authData": "Authentication information from your Google account, including calendar events and Gmail content"
     },
     "dataUsage": {
       "title": "How We Use Your Information",

@@ -81,7 +81,7 @@
       "voiceData": "用於處理您請求的語音錄音和轉錄",
       "conversationHistory": "為對話提供上下文的聊天記錄",
       "technicalData": "設備資訊、IP位址和使用情況分析",
-      "authData": "來自您Google帳戶的認證資訊"
+      "authData": "來自您Google帳戶的認證資訊，包括日曆事件和Gmail內容"
     },
     "dataUsage": {
       "title": "我們如何使用您的資訊",
