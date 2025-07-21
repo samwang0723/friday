@@ -12,7 +12,10 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { usePlayer } from "@/lib/hooks/usePlayer";
 import { usePusher } from "@/lib/hooks/usePusher";
 import { useSettings } from "@/lib/hooks/useSettings";
-import { useVADManager } from "@/lib/hooks/useVADManager";
+import {
+  useVADManager,
+  getVADConfigForSensitivity
+} from "@/lib/hooks/useVADManager";
 import { useWebMRecorder } from "@/lib/hooks/useWebMRecorder";
 import type {
   CalendarEventData,
@@ -761,15 +764,9 @@ export default function Home() {
     }
   }, []);
 
-  // VAD Manager setup
+  // VAD Manager setup - use dynamic configuration based on sensitivity setting
   const vadManager = useVADManager(
-    {
-      positiveSpeechThreshold: 0.7,
-      minSpeechFrames: 6,
-      rmsEnergyThreshold: -35,
-      minSpeechDuration: 400,
-      spectralCentroidThreshold: 500
-    },
+    getVADConfigForSensitivity(settings.vadSensitivity),
     {
       onSpeechStart,
       onSpeechEnd

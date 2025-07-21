@@ -69,28 +69,42 @@ function isSpeechLike(
   const spectralCentroid = calculateSpectralCentroid(audio);
 
   // RMS energy threshold: speech needs sufficient energy (higher than threshold)
-  const rmsThreshold = isStreaming ? -40 : config.rmsEnergyThreshold || -35;
+  // Made more sensitive to capture quieter speech
+  const rmsThreshold = isStreaming ? -45 : config.rmsEnergyThreshold || -40;
   if (rmsLevel < rmsThreshold) {
+    console.log(
+      `VAD: Audio filtered - RMS too low: ${rmsLevel.toFixed(2)}dBFS < ${rmsThreshold}dBFS`
+    );
     return false; // Too quiet, likely silence or background noise
   }
 
   // Spectral centroid threshold: speech has characteristic frequency distribution
-  // Human speech typically has centroid between 1000-3000 Hz
-  // Lower values (< 1000 Hz) are often low-frequency noise, breathing, or rumble
+  // Human speech typically has centroid between 300-3000 Hz
+  // Lower values (< 300 Hz) are often low-frequency noise, breathing, or rumble
+  // Relaxed from 1000Hz to 300Hz to capture more natural speech patterns
   const centroidThreshold = isStreaming
-    ? 800 // More lenient during streaming to allow interruptions
-    : config.spectralCentroidThreshold || 1000;
+    ? 250 // More lenient during streaming to allow interruptions
+    : config.spectralCentroidThreshold || 300;
 
   if (spectralCentroid < centroidThreshold) {
+    console.log(
+      `VAD: Audio filtered - Centroid too low: ${spectralCentroid.toFixed(0)}Hz < ${centroidThreshold}Hz`
+    );
     return false; // Too low frequency, likely not speech
   }
 
   // Optional: Also filter out very high frequency content (> 4000 Hz)
   // which is typically noise, clicks, or artifacts
   if (spectralCentroid > 4000) {
+    console.log(
+      `VAD: Audio filtered - Centroid too high: ${spectralCentroid.toFixed(0)}Hz > 4000Hz (likely noise)`
+    );
     return false; // Too high frequency, likely noise or artifacts
   }
 
+  console.log(
+    `VAD: Audio passed speech-like analysis - RMS: ${rmsLevel.toFixed(2)}dBFS, Centroid: ${spectralCentroid.toFixed(0)}Hz`
+  );
   return true;
 }
 
@@ -100,6 +114,42 @@ export interface VADConfig {
   rmsEnergyThreshold?: number;
   minSpeechDuration?: number;
   spectralCentroidThreshold?: number;
+}
+
+export type VADSensitivity = "low" | "medium" | "high";
+
+// Convert sensitivity setting to VAD configuration
+export function getVADConfigForSensitivity(
+  sensitivity: VADSensitivity
+): VADConfig {
+  switch (sensitivity) {
+    case "low":
+      return {
+        positiveSpeechThreshold: 0.8, // Higher threshold, less sensitive
+        minSpeechFrames: 8,
+        rmsEnergyThreshold: -35, // Higher threshold, requires louder speech
+        minSpeechDuration: 400, // Longer minimum duration
+        spectralCentroidThreshold: 400 // Higher frequency threshold
+      };
+    case "medium":
+      return {
+        positiveSpeechThreshold: 0.6, // Balanced
+        minSpeechFrames: 4,
+        rmsEnergyThreshold: -40,
+        minSpeechDuration: 250,
+        spectralCentroidThreshold: 300
+      };
+    case "high":
+      return {
+        positiveSpeechThreshold: 0.5, // Lower threshold, more sensitive
+        minSpeechFrames: 2,
+        rmsEnergyThreshold: -45, // Lower threshold, captures quieter speech
+        minSpeechDuration: 150, // Shorter minimum duration
+        spectralCentroidThreshold: 200 // Lower frequency threshold
+      };
+    default:
+      return getVADConfigForSensitivity("medium");
+  }
 }
 
 export interface VADCallbacks {
@@ -161,10 +211,13 @@ export function useVADManager(
   const onSpeechStart = useCallback(() => {
     const now = Date.now();
     const timeSinceAudioStart = now - audioStartTimeRef.current;
-    console.log("VAD: Speech detected");
 
     // Filter out speech detection that happens very soon after audio starts
     const isLikelyEcho = context.isStreaming && timeSinceAudioStart < 1000;
+
+    console.log(
+      `VAD: Speech detected - Time since audio start: ${timeSinceAudioStart}ms, Is likely echo: ${isLikelyEcho}, Is streaming: ${context.isStreaming}`
+    );
 
     setVADState(prev => ({
       ...prev,
@@ -177,7 +230,12 @@ export function useVADManager(
 
     // Only trigger interruption for actual user speech, not echo
     if (!isLikelyEcho) {
+      console.log("VAD: Triggering speech start callback");
       callbacks.onSpeechStart?.();
+    } else {
+      console.log(
+        "VAD: Suppressing speech start callback due to echo detection"
+      );
     }
   }, [context.isStreaming, callbacks.onSpeechStart]);
 
@@ -215,7 +273,13 @@ export function useVADManager(
       }
 
       console.log(
-        `VAD: Analysis - RMS: ${speechAnalysis.rmsLevel.toFixed(2)}dBFS, Centroid: ${speechAnalysis.spectralCentroid.toFixed(0)}Hz, Duration: ${speechAnalysis.duration}ms, Valid: ${speechAnalysis.isValid}`
+        `VAD: Speech Analysis Results:\n` +
+          `  - RMS Level: ${speechAnalysis.rmsLevel.toFixed(2)}dBFS (threshold: ${config.rmsEnergyThreshold || -40}dBFS)\n` +
+          `  - Spectral Centroid: ${speechAnalysis.spectralCentroid.toFixed(0)}Hz (threshold: ${config.spectralCentroidThreshold || 300}Hz)\n` +
+          `  - Duration: ${speechAnalysis.duration}ms (minimum: ${config.minSpeechDuration || 250}ms)\n` +
+          `  - Audio Length: ${audio.length} samples\n` +
+          `  - Is Streaming: ${context.isStreaming}\n` +
+          `  - Final Result: ${speechAnalysis.isValid ? "VALID SPEECH" : "FILTERED OUT"}`
       );
 
       setVADState(prev => ({

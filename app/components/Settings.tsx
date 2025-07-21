@@ -15,6 +15,7 @@ interface SettingsProps {
     ttsEngine: string;
     streaming: boolean;
     audioEnabled: boolean;
+    vadSensitivity: "low" | "medium" | "high";
   };
   settingsLoaded: boolean;
   onSettingsChange: (settings: SettingsProps["settings"]) => void;
@@ -301,6 +302,50 @@ export default function Settings({
                 )}
               />
             </button>
+          </div>
+
+          {/* VAD Sensitivity */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <svg
+                className="h-5 w-5 text-purple-400"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.5"
+                  d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
+                />
+              </svg>
+              <div className="flex flex-col">
+                <span className="text-white text-sm">
+                  Voice Detection Sensitivity
+                </span>
+                <span className="text-gray-400 text-xs">
+                  How sensitive the voice detection is to speech
+                </span>
+              </div>
+            </div>
+            <select
+              id="vad-sensitivity"
+              name="vadSensitivity"
+              value={settings.vadSensitivity}
+              onChange={e => updateSetting("vadSensitivity", e.target.value)}
+              className="bg-white/10 text-white text-sm rounded-md px-3 py-1 border-none focus:ring-2 focus:ring-blue-500 focus:outline-none appearance-none bg-no-repeat bg-right pr-8"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`,
+                backgroundPosition: "right 0.5rem center",
+                backgroundSize: "1.25em"
+              }}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
           </div>
 
           {/* Language Switcher */}

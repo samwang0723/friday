@@ -7,13 +7,15 @@ export interface SettingsState {
   ttsEngine: string;
   streaming: boolean;
   audioEnabled: boolean;
+  vadSensitivity: "low" | "medium" | "high";
 }
 
 const DEFAULT_SETTINGS: SettingsState = {
   sttEngine: "groq",
   ttsEngine: "elevenlabs",
   streaming: true,
-  audioEnabled: true
+  audioEnabled: true,
+  vadSensitivity: "medium"
 };
 
 const STORAGE_KEY = "voiceAssistantSettings";
@@ -48,7 +50,9 @@ export function useSettings() {
             audioEnabled:
               parsed.audioEnabled !== undefined
                 ? parsed.audioEnabled
-                : DEFAULT_SETTINGS.audioEnabled
+                : DEFAULT_SETTINGS.audioEnabled,
+            vadSensitivity:
+              parsed.vadSensitivity || DEFAULT_SETTINGS.vadSensitivity
           };
 
           return loadedSettings;
