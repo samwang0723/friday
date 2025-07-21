@@ -78,10 +78,10 @@ export async function transcribeAudio(
       }
 
       const groq = new Groq();
-      const audioFile = new File([new Uint8Array(audio.buffer)], "audio.wav", {
-        type: "audio/wav"
-      });
 
+      const audioFile = new File([audio], "audio.webm", {
+        type: "audio/webm"
+      });
       const { text } = await groq.audio.transcriptions.create({
         file: audioFile,
         model: config.modelName

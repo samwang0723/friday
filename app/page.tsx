@@ -13,13 +13,13 @@ import { usePlayer } from "@/lib/hooks/usePlayer";
 import { usePusher } from "@/lib/hooks/usePusher";
 import { useSettings } from "@/lib/hooks/useSettings";
 import { useVADManager } from "@/lib/hooks/useVADManager";
+import { useWebMRecorder } from "@/lib/hooks/useWebMRecorder";
 import type {
   CalendarEventData,
   ChatMessageData,
   EmailNotificationData,
   SystemNotificationData
 } from "@/lib/types/pusher";
-import { utils } from "@ricky0123/vad-react";
 import { track } from "@vercel/analytics";
 import { useLocale, useTranslations } from "next-intl";
 import React, {
@@ -233,7 +233,7 @@ export default function Home() {
       track("Text input");
     } else if (data instanceof Blob) {
       console.log("Processing as blob input");
-      formData.append("input", data, "audio.wav");
+      formData.append("input", data, "audio.webm");
       track("Speech input");
     } else if (data && typeof data === "object" && "transcript" in data) {
       console.log("Processing as transcript object:", data.transcript);
@@ -629,9 +629,27 @@ export default function Home() {
             // Resume VAD after streaming completes (for Firefox)
             const isFirefox = navigator.userAgent.includes("Firefox");
             if (isFirefox) {
-              setTimeout(() => {
-                vadManager.start();
-              }, 100);
+              // Wait for stream to fully close and VAD to be ready
+              const checkVADReadyAndStart = () => {
+                if (
+                  !vadManager.state.loading &&
+                  !vadManager.state.errored &&
+                  auth.isAuthenticated &&
+                  settings.audioEnabled
+                ) {
+                  vadManager.start();
+                } else if (
+                  !vadManager.state.errored &&
+                  auth.isAuthenticated &&
+                  settings.audioEnabled
+                ) {
+                  // Retry if VAD is still loading but not errored
+                  setTimeout(checkVADReadyAndStart, 50);
+                }
+              };
+
+              // Small delay to ensure stream cleanup is complete
+              setTimeout(checkVADReadyAndStart, 100);
             }
           }
         };
@@ -669,9 +687,20 @@ export default function Home() {
     submitRef.current = submit;
   });
 
-  // VAD setup with stable callbacks using refs
+  // Create refs to hold the instances
+  const vadManagerRef = useRef<any>(null);
+  const webmRecorderRef = useRef<any>(null);
+
+  // VAD callbacks using refs to avoid circular dependency
   const onSpeechStart = useCallback(() => {
     if (!authRef.current.isAuthenticated) return;
+
+    // Start WebM recording
+    const recorder = webmRecorderRef.current;
+    if (recorder?.state.isAvailable && !recorder.state.isRecording) {
+      console.log("Starting WebM recording");
+      recorder.startRecording();
+    }
 
     // Interrupt immediately when user starts speaking
     if (chatStateRef.current.message || chatStateRef.current.isStreaming) {
@@ -694,24 +723,41 @@ export default function Home() {
     }
   }, []);
 
-  const onSpeechEnd = useCallback((audio: Float32Array) => {
+  const onSpeechEnd = useCallback(async (audio: Float32Array) => {
     if (!authRef.current.isAuthenticated) return;
+
+    // Note: We ignore the Float32Array parameter from VAD and use WebM recorder instead
 
     // Stop any remaining audio playback before processing new input
     playerRef.current.stop();
 
-    // Process the completed speech input
-    const wav = utils.encodeWAV(audio);
-    const blob = new Blob([wav], { type: "audio/wav" });
+    try {
+      // Stop WebM recording and get the blob directly
+      const recorder = webmRecorderRef.current;
+      if (recorder?.state.isRecording) {
+        console.log("Stopping WebM recording");
+        const webmBlob = await recorder.stopRecording();
 
-    // Submit the audio
-    startTransition(() => submitRef.current(blob));
+        if (webmBlob) {
+          console.log("WebM recording completed, blob size:", webmBlob.size);
 
-    track("Speech input");
+          // Submit the audio as WebM
+          startTransition(() => submitRef.current(webmBlob));
 
-    const isFirefox = navigator.userAgent.includes("Firefox");
-    if (isFirefox) {
-      vadManager.pause();
+          track("Speech input");
+        } else {
+          console.warn("No WebM blob received from recorder");
+        }
+      } else {
+        console.warn("WebM recorder was not recording when speech ended");
+      }
+
+      const isFirefox = navigator.userAgent.includes("Firefox");
+      if (isFirefox) {
+        vadManagerRef.current?.pause();
+      }
+    } catch (error) {
+      console.error("Error with WebM recording:", error);
     }
   }, []);
 
@@ -722,7 +768,7 @@ export default function Home() {
       minSpeechFrames: 6,
       rmsEnergyThreshold: -35,
       minSpeechDuration: 400,
-      spectralCentroidThreshold: 1000
+      spectralCentroidThreshold: 500
     },
     {
       onSpeechStart,
@@ -737,6 +783,15 @@ export default function Home() {
   );
 
   const vadState = vadManager.state;
+
+  // WebM Recorder setup - uses same audio stream as VAD
+  const webmRecorder = useWebMRecorder(vadManager.audioStream);
+
+  // Update refs
+  React.useEffect(() => {
+    vadManagerRef.current = vadManager;
+    webmRecorderRef.current = webmRecorder;
+  }, [vadManager, webmRecorder]);
 
   // Pusher event handlers
   const handleEmailNotification = useCallback((data: EmailNotificationData) => {

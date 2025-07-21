@@ -126,6 +126,7 @@ export interface VADManager {
   start: () => void;
   pause: () => void;
   isRunning: boolean;
+  audioStream: MediaStream | undefined;
 }
 
 export function useVADManager(
@@ -145,6 +146,10 @@ export function useVADManager(
 
   const audioStartTimeRef = useRef<number>(0);
   const isActiveRef = useRef<boolean>(false);
+  const retryCountRef = useRef<number>(0);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const maxRetries = 3;
+  const baseRetryDelay = 1000; // 1 second
 
   // Track when audio starts for echo detection
   useEffect(() => {
@@ -239,20 +244,46 @@ export function useVADManager(
   // Create enhanced audio stream
   const [audioStream, setAudioStream] = useState<MediaStream | undefined>();
   const audioStreamRef = useRef<MediaStream | undefined>(undefined);
+  const streamCreationTimeoutRef = useRef<NodeJS.Timeout | undefined>(
+    undefined
+  );
 
   // Keep ref in sync with state
   useEffect(() => {
     audioStreamRef.current = audioStream;
   }, [audioStream]);
 
-  useEffect(() => {
-    const createEnhancedStream = async () => {
-      // Clean up existing stream first
-      if (audioStreamRef.current) {
-        audioStreamRef.current.getTracks().forEach(track => track.stop());
+  // Enhanced stream cleanup utility
+  const cleanupAudioStream = useCallback((stream?: MediaStream) => {
+    const streamToClean = stream || audioStreamRef.current;
+    if (streamToClean) {
+      try {
+        streamToClean.getTracks().forEach(track => {
+          if (track.readyState !== "ended") {
+            track.stop();
+          }
+        });
+      } catch (error) {
+        console.warn("VAD: Error during stream cleanup:", error);
+      }
+
+      if (streamToClean === audioStreamRef.current) {
         audioStreamRef.current = undefined;
         setAudioStream(undefined);
       }
+    }
+  }, []);
+
+  useEffect(() => {
+    const createEnhancedStream = async () => {
+      // Clear any existing timeout
+      if (streamCreationTimeoutRef.current) {
+        clearTimeout(streamCreationTimeoutRef.current);
+        streamCreationTimeoutRef.current = undefined;
+      }
+
+      // Clean up existing stream first
+      cleanupAudioStream();
 
       if (
         !context.isAuthenticated ||
@@ -263,7 +294,8 @@ export function useVADManager(
       }
 
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        // Add timeout protection for stream creation
+        const streamPromise = navigator.mediaDevices.getUserMedia({
           audio: {
             sampleRate: 16000,
             channelCount: 1,
@@ -272,24 +304,68 @@ export function useVADManager(
             autoGainControl: true
           }
         });
-        audioStreamRef.current = stream;
-        setAudioStream(stream);
+
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          streamCreationTimeoutRef.current = setTimeout(() => {
+            reject(new Error("Stream creation timeout after 10 seconds"));
+          }, 10000);
+        });
+
+        const stream = await Promise.race([streamPromise, timeoutPromise]);
+
+        // Clear timeout on success
+        if (streamCreationTimeoutRef.current) {
+          clearTimeout(streamCreationTimeoutRef.current);
+          streamCreationTimeoutRef.current = undefined;
+        }
+
+        // Verify stream is still valid before setting
+        if (
+          stream &&
+          stream.getTracks().length > 0 &&
+          stream.getTracks()[0].readyState === "live"
+        ) {
+          audioStreamRef.current = stream;
+          setAudioStream(stream);
+          console.log("VAD: Audio stream created successfully");
+        } else {
+          console.warn("VAD: Created stream is invalid, cleaning up");
+          cleanupAudioStream(stream);
+          setVADState(prev => ({ ...prev, errored: true }));
+        }
       } catch (error) {
+        // Clear timeout on error
+        if (streamCreationTimeoutRef.current) {
+          clearTimeout(streamCreationTimeoutRef.current);
+          streamCreationTimeoutRef.current = undefined;
+        }
+
         console.error("VAD: Failed to create audio stream:", error);
         setVADState(prev => ({ ...prev, errored: true }));
+
+        // Clean up any partial streams
+        cleanupAudioStream();
       }
     };
 
     createEnhancedStream();
 
     return () => {
-      // Use ref to ensure we clean up the current stream
-      if (audioStreamRef.current) {
-        audioStreamRef.current.getTracks().forEach(track => track.stop());
-        audioStreamRef.current = undefined;
+      // Clear timeout on cleanup
+      if (streamCreationTimeoutRef.current) {
+        clearTimeout(streamCreationTimeoutRef.current);
+        streamCreationTimeoutRef.current = undefined;
       }
+
+      // Use enhanced cleanup function
+      cleanupAudioStream();
     };
-  }, [context.isAuthenticated, context.audioEnabled, context.settingsLoaded]);
+  }, [
+    context.isAuthenticated,
+    context.audioEnabled,
+    context.settingsLoaded,
+    cleanupAudioStream
+  ]);
 
   // Initialize VAD with error handling
   const vad = useMicVAD({
@@ -305,6 +381,7 @@ export function useVADManager(
         shouldShowOrb: false
       }));
     },
+    model: "v5",
     positiveSpeechThreshold: config.positiveSpeechThreshold || 0.8,
     minSpeechFrames: config.minSpeechFrames || 10,
     negativeSpeechThreshold: 0.6, // Increased from 0.5 for cleaner cutoffs
@@ -314,14 +391,112 @@ export function useVADManager(
     stream: audioStream
   });
 
-  // Update VAD state based on hook state
+  // Enhanced error recovery with retry logic
+  const retryVADInitialization = useCallback(() => {
+    if (retryCountRef.current >= maxRetries) {
+      console.error(
+        `VAD: Maximum retry attempts (${maxRetries}) reached, giving up`
+      );
+      return;
+    }
+
+    retryCountRef.current += 1;
+    const retryDelay = baseRetryDelay * Math.pow(2, retryCountRef.current - 1); // Exponential backoff
+
+    console.log(
+      `VAD: Retrying initialization (attempt ${retryCountRef.current}/${maxRetries}) in ${retryDelay}ms`
+    );
+
+    retryTimeoutRef.current = setTimeout(() => {
+      setVADState(prev => ({ ...prev, errored: false }));
+      // The auto-management effect will handle restarting
+    }, retryDelay);
+  }, [maxRetries, baseRetryDelay]);
+
+  // Update VAD state based on hook state with retry logic
   useEffect(() => {
+    const wasErrored = vadState.errored;
+    const isNowErrored = Boolean(vad.errored);
+
     setVADState(prev => ({
       ...prev,
       loading: vad.loading || false,
-      errored: Boolean(vad.errored)
+      errored: isNowErrored
     }));
-  }, [vad.loading, vad.errored]);
+
+    // Trigger retry on new error if conditions are met
+    if (
+      !wasErrored &&
+      isNowErrored &&
+      context.isAuthenticated &&
+      context.audioEnabled &&
+      context.settingsLoaded
+    ) {
+      console.log("VAD: Error detected, initiating retry logic");
+      retryVADInitialization();
+    }
+
+    // Reset retry count on successful recovery
+    if (wasErrored && !isNowErrored) {
+      console.log("VAD: Error cleared, resetting retry count");
+      retryCountRef.current = 0;
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = undefined;
+      }
+    }
+  }, [
+    vad.loading,
+    vad.errored,
+    vadState.errored,
+    context.isAuthenticated,
+    context.audioEnabled,
+    context.settingsLoaded,
+    retryVADInitialization
+  ]);
+
+  // State validation utility
+  const validateVADState = useCallback(() => {
+    const issues = [];
+
+    if (isActiveRef.current && vad.errored) {
+      issues.push("VAD marked as active but is in error state");
+    }
+
+    if (isActiveRef.current && !audioStream) {
+      issues.push("VAD marked as active but no audio stream available");
+    }
+
+    if (vadState.userSpeaking && !isActiveRef.current) {
+      issues.push("User speaking detected but VAD not active");
+    }
+
+    if (issues.length > 0) {
+      console.warn("VAD State validation issues:", issues);
+
+      // Auto-correct common issues
+      if (isActiveRef.current && (vad.errored || !audioStream)) {
+        console.log("VAD: Auto-correcting invalid active state");
+        isActiveRef.current = false;
+        setVADState(prev => ({
+          ...prev,
+          userSpeaking: false,
+          actualUserSpeaking: false,
+          shouldShowOrb: false
+        }));
+      }
+    }
+
+    return issues.length === 0;
+  }, [vad.errored, audioStream, vadState.userSpeaking]);
+
+  // Periodic state validation (development mode only)
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      const validationInterval = setInterval(validateVADState, 5000);
+      return () => clearInterval(validationInterval);
+    }
+  }, [validateVADState]);
 
   // Auto-manage VAD based on context
   useEffect(() => {
@@ -344,8 +519,14 @@ export function useVADManager(
       return;
     }
 
+    if (!audioStream) {
+      console.log("VAD: Waiting for audio stream before starting");
+      return;
+    }
+
     if (!isActiveRef.current) {
       console.log("VAD: Starting automatically");
+      validateVADState(); // Validate before auto-starting
       vad.start();
       isActiveRef.current = true;
     }
@@ -354,7 +535,9 @@ export function useVADManager(
     context.audioEnabled,
     context.settingsLoaded,
     vad.loading,
-    vad.errored
+    vad.errored,
+    audioStream,
+    validateVADState
   ]);
 
   const start = useCallback(() => {
@@ -374,8 +557,14 @@ export function useVADManager(
       return;
     }
 
+    if (!audioStream) {
+      console.log("VAD: Cannot start - no audio stream available");
+      return;
+    }
+
     if (!isActiveRef.current) {
       console.log("VAD: Starting manually");
+      validateVADState(); // Validate before starting
       vad.start();
       isActiveRef.current = true;
     }
@@ -384,7 +573,9 @@ export function useVADManager(
     context.audioEnabled,
     context.settingsLoaded,
     vad.loading,
-    vad.errored
+    vad.errored,
+    audioStream,
+    validateVADState
   ]);
 
   const pause = useCallback(() => {
@@ -393,6 +584,16 @@ export function useVADManager(
       vad.pause();
       isActiveRef.current = false;
     }
+  }, []);
+
+  // Cleanup retry timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = undefined;
+      }
+    };
   }, []);
 
   return {
@@ -404,6 +605,7 @@ export function useVADManager(
     },
     start,
     pause,
-    isRunning: isActiveRef.current
+    isRunning: isActiveRef.current,
+    audioStream: audioStream
   };
 }
