@@ -37,7 +37,7 @@ yarn-error.log*
 next-env.d.ts
 
 # files copied from npm modules
-public/
+# public/
 
 # cursor
 .cursor
