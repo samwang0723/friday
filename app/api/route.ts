@@ -3,7 +3,7 @@ import {
   synthesizeSpeech,
   synthesizeSpeechStream,
   transcribeAudio
-} from "@/lib/audio";
+} from "@/lib/voice";
 import { headers } from "next/headers";
 import { after } from "next/server";
 import { z } from "zod";

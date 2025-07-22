@@ -8,13 +8,13 @@ import Settings from "@/components/Settings";
 import SettingsButton from "@/components/SettingsButton";
 import VoiceOrb from "@/components/VoiceOrb";
 import { AgentCoreService } from "@/lib/agentCore";
+import { useAudioPlayer } from "@/lib/hooks/useAudioPlayer";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { usePlayer } from "@/lib/hooks/usePlayer";
 import { usePusher } from "@/lib/hooks/usePusher";
 import { useSettings } from "@/lib/hooks/useSettings";
 import {
-  useVADManager,
-  getVADConfigForSensitivity
+  getVADConfigForSensitivity,
+  useVADManager
 } from "@/lib/hooks/useVADManager";
 import { useWebMRecorder } from "@/lib/hooks/useWebMRecorder";
 import type {
@@ -110,7 +110,7 @@ export default function Home() {
     setClientLocale(currentLocale);
   }, []);
   const inputRef = useRef<HTMLInputElement>(null);
-  const player = usePlayer();
+  const player = useAudioPlayer();
   const agentCoreRef = useRef<AgentCoreService | null>(null);
   const currentRequestRef = useRef<AbortController | null>(null);
 
@@ -334,16 +334,7 @@ export default function Home() {
 
         // Play the audio
         const audioArrayBuffer = await response.arrayBuffer();
-        const audioStream = new ReadableStream({
-          start(controller) {
-            controller.enqueue(new Uint8Array(audioArrayBuffer));
-            controller.close();
-          }
-        });
-
-        player.play(audioStream, () => {
-          // Audio playback complete - no special browser handling needed
-        });
+        player.playAudioChunk(audioArrayBuffer);
 
         // Create assistant message
         const assistantMessage: Message = {
@@ -466,15 +457,11 @@ export default function Home() {
             // Start audio playback on first chunk
             if (!audioStreamStarted && audioStreamController) {
               audioStreamStarted = true;
-              player.play(audioStream, () => {
-                // Audio playback complete - no special browser handling needed
-              });
+              // we are using audio worklet to play audio, so we don't need to do anything here
             }
 
             // Feed chunk to audio stream
-            if (audioStreamController && !audioStreamClosed) {
-              audioStreamController.enqueue(chunk);
-            }
+            player.playAudioChunk(chunk.slice().buffer);
 
             // Clean up and move to next
             audioChunkMap.delete(nextExpectedIndex);
@@ -657,6 +644,12 @@ export default function Home() {
     updateChatStateRef.current = updateChatState;
     submitRef.current = submit;
   }, [chatState, auth, player, updateChatState, submit]);
+
+  useEffect(() => {
+    if (settings.audioEnabled && !player.isPlayerInitialized) {
+      player.initAudioPlayer();
+    }
+  }, [settings.audioEnabled, player.isPlayerInitialized]);
 
   // Create refs to hold the instances
   const vadManagerRef = useRef<any>(null);
