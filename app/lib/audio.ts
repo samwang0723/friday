@@ -7,9 +7,8 @@ export const startAudioPlayerWorklet = async (): Promise<
   });
 
   // 2. Load your custom processor code
-  await audioPlayerContext.audioWorklet.addModule(
-    "/js/pcm-player-processor.js"
-  );
+  const workletURL = new URL("/js/pcm-player-processor.js");
+  await audioPlayerContext.audioWorklet.addModule(workletURL);
 
   // 3. Create an AudioWorkletNode
   const audioPlayerNode = new AudioWorkletNode(
