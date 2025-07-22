@@ -588,7 +588,9 @@ export default function Home() {
 
             resolve([...updatedMessages, assistantMessage]);
           } catch (error) {
-            currentRequestRef.current = null;
+            if (currentRequestRef.current === abortController) {
+              currentRequestRef.current = null;
+            }
             if (error instanceof Error && error.name === "AbortError") {
               console.log("SSE stream was cancelled");
               resolve(prevMessages);
@@ -605,7 +607,9 @@ export default function Home() {
               isStreaming: false,
               message: ""
             });
-            currentRequestRef.current = null;
+            if (currentRequestRef.current === abortController) {
+              currentRequestRef.current = null;
+            }
 
             // Close audio stream if not already closed
             closeAudioStream();
@@ -615,7 +619,9 @@ export default function Home() {
         processSSE();
       });
     } catch (error) {
-      currentRequestRef.current = null;
+      if (currentRequestRef.current === abortController) {
+        currentRequestRef.current = null;
+      }
 
       // Handle AbortError specifically
       if (error instanceof Error && error.name === "AbortError") {
@@ -722,12 +728,22 @@ export default function Home() {
     }
   }, []);
 
+  const onVADMisfire = useCallback(() => {
+    // Stop the WebM recorder on a VAD misfire
+    const recorder = webmRecorderRef.current;
+    if (recorder?.state.isRecording) {
+      console.log("VAD misfire detected, stopping WebM recording");
+      recorder.stopRecording();
+    }
+  }, []);
+
   // VAD Manager setup - use dynamic configuration based on sensitivity setting
   const vadManager = useVADManager(
     getVADConfigForSensitivity(settings.vadSensitivity),
     {
       onSpeechStart,
-      onSpeechEnd
+      onSpeechEnd,
+      onVADMisfire
     },
     {
       isStreaming: chatState.isStreaming,

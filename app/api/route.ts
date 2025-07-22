@@ -189,11 +189,13 @@ export async function POST(request: Request) {
         chatResponse = { response: data.transcript };
       } else {
         // Use Agent Core chat function for user input
+        const startTime = Date.now();
         chatResponse = await agentCore.chat(
           transcript,
           accessToken as string,
           clientContext
         );
+        console.log("AgentCore chat took", Date.now() - startTime, "ms");
       }
 
       if (abortController.signal.aborted) {
@@ -203,11 +205,13 @@ export async function POST(request: Request) {
       // Generate audio only if audioEnabled is true
       if (settings.audioEnabled !== false) {
         // Generate complete audio using synthesizeSpeech
+        const startTime = Date.now();
         const audioResponse = await synthesizeSpeech(
           chatResponse.response,
           settings.ttsEngine,
           abortController.signal
         );
+        console.log("Synthesize speech took", Date.now() - startTime, "ms");
 
         if (!audioResponse.ok) {
           return new Response("TTS generation failed", { status: 500 });

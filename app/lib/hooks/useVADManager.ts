@@ -11,7 +11,6 @@ function calculateRMSdBFS(audioData: Float32Array): number {
   return rms > 0 ? 20 * Math.log10(rms) : -100;
 }
 
-
 // Simplified speech detection using only RMS energy
 function isSpeechLike(
   audio: Float32Array,
@@ -84,6 +83,7 @@ export function getVADConfigForSensitivity(
 export interface VADCallbacks {
   onSpeechStart?: () => void;
   onSpeechEnd?: (audio: Float32Array) => void;
+  onVADMisfire?: () => void;
 }
 
 export interface VADContext {
@@ -368,8 +368,9 @@ export function useVADManager(
         userSpeaking: false,
         shouldShowOrb: false
       }));
+      callbacks.onVADMisfire?.();
     },
-    model: "v5",
+    // model: "v5",
     positiveSpeechThreshold: config.positiveSpeechThreshold || 0.7,
     minSpeechFrames: config.minSpeechFrames || 8,
     negativeSpeechThreshold: 0.5, // Lower threshold to be less aggressive about ending
