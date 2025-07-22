@@ -1,4 +1,4 @@
-import { useRef, useMemo, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 interface StreamQueueItem {
   stream: ReadableStream;
@@ -10,8 +10,10 @@ export function usePlayer() {
   const source = useRef<AudioBufferSourceNode | null>(null);
   const streamQueue = useRef<StreamQueueItem[]>([]);
   const isProcessing = useRef(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const contextCreatedRef = useRef(false);
 
-  async function processNextStream() {
+  const processNextStream = useCallback(async function processNextStream() {
     if (isProcessing.current || streamQueue.current.length === 0) {
       return;
     }
@@ -25,24 +27,38 @@ export function usePlayer() {
       isProcessing.current = false;
       // Process next stream in queue if available
       if (streamQueue.current.length > 0) {
-        // Add 100ms delay before playing next stream
-        setTimeout(() => {
+        // Add minimal delay before playing next stream for smooth transitions
+        timeoutRef.current = setTimeout(() => {
           processNextStream();
-        }, 800);
+        }, 50);
       }
     }
-  }
+  }, []);
+
+  const createAudioContext = useCallback(() => {
+    if (!audioContext.current || audioContext.current.state === "closed") {
+      audioContext.current = new AudioContext({ sampleRate: 24000 });
+      contextCreatedRef.current = true;
+    }
+
+    // Resume context if suspended
+    if (audioContext.current.state === "suspended") {
+      audioContext.current.resume();
+    }
+
+    return audioContext.current;
+  }, []);
 
   async function playStream(stream: ReadableStream, callback: () => void) {
-    audioContext.current = new AudioContext({ sampleRate: 24000 });
+    const context = createAudioContext();
 
-    let nextStartTime = audioContext.current.currentTime;
+    let nextStartTime = context.currentTime;
     const reader = stream.getReader();
     let leftover = new Uint8Array();
     let result = await reader.read();
     let lastSource: AudioBufferSourceNode | null = null;
 
-    while (!result.done && audioContext.current) {
+    while (!result.done && context && context.state !== "closed") {
       const data = new Uint8Array(leftover.length + result.value.length);
       data.set(leftover);
       data.set(result.value, leftover.length);
@@ -54,20 +70,20 @@ export function usePlayer() {
       leftover = new Uint8Array(data.buffer, length, remainder);
 
       // Check if audio context is still valid
-      if (!audioContext.current || audioContext.current.state === "closed") {
+      if (!context || (context.state as string) === "closed") {
         break;
       }
 
-      const audioBuffer = audioContext.current.createBuffer(
+      const audioBuffer = context.createBuffer(
         1,
         buffer.length,
-        audioContext.current.sampleRate
+        context.sampleRate
       );
       audioBuffer.copyToChannel(buffer, 0);
 
-      source.current = audioContext.current.createBufferSource();
+      source.current = context.createBufferSource();
       source.current.buffer = audioBuffer;
-      source.current.connect(audioContext.current.destination);
+      source.current.connect(context.destination);
       source.current.start(nextStartTime);
 
       // Keep reference to the last created source for onended handler
@@ -79,24 +95,22 @@ export function usePlayer() {
 
     // Set onended handler on the last source that was created
     // Use lastSource instead of source.current to avoid race conditions
-    if (
-      lastSource &&
-      audioContext.current &&
-      audioContext.current.state !== "closed"
-    ) {
+    if (lastSource && context && context.state !== "closed") {
       lastSource.onended = () => {
-        // Clean up current stream
-        if (audioContext.current) {
+        // Only close context if we created it for this stream
+        if (contextCreatedRef.current && audioContext.current) {
           audioContext.current.close();
           audioContext.current = null;
+          contextCreatedRef.current = false;
         }
         callback();
       };
     } else {
       // If no source was created or context is invalid, still call callback
-      if (audioContext.current) {
+      if (contextCreatedRef.current && audioContext.current) {
         audioContext.current.close();
         audioContext.current = null;
+        contextCreatedRef.current = false;
       }
       callback();
     }
@@ -116,6 +130,12 @@ export function usePlayer() {
   }, []);
 
   const stop = useCallback(function stop() {
+    // Clear any pending timeouts
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
     // Clear the queue
     streamQueue.current = [];
     isProcessing.current = false;
@@ -148,7 +168,22 @@ export function usePlayer() {
         console.log("AudioContext cleanup error:", e);
       }
       audioContext.current = null;
+      contextCreatedRef.current = false;
     }
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      // Clean up AudioContext on unmount
+      if (audioContext.current && audioContext.current.state !== "closed") {
+        audioContext.current.close();
+      }
+    };
   }, []);
 
   return useMemo(

@@ -342,10 +342,7 @@ export default function Home() {
         });
 
         player.play(audioStream, () => {
-          const isFirefox = navigator.userAgent.includes("Firefox");
-          if (isFirefox) {
-            vadManager.start();
-          }
+          // Audio playback complete - no special browser handling needed
         });
 
         // Create assistant message
@@ -470,10 +467,7 @@ export default function Home() {
             if (!audioStreamStarted && audioStreamController) {
               audioStreamStarted = true;
               player.play(audioStream, () => {
-                const isFirefox = navigator.userAgent.includes("Firefox");
-                if (isFirefox) {
-                  vadManager.start();
-                }
+                // Audio playback complete - no special browser handling needed
               });
             }
 
@@ -628,32 +622,6 @@ export default function Home() {
 
             // Close audio stream if not already closed
             closeAudioStream();
-
-            // Resume VAD after streaming completes (for Firefox)
-            const isFirefox = navigator.userAgent.includes("Firefox");
-            if (isFirefox) {
-              // Wait for stream to fully close and VAD to be ready
-              const checkVADReadyAndStart = () => {
-                if (
-                  !vadManager.state.loading &&
-                  !vadManager.state.errored &&
-                  auth.isAuthenticated &&
-                  settings.audioEnabled
-                ) {
-                  vadManager.start();
-                } else if (
-                  !vadManager.state.errored &&
-                  auth.isAuthenticated &&
-                  settings.audioEnabled
-                ) {
-                  // Retry if VAD is still loading but not errored
-                  setTimeout(checkVADReadyAndStart, 50);
-                }
-              };
-
-              // Small delay to ensure stream cleanup is complete
-              setTimeout(checkVADReadyAndStart, 100);
-            }
           }
         };
 
@@ -688,7 +656,7 @@ export default function Home() {
     playerRef.current = player;
     updateChatStateRef.current = updateChatState;
     submitRef.current = submit;
-  });
+  }, [chatState, auth, player, updateChatState, submit]);
 
   // Create refs to hold the instances
   const vadManagerRef = useRef<any>(null);
@@ -726,7 +694,7 @@ export default function Home() {
     }
   }, []);
 
-  const onSpeechEnd = useCallback(async (audio: Float32Array) => {
+  const onSpeechEnd = useCallback(async (_audio: Float32Array) => {
     if (!authRef.current.isAuthenticated) return;
 
     // Note: We ignore the Float32Array parameter from VAD and use WebM recorder instead
@@ -755,10 +723,7 @@ export default function Home() {
         console.warn("WebM recorder was not recording when speech ended");
       }
 
-      const isFirefox = navigator.userAgent.includes("Firefox");
-      if (isFirefox) {
-        vadManagerRef.current?.pause();
-      }
+      // No browser-specific VAD handling needed
     } catch (error) {
       console.error("Error with WebM recording:", error);
     }
