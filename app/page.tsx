@@ -8,13 +8,13 @@ import Settings from "@/components/Settings";
 import SettingsButton from "@/components/SettingsButton";
 import VoiceOrb from "@/components/VoiceOrb";
 import { AgentCoreService } from "@/lib/agentCore";
+import { useAudioPlayer } from "@/lib/hooks/useAudioPlayer";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { usePlayer } from "@/lib/hooks/usePlayer";
 import { usePusher } from "@/lib/hooks/usePusher";
 import { useSettings } from "@/lib/hooks/useSettings";
 import {
-  useVADManager,
-  getVADConfigForSensitivity
+  getVADConfigForSensitivity,
+  useVADManager
 } from "@/lib/hooks/useVADManager";
 import { useWebMRecorder } from "@/lib/hooks/useWebMRecorder";
 import type {
@@ -110,7 +110,7 @@ export default function Home() {
     setClientLocale(currentLocale);
   }, []);
   const inputRef = useRef<HTMLInputElement>(null);
-  const player = usePlayer();
+  const player = useAudioPlayer();
   const agentCoreRef = useRef<AgentCoreService | null>(null);
   const currentRequestRef = useRef<AbortController | null>(null);
 
@@ -334,19 +334,7 @@ export default function Home() {
 
         // Play the audio
         const audioArrayBuffer = await response.arrayBuffer();
-        const audioStream = new ReadableStream({
-          start(controller) {
-            controller.enqueue(new Uint8Array(audioArrayBuffer));
-            controller.close();
-          }
-        });
-
-        player.play(audioStream, () => {
-          const isFirefox = navigator.userAgent.includes("Firefox");
-          if (isFirefox) {
-            vadManager.start();
-          }
-        });
+        player.playAudioChunk(audioArrayBuffer);
 
         // Create assistant message
         const assistantMessage: Message = {
@@ -469,18 +457,11 @@ export default function Home() {
             // Start audio playback on first chunk
             if (!audioStreamStarted && audioStreamController) {
               audioStreamStarted = true;
-              player.play(audioStream, () => {
-                const isFirefox = navigator.userAgent.includes("Firefox");
-                if (isFirefox) {
-                  vadManager.start();
-                }
-              });
+              // we are using audio worklet to play audio, so we don't need to do anything here
             }
 
             // Feed chunk to audio stream
-            if (audioStreamController && !audioStreamClosed) {
-              audioStreamController.enqueue(chunk);
-            }
+            player.playAudioChunk(chunk.slice().buffer);
 
             // Clean up and move to next
             audioChunkMap.delete(nextExpectedIndex);
@@ -607,7 +588,9 @@ export default function Home() {
 
             resolve([...updatedMessages, assistantMessage]);
           } catch (error) {
-            currentRequestRef.current = null;
+            if (currentRequestRef.current === abortController) {
+              currentRequestRef.current = null;
+            }
             if (error instanceof Error && error.name === "AbortError") {
               console.log("SSE stream was cancelled");
               resolve(prevMessages);
@@ -624,43 +607,21 @@ export default function Home() {
               isStreaming: false,
               message: ""
             });
-            currentRequestRef.current = null;
+            if (currentRequestRef.current === abortController) {
+              currentRequestRef.current = null;
+            }
 
             // Close audio stream if not already closed
             closeAudioStream();
-
-            // Resume VAD after streaming completes (for Firefox)
-            const isFirefox = navigator.userAgent.includes("Firefox");
-            if (isFirefox) {
-              // Wait for stream to fully close and VAD to be ready
-              const checkVADReadyAndStart = () => {
-                if (
-                  !vadManager.state.loading &&
-                  !vadManager.state.errored &&
-                  auth.isAuthenticated &&
-                  settings.audioEnabled
-                ) {
-                  vadManager.start();
-                } else if (
-                  !vadManager.state.errored &&
-                  auth.isAuthenticated &&
-                  settings.audioEnabled
-                ) {
-                  // Retry if VAD is still loading but not errored
-                  setTimeout(checkVADReadyAndStart, 50);
-                }
-              };
-
-              // Small delay to ensure stream cleanup is complete
-              setTimeout(checkVADReadyAndStart, 100);
-            }
           }
         };
 
         processSSE();
       });
     } catch (error) {
-      currentRequestRef.current = null;
+      if (currentRequestRef.current === abortController) {
+        currentRequestRef.current = null;
+      }
 
       // Handle AbortError specifically
       if (error instanceof Error && error.name === "AbortError") {
@@ -688,7 +649,13 @@ export default function Home() {
     playerRef.current = player;
     updateChatStateRef.current = updateChatState;
     submitRef.current = submit;
-  });
+  }, [chatState, auth, player, updateChatState, submit]);
+
+  useEffect(() => {
+    if (settings.audioEnabled && !player.isPlayerInitialized) {
+      player.initAudioPlayer();
+    }
+  }, [settings.audioEnabled, player.isPlayerInitialized]);
 
   // Create refs to hold the instances
   const vadManagerRef = useRef<any>(null);
@@ -726,7 +693,7 @@ export default function Home() {
     }
   }, []);
 
-  const onSpeechEnd = useCallback(async (audio: Float32Array) => {
+  const onSpeechEnd = useCallback(async (_audio: Float32Array) => {
     if (!authRef.current.isAuthenticated) return;
 
     // Note: We ignore the Float32Array parameter from VAD and use WebM recorder instead
@@ -755,12 +722,18 @@ export default function Home() {
         console.warn("WebM recorder was not recording when speech ended");
       }
 
-      const isFirefox = navigator.userAgent.includes("Firefox");
-      if (isFirefox) {
-        vadManagerRef.current?.pause();
-      }
+      // No browser-specific VAD handling needed
     } catch (error) {
       console.error("Error with WebM recording:", error);
+    }
+  }, []);
+
+  const onVADMisfire = useCallback(() => {
+    // Stop the WebM recorder on a VAD misfire
+    const recorder = webmRecorderRef.current;
+    if (recorder?.state.isRecording) {
+      console.log("VAD misfire detected, stopping WebM recording");
+      recorder.stopRecording();
     }
   }, []);
 
@@ -769,7 +742,8 @@ export default function Home() {
     getVADConfigForSensitivity(settings.vadSensitivity),
     {
       onSpeechStart,
-      onSpeechEnd
+      onSpeechEnd,
+      onVADMisfire
     },
     {
       isStreaming: chatState.isStreaming,

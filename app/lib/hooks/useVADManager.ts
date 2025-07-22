@@ -11,62 +11,13 @@ function calculateRMSdBFS(audioData: Float32Array): number {
   return rms > 0 ? 20 * Math.log10(rms) : -100;
 }
 
-// Calculate spectral centroid for frequency analysis
-function calculateSpectralCentroid(audioData: Float32Array): number {
-  const fftSize = 2048;
-  const sampleRate = 16000;
-  const halfSize = fftSize / 2;
-
-  // Pad or truncate audio data to match FFT size
-  const paddedData = new Float32Array(fftSize);
-  for (let i = 0; i < Math.min(audioData.length, fftSize); i++) {
-    paddedData[i] = audioData[i];
-  }
-
-  // Apply windowing function (Hamming window)
-  for (let i = 0; i < fftSize; i++) {
-    paddedData[i] *= 0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (fftSize - 1));
-  }
-
-  // Compute FFT using DFT (simplified for this use case)
-  const magnitudes = new Float32Array(halfSize);
-
-  for (let k = 0; k < halfSize; k++) {
-    let real = 0;
-    let imag = 0;
-
-    for (let n = 0; n < fftSize; n++) {
-      const angle = (-2 * Math.PI * k * n) / fftSize;
-      real += paddedData[n] * Math.cos(angle);
-      imag += paddedData[n] * Math.sin(angle);
-    }
-
-    magnitudes[k] = Math.sqrt(real * real + imag * imag);
-  }
-
-  // Calculate spectral centroid
-  let numerator = 0;
-  let denominator = 0;
-
-  for (let i = 1; i < halfSize; i++) {
-    // Skip DC component
-    const freq = (i * sampleRate) / fftSize;
-    const mag = magnitudes[i];
-    numerator += freq * mag;
-    denominator += mag;
-  }
-
-  return denominator > 0 ? numerator / denominator : 0;
-}
-
-// Enhanced speech detection using multiple audio features
+// Simplified speech detection using only RMS energy
 function isSpeechLike(
   audio: Float32Array,
   config: VADConfig,
   isStreaming?: boolean
 ): boolean {
   const rmsLevel = calculateRMSdBFS(audio);
-  const spectralCentroid = calculateSpectralCentroid(audio);
 
   // RMS energy threshold: speech needs sufficient energy (higher than threshold)
   // Made more sensitive to capture quieter speech
@@ -78,32 +29,8 @@ function isSpeechLike(
     return false; // Too quiet, likely silence or background noise
   }
 
-  // Spectral centroid threshold: speech has characteristic frequency distribution
-  // Human speech typically has centroid between 300-3000 Hz
-  // Lower values (< 300 Hz) are often low-frequency noise, breathing, or rumble
-  // Relaxed from 1000Hz to 300Hz to capture more natural speech patterns
-  const centroidThreshold = isStreaming
-    ? 250 // More lenient during streaming to allow interruptions
-    : config.spectralCentroidThreshold || 300;
-
-  if (spectralCentroid < centroidThreshold) {
-    console.log(
-      `VAD: Audio filtered - Centroid too low: ${spectralCentroid.toFixed(0)}Hz < ${centroidThreshold}Hz`
-    );
-    return false; // Too low frequency, likely not speech
-  }
-
-  // Optional: Also filter out very high frequency content (> 4000 Hz)
-  // which is typically noise, clicks, or artifacts
-  if (spectralCentroid > 4000) {
-    console.log(
-      `VAD: Audio filtered - Centroid too high: ${spectralCentroid.toFixed(0)}Hz > 4000Hz (likely noise)`
-    );
-    return false; // Too high frequency, likely noise or artifacts
-  }
-
   console.log(
-    `VAD: Audio passed speech-like analysis - RMS: ${rmsLevel.toFixed(2)}dBFS, Centroid: ${spectralCentroid.toFixed(0)}Hz`
+    `VAD: Audio passed speech-like analysis - RMS: ${rmsLevel.toFixed(2)}dBFS`
   );
   return true;
 }
@@ -119,33 +46,34 @@ export interface VADConfig {
 export type VADSensitivity = "low" | "medium" | "high";
 
 // Convert sensitivity setting to VAD configuration
+// Adjusted for more natural speech patterns with pauses
 export function getVADConfigForSensitivity(
   sensitivity: VADSensitivity
 ): VADConfig {
   switch (sensitivity) {
     case "low":
       return {
-        positiveSpeechThreshold: 0.8, // Higher threshold, less sensitive
-        minSpeechFrames: 8,
-        rmsEnergyThreshold: -35, // Higher threshold, requires louder speech
-        minSpeechDuration: 400, // Longer minimum duration
-        spectralCentroidThreshold: 400 // Higher frequency threshold
+        positiveSpeechThreshold: 0.9, // Much higher threshold for long sentences
+        minSpeechFrames: 12, // More frames needed to start
+        rmsEnergyThreshold: -30, // Higher threshold, requires louder speech
+        minSpeechDuration: 800, // Much longer minimum to avoid cutting sentences
+        spectralCentroidThreshold: 400
       };
     case "medium":
       return {
-        positiveSpeechThreshold: 0.6, // Balanced
-        minSpeechFrames: 4,
-        rmsEnergyThreshold: -40,
-        minSpeechDuration: 250,
+        positiveSpeechThreshold: 0.7, // Higher threshold for natural pauses
+        minSpeechFrames: 8, // More frames to avoid quick cuts
+        rmsEnergyThreshold: -35, // Slightly higher threshold
+        minSpeechDuration: 600, // Longer minimum to capture full thoughts
         spectralCentroidThreshold: 300
       };
     case "high":
       return {
-        positiveSpeechThreshold: 0.5, // Lower threshold, more sensitive
-        minSpeechFrames: 2,
-        rmsEnergyThreshold: -45, // Lower threshold, captures quieter speech
-        minSpeechDuration: 150, // Shorter minimum duration
-        spectralCentroidThreshold: 200 // Lower frequency threshold
+        positiveSpeechThreshold: 0.6, // Still sensitive but not too quick
+        minSpeechFrames: 6, // Reasonable frame count
+        rmsEnergyThreshold: -40, // Standard threshold
+        minSpeechDuration: 400, // Minimum to avoid cutting mid-sentence
+        spectralCentroidThreshold: 200
       };
     default:
       return getVADConfigForSensitivity("medium");
@@ -155,6 +83,7 @@ export function getVADConfigForSensitivity(
 export interface VADCallbacks {
   onSpeechStart?: () => void;
   onSpeechEnd?: (audio: Float32Array) => void;
+  onVADMisfire?: () => void;
 }
 
 export interface VADContext {
@@ -189,10 +118,12 @@ export function useVADManager(
     errored: false,
     userSpeaking: false,
     actualUserSpeaking: false,
-    speechStartTime: 0,
     lastSpeechTime: 0,
     shouldShowOrb: false
   });
+
+  // Separate ref for speechStartTime to avoid circular dependencies
+  const speechStartTimeRef = useRef<number>(0);
 
   const audioStartTimeRef = useRef<number>(0);
   const isActiveRef = useRef<boolean>(false);
@@ -213,18 +144,18 @@ export function useVADManager(
     const timeSinceAudioStart = now - audioStartTimeRef.current;
 
     // Filter out speech detection that happens very soon after audio starts
-    const isLikelyEcho = context.isStreaming && timeSinceAudioStart < 1000;
+    const isLikelyEcho = context.isStreaming && timeSinceAudioStart < 500;
 
     console.log(
       `VAD: Speech detected - Time since audio start: ${timeSinceAudioStart}ms, Is likely echo: ${isLikelyEcho}, Is streaming: ${context.isStreaming}`
     );
 
+    speechStartTimeRef.current = now;
     setVADState(prev => ({
       ...prev,
       actualUserSpeaking: true,
       userSpeaking: !isLikelyEcho,
       shouldShowOrb: !isLikelyEcho,
-      speechStartTime: now,
       lastSpeechTime: now
     }));
 
@@ -244,11 +175,10 @@ export function useVADManager(
       const now = Date.now();
       console.log("VAD: Speech ended");
 
-      // Apply multi-layer speech filtering
+      // Apply simplified speech filtering
       const speechAnalysis = {
         rmsLevel: calculateRMSdBFS(audio),
-        spectralCentroid: calculateSpectralCentroid(audio),
-        duration: now - vadState.speechStartTime,
+        duration: now - speechStartTimeRef.current,
         isValid: true
       };
 
@@ -275,7 +205,6 @@ export function useVADManager(
       console.log(
         `VAD: Speech Analysis Results:\n` +
           `  - RMS Level: ${speechAnalysis.rmsLevel.toFixed(2)}dBFS (threshold: ${config.rmsEnergyThreshold || -40}dBFS)\n` +
-          `  - Spectral Centroid: ${speechAnalysis.spectralCentroid.toFixed(0)}Hz (threshold: ${config.spectralCentroidThreshold || 300}Hz)\n` +
           `  - Duration: ${speechAnalysis.duration}ms (minimum: ${config.minSpeechDuration || 250}ms)\n` +
           `  - Audio Length: ${audio.length} samples\n` +
           `  - Is Streaming: ${context.isStreaming}\n` +
@@ -297,12 +226,7 @@ export function useVADManager(
         console.log("VAD: Speech filtered out, not calling onSpeechEnd");
       }
     },
-    [
-      config,
-      context.isStreaming,
-      callbacks.onSpeechEnd,
-      vadState.speechStartTime
-    ]
+    [config, context.isStreaming, callbacks.onSpeechEnd]
   );
 
   // Create enhanced audio stream
@@ -444,13 +368,14 @@ export function useVADManager(
         userSpeaking: false,
         shouldShowOrb: false
       }));
+      callbacks.onVADMisfire?.();
     },
-    model: "v5",
-    positiveSpeechThreshold: config.positiveSpeechThreshold || 0.8,
-    minSpeechFrames: config.minSpeechFrames || 10,
-    negativeSpeechThreshold: 0.6, // Increased from 0.5 for cleaner cutoffs
-    redemptionFrames: 4, // Reduced from 4 for shorter speech tails
-    preSpeechPadFrames: 1,
+    // model: "v5",
+    positiveSpeechThreshold: config.positiveSpeechThreshold || 0.7,
+    minSpeechFrames: config.minSpeechFrames || 8,
+    negativeSpeechThreshold: 0.5, // Lower threshold to be less aggressive about ending
+    redemptionFrames: 8, // Increased to allow for natural pauses in speech
+    preSpeechPadFrames: 2, // More padding for natural starts
     // frameSamples: 480, // Aligned with RNNoise frame size
     stream: audioStream
   });

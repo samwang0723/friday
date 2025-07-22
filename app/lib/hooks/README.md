@@ -292,42 +292,6 @@ VAD Worker → VAD State → Main Component → UI Updates
 3. **Performance issues**: Check audio stream configuration
 4. **Firefox issues**: Look for specific Firefox error patterns
 
-### Migration from useVADWithOrbControl
-
-The old `useVADWithOrbControl` hook has been replaced with `useVADManager`. Key differences:
-
-#### Before (Complex)
-
-```typescript
-const vad = useVADWithOrbControl({
-  onSpeechStart,
-  onSpeechEnd,
-  isStreaming: chatState.isStreaming,
-  isAuthenticated: auth.isAuthenticated,
-  audioEnabled: settings.audioEnabled
-  // ... 8 more config options
-});
-
-// Complex state management
-const vadState = {
-  loading: vad.loading,
-  errored: vad.errored,
-  userSpeaking: vad.userSpeaking
-};
-
-// Manual lifecycle management
-useEffect(
-  () => {
-    // Complex logic for starting/stopping VAD
-  },
-  [
-    /* many dependencies */
-  ]
-);
-```
-
-#### After (Simple)
-
 ```typescript
 const vadManager = useVADManager(config, callbacks, context);
 const vadState = vadManager.state;
@@ -343,3 +307,132 @@ const vadState = vadManager.state;
 ✅ **Improved Reliability**: Better error handling and recovery
 ✅ **Cleaner Code**: Reduced complexity and boilerplate
 ✅ **Better Testing**: Easier to test and debug
+
+## WebM Recorder System
+
+### Overview
+
+The `useWebMRecorder` hook provides a simple and efficient way to record audio directly from a `MediaStream` into the WebM format using the browser's native `MediaRecorder` API. It is designed to work in tandem with the `useVADManager` hook to capture user speech for processing by the backend.
+
+### Architecture
+
+The recorder is initialized with the same `MediaStream` used by the VAD. It operates in parallel, waiting for signals from the VAD callbacks (`onSpeechStart` / `onSpeechEnd`) to start and stop recording. This approach leverages the browser's highly optimized, native encoding capabilities, ensuring minimal performance impact on the application.
+
+```mermaid
+sequenceDiagram
+    participant Mic as "Microphone"
+    participant VADManager as "useVADManager"
+    participant Page as "page.tsx"
+    participant WebMRecorder as "useWebMRecorder"
+    participant Server as "API Server"
+
+    Mic->>+VADManager: Provides MediaStream
+    VADManager->>Page: Returns audioStream
+    Page->>+WebMRecorder: Initializes with audioStream
+
+    %% Speech Detection and Recording
+    activate VADManager
+    VADManager->>VADManager: Analyzes stream for speech
+    VADManager-->>Page: onSpeechStart()
+    deactivate VADManager
+
+    activate Page
+    Page->>+WebMRecorder: startRecording()
+    deactivate Page
+
+    activate WebMRecorder
+    WebMRecorder->>WebMRecorder: Records stream to WebM chunks
+    deactivate WebMRecorder
+
+    %% Speech End
+    activate VADManager
+    VADManager->>VADManager: Detects end of speech
+    VADManager-->>Page: onSpeechEnd(Float32Array)
+    deactivate VADManager
+
+    activate Page
+    Page->>Page: Ignores Float32Array
+    Page->>+WebMRecorder: stopRecording()
+    WebMRecorder-->>-Page: Returns WebM Blob
+    Page->>+Server: submit(WebM Blob)
+    Server-->>-Page: Response
+    deactivate Page
+```
+
+### How It Works
+
+1.  **Initialization**: The hook receives a `MediaStream` (typically from `useVADManager`). It checks for browser support for `MediaRecorder` and the desired `audio/webm` MIME type.
+2.  **`startRecording()`**: When called (usually in the `onSpeechStart` callback), it clears any previous recordings, resets timers, and calls `mediaRecorder.start()`.
+3.  **Data Collection**: The `MediaRecorder` emits `dataavailable` events at regular intervals (`timeSlice`). The hook collects these `Blob` chunks in an array.
+4.  **`stopRecording()`**: When called (usually in the `onSpeechEnd` callback), it calls `mediaRecorder.stop()`.
+5.  **Finalization**: On the `stop` event, it combines all collected chunks into a single WebM `Blob`, validates its size, and returns the `Blob` via a `Promise`.
+
+### Usage
+
+```typescript
+import { useWebMRecorder } from "@/lib/hooks/useWebMRecorder";
+
+// Get audioStream from useVADManager
+const vadManager = useVADManager(...);
+const webmRecorder = useWebMRecorder(vadManager.audioStream, {
+    maxDuration: 30000, // 30 seconds
+    minBlobSize: 1024, // 1KB
+});
+
+// In VAD's onSpeechStart callback:
+webmRecorder.startRecording();
+
+// In VAD's onSpeechEnd callback:
+const webmBlob = await webmRecorder.stopRecording();
+if (webmBlob) {
+    // submit blob to server
+}
+```
+
+### Configuration Options
+
+| Option               | Type     | Default                    | Description                                              |
+| -------------------- | -------- | -------------------------- | -------------------------------------------------------- |
+| `mimeType`           | `string` | `'audio/webm;codecs=opus'` | The MIME type for the recording.                         |
+| `audioBitsPerSecond` | `number` | `128000`                   | The target audio bitrate in bits per second.             |
+| `timeSlice`          | `number` | `100`                      | The interval (in ms) for chunking the recording.         |
+| `maxDuration`        | `number` | `60000`                    | Maximum recording duration in ms before auto-stopping.   |
+| `minBlobSize`        | `number` | `1024`                     | Minimum valid blob size in bytes to be considered valid. |
+
+### State Properties
+
+| Property            | Type             | Description                                  |
+| ------------------- | ---------------- | -------------------------------------------- |
+| `isRecording`       | `boolean`        | Whether the recorder is currently active.    |
+| `isAvailable`       | `boolean`        | Whether `MediaRecorder` is supported.        |
+| `error`             | `string \| null` | Any error message that occurred.             |
+| `recordingDuration` | `number`         | The current duration of the recording in ms. |
+| `blobSize`          | `number`         | The size of the last recorded blob in bytes. |
+
+### Methods
+
+| Method           | Signature                     | Description                                                                  |
+| ---------------- | ----------------------------- | ---------------------------------------------------------------------------- |
+| `startRecording` | `() => void`                  | Begins the recording process.                                                |
+| `stopRecording`  | `() => Promise<Blob \| null>` | Stops the recording and returns the final `Blob`, or `null` if it's invalid. |
+
+### Key Features
+
+#### ✅ **Native Performance**
+
+- Leverages the browser's built-in `MediaRecorder` for efficient, hardware-accelerated encoding.
+- Avoids CPU-intensive JavaScript audio processing, ensuring a smooth UI.
+
+#### ✅ **Simple API**
+
+- A clean and straightforward interface with `startRecording` and `stopRecording` methods.
+- Handles all the internal complexity of chunking, timing, and blob creation.
+
+#### ✅ **Robust Error Handling**
+
+- Includes checks for browser support and handles recorder errors gracefully.
+- Validates the final audio blob size to prevent sending empty or invalid recordings.
+
+#### ✅ **Configurability**
+
+- Allows customization of MIME type, bitrate, and recording duration limits to suit different needs.

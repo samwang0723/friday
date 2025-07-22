@@ -1,4 +1,4 @@
-import { EnterIcon, LoadingIcon } from "@/lib/icons";
+import { EnterIcon, LoadingIcon } from "@/components/Icons";
 import clsx from "clsx";
 import { useTranslations } from "next-intl";
 import React from "react";
