@@ -26,10 +26,19 @@ export default function NotificationStatus({
 
   return (
     <div className="flex items-center space-x-2 text-xs">
-      <div
-        className={`w-2 h-2 rounded-full ${getStatusColor(status)}`}
-        id="eventStatusIndicator"
-      />
+      <span className="relative flex h-2 w-2">
+        <span
+          id="eventStatusIndicator"
+          className={`animate-ping absolute inline-flex h-full w-full rounded-full ${getStatusColor(
+            status
+          )} opacity-75`}
+        />
+        <span
+          className={`relative inline-flex rounded-full h-2 w-2 ${getStatusColor(
+            status
+          )}`}
+        />
+      </span>
       <span className="text-gray-400" id="eventStatusText">
         {statusText}
       </span>

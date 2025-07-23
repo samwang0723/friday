@@ -6,6 +6,7 @@ import React from "react";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { getLocale } from "./lib/i18n";
+import { NotificationProvider } from "./lib/hooks/useNotifications";
 
 export const metadata: Metadata = {
   title: "Friday",
@@ -38,12 +39,14 @@ export default async function RootLayout({
         style={{ backgroundColor: "#09051a" }}
       >
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <main className="flex flex-col items-center justify-center grow">
-            {children}
-          </main>
+          <NotificationProvider>
+            <main className="flex flex-col items-center justify-center grow">
+              {children}
+            </main>
 
-          <Toaster richColors theme="system" />
-          <Analytics />
+            <Toaster richColors theme="system" />
+            <Analytics />
+          </NotificationProvider>
         </NextIntlClientProvider>
       </body>
     </html>

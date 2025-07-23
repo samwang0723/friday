@@ -3,6 +3,7 @@
 import ChatForm from "@/components/ChatForm";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import MessageDisplay from "@/components/MessageDisplay";
+import NotificationButton from "@/components/NotificationButton";
 import NotificationStatus from "@/components/NotificationStatus";
 import Settings from "@/components/Settings";
 import SettingsButton from "@/components/SettingsButton";
@@ -10,6 +11,7 @@ import VoiceOrb from "@/components/VoiceOrb";
 import { AgentCoreService } from "@/lib/agentCore";
 import { useAudioPlayer } from "@/lib/hooks/useAudioPlayer";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { useNotifications } from "@/lib/hooks/useNotifications";
 import { usePusher } from "@/lib/hooks/usePusher";
 import { useSettings } from "@/lib/hooks/useSettings";
 import {
@@ -128,6 +130,9 @@ export default function Home() {
 
   // Authentication hook
   const auth = useAuth();
+
+  // Notifications hook
+  const { addNotification } = useNotifications();
 
   // Initialize Agent Core service
   useEffect(() => {
@@ -765,42 +770,89 @@ export default function Home() {
   }, [vadManager, webmRecorder]);
 
   // Pusher event handlers
-  const handleEmailNotification = useCallback((data: EmailNotificationData) => {
-    console.log("Important email event:", data);
-    toast.info(`Important Email: ${data.subject} from ${data.fromAddress}`, {
-      duration: 180000
-    });
-  }, []);
+  const handleEmailNotification = useCallback(
+    (data: EmailNotificationData) => {
+      console.log("Important email event:", data);
+      const message = `Important Email: ${data.subject} from ${data.fromAddress}`;
 
-  const handleCalendarUpcoming = useCallback((data: CalendarEventData) => {
-    console.log("Upcoming calendar event:", data);
-    const timeText =
-      data.timeUntilStart && data.timeUntilStart <= 15
-        ? "starting soon"
-        : `in ${data.timeUntilStart} minutes`;
-    toast.info(`Upcoming Event: ${data.title} ${timeText}`, {
-      duration: 180000
-    });
-  }, []);
+      addNotification({
+        type: "email",
+        title: "Important Email",
+        message: `${data.subject} from ${data.fromAddress}`,
+        data
+      });
 
-  const handleCalendarNew = useCallback((data: CalendarEventData) => {
-    console.log("New calendar event:", data);
-    const eventDate = data.startTime
-      ? new Date(data.startTime).toLocaleDateString()
-      : "soon";
-    toast.info(`New Event Added: ${data.title} on ${eventDate}`, {
-      duration: 180000
-    });
-  }, []);
+      toast.info(message, {
+        duration: 180000
+      });
+    },
+    [addNotification]
+  );
+
+  const handleCalendarUpcoming = useCallback(
+    (data: CalendarEventData) => {
+      console.log("Upcoming calendar event:", data);
+      const timeText =
+        data.timeUntilStart && data.timeUntilStart <= 15
+          ? "starting soon"
+          : `in ${data.timeUntilStart} minutes`;
+      const message = `Upcoming Event: ${data.title} ${timeText}`;
+
+      addNotification({
+        type: "calendar_upcoming",
+        title: "Upcoming Event",
+        message: `${data.title} ${timeText}`,
+        data
+      });
+
+      toast.info(message, {
+        duration: 180000
+      });
+    },
+    [addNotification]
+  );
+
+  const handleCalendarNew = useCallback(
+    (data: CalendarEventData) => {
+      console.log("New calendar event:", data);
+      const eventDate = data.startTime
+        ? new Date(data.startTime).toLocaleDateString()
+        : "soon";
+      const message = `New Event Added: ${data.title} on ${eventDate}`;
+
+      addNotification({
+        type: "calendar_new",
+        title: "New Event Added",
+        message: `${data.title} on ${eventDate}`,
+        data
+      });
+
+      toast.info(message, {
+        duration: 180000
+      });
+    },
+    [addNotification]
+  );
 
   const handleSystemNotification = useCallback(
     (data: SystemNotificationData) => {
       console.log("System notification:", data);
-      toast.info(data.title ? `${data.title}: ${data.message}` : data.message, {
+      const message = data.title
+        ? `${data.title}: ${data.message}`
+        : data.message;
+
+      addNotification({
+        type: "system",
+        title: data.title || "System Notification",
+        message: data.message,
+        data
+      });
+
+      toast.info(message, {
         duration: 180000
       });
     },
-    []
+    [addNotification]
   );
 
   const handleChatMessage = useCallback(
@@ -812,6 +864,13 @@ export default function Home() {
         return;
       }
 
+      addNotification({
+        type: "chat",
+        title: "Proactive Message",
+        message: data.message,
+        data
+      });
+
       // Use the existing submit function with transcript object to leverage full SSE/audio pipeline
       console.log("Submitting transcript:", data.message);
       startTransition(() => {
@@ -821,7 +880,7 @@ export default function Home() {
         submit({ transcript: data.message });
       });
     },
-    [auth, submit, t]
+    [auth, submit, t, addNotification]
   );
 
   // Pusher hook
@@ -934,13 +993,20 @@ export default function Home() {
 
       <SettingsButton onClick={() => setIsSettingsOpen(true)} />
 
-      {/* Notification Status */}
+      {/* Connected Status - Center Top */}
       {auth.isAuthenticated && (
-        <div className="fixed top-4 right-4 z-10">
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-10">
           <NotificationStatus
             status={pusher.status}
             statusText={pusher.statusText}
           />
+        </div>
+      )}
+
+      {/* Notification Button - Top Right */}
+      {auth.isAuthenticated && (
+        <div className="fixed top-4 right-4 z-10">
+          <NotificationButton />
         </div>
       )}
 
