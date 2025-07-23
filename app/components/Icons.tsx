@@ -1,4 +1,4 @@
-export function LoadingIcon() {
+export function LoadingIcon({ className }: { className?: string }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -10,7 +10,7 @@ export function LoadingIcon() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="animate-spin"
+      className={className || "animate-spin"}
     >
       <path stroke="none" d="M0 0h24v24H0z" fill="none" />
       <path d="M12 3a9 9 0 1 0 9 9" />
@@ -18,7 +18,7 @@ export function LoadingIcon() {
   );
 }
 
-export function EnterIcon() {
+export function EnterIcon({ className }: { className?: string }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -30,6 +30,7 @@ export function EnterIcon() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      className={className}
     >
       <path stroke="none" d="M0 0h24v24H0z" fill="none" />
       <path d="M18 6v6a3 3 0 0 1 -3 3h-10l4 -4m0 8l-4 -4" />
@@ -37,10 +38,10 @@ export function EnterIcon() {
   );
 }
 
-export function BellIcon() {
+export function BellIcon({ className }: { className?: string }) {
   return (
     <svg
-      className="h-6 w-6 text-neutral-700 dark:text-neutral-300"
+      className={className || "h-6 w-6 text-neutral-700 dark:text-neutral-300"}
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
       viewBox="0 0 24 24"
@@ -62,7 +63,7 @@ export function BellIcon() {
   );
 }
 
-export function CloseIcon() {
+export function CloseIcon({ className }: { className?: string }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -74,6 +75,7 @@ export function CloseIcon() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      className={className}
     >
       <path stroke="none" d="M0 0h24v24H0z" fill="none" />
       <path d="m18 6l-12 12" />

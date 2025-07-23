@@ -1,15 +1,15 @@
 "use client";
 
-import Link from "next/link";
-import { useTranslations } from "next-intl";
 import { CloseIcon } from "@/components/Icons";
+import { useAuth } from "@/lib/hooks/useAuth";
 import {
   useNotifications,
   type Notification
 } from "@/lib/hooks/useNotifications";
-import { useAuth } from "@/lib/hooks/useAuth";
-import { useEffect } from "react";
+import { useTranslations } from "next-intl";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 function NotificationItem({ notification }: { notification: Notification }) {
   const { markAsRead } = useNotifications();
@@ -118,44 +118,76 @@ export default function NotificationsPage() {
 
   return (
     <div className="min-h-screen bg-[#09051a] text-white">
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <Link
-              href="/"
-              className="p-2 rounded-full hover:bg-gray-800 transition-colors"
-              aria-label="Go back"
-            >
-              <CloseIcon />
-            </Link>
-            <h1 className="text-3xl font-bold">Notifications</h1>
-            {unreadCount > 0 && (
-              <span className="bg-red-500 text-white text-sm rounded-full px-2 py-1">
-                {unreadCount} unread
-              </span>
-            )}
-          </div>
+      <div className="sticky top-0 bg-[#09051a] border-b border-gray-800 z-10">
+        <div className="max-w-4xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <Link
+                href="/"
+                className="p-3 rounded-full bg-neutral-200/80 dark:bg-neutral-800/80 backdrop-blur-md hover:bg-neutral-300/80 dark:hover:bg-neutral-700/80 transition-colors shadow-lg flex-shrink-0"
+                aria-label="Go back"
+              >
+                <CloseIcon className="h-5 w-5 text-neutral-700 dark:text-neutral-300" />
+              </Link>
+              <h1 className="text-xl sm:text-xl font-bold">Notifications</h1>
+              {unreadCount > 0 && (
+                <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 flex-shrink-0">
+                  {unreadCount}
+                </span>
+              )}
+            </div>
 
-          <div className="flex space-x-2">
-            {unreadCount > 0 && (
-              <button
-                onClick={markAllAsRead}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm transition-colors"
-              >
-                Mark All Read
-              </button>
-            )}
-            {notifications.length > 0 && (
-              <button
-                onClick={clearAll}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm transition-colors"
-              >
-                Clear All
-              </button>
-            )}
+            <div className="flex items-center space-x-2">
+              {unreadCount > 0 && (
+                <button
+                  onClick={markAllAsRead}
+                  className="p-2 hover:bg-gray-800/50 rounded transition-colors"
+                  aria-label="Mark all as read"
+                >
+                  <svg
+                    className="h-5 w-5 text-gray-400 hover:text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.5"
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </button>
+              )}
+              {notifications.length > 0 && (
+                <button
+                  onClick={clearAll}
+                  className="p-2 hover:bg-gray-800/50 rounded transition-colors"
+                  aria-label="Clear all notifications"
+                >
+                  <svg
+                    className="h-5 w-5 text-gray-400 hover:text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.5"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
         </div>
+      </div>
 
+      <div className="max-w-4xl mx-auto pt-6">
         <div className="bg-gray-900 rounded-lg overflow-hidden">
           {notifications.length === 0 ? (
             <div className="p-8 text-center">
