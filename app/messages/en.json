@@ -68,6 +68,15 @@
   "success": {
     "signedOut": "Signed out successfully"
   },
+  "status": {
+    "disconnected": "Disconnected",
+    "connecting": "Connecting...",
+    "connected": "Connected",
+    "connectionFailed": "Connection failed",
+    "connectionError": "Connection error",
+    "subscriptionFailed": "Subscription failed",
+    "failedToConnect": "Failed to connect"
+  },
   "privacy": {
     "title": "Privacy Policy",
     "lastUpdated": "Last updated: July 2025",

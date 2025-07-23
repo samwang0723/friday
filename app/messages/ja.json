@@ -67,6 +67,15 @@
   "success": {
     "signedOut": "正常にサインアウトしました"
   },
+  "status": {
+    "disconnected": "切断済み",
+    "connecting": "接続中...",
+    "connected": "接続済み",
+    "connectionFailed": "接続失敗",
+    "connectionError": "接続エラー",
+    "subscriptionFailed": "サブスクリプション失敗",
+    "failedToConnect": "接続失敗"
+  },
   "privacy": {
     "title": "プライバシーポリシー",
     "lastUpdated": "最終更新：2025年7月",

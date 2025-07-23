@@ -67,6 +67,15 @@
   "success": {
     "signedOut": "Sesión cerrada exitosamente"
   },
+  "status": {
+    "disconnected": "Desconectado",
+    "connecting": "Conectando...",
+    "connected": "Conectado",
+    "connectionFailed": "Error de conexión",
+    "connectionError": "Error de conexión",
+    "subscriptionFailed": "Error de suscripción",
+    "failedToConnect": "Error al conectar"
+  },
   "privacy": {
     "title": "Política de Privacidad",
     "lastUpdated": "Última actualización: Julio 2025",

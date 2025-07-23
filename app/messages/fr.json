@@ -67,6 +67,15 @@
   "success": {
     "signedOut": "Déconnexion réussie"
   },
+  "status": {
+    "disconnected": "Déconnecté",
+    "connecting": "Connexion...",
+    "connected": "Connecté",
+    "connectionFailed": "Échec de connexion",
+    "connectionError": "Erreur de connexion",
+    "subscriptionFailed": "Échec d'abonnement",
+    "failedToConnect": "Échec de connexion"
+  },
   "privacy": {
     "title": "Politique de Confidentialité",
     "lastUpdated": "Dernière mise à jour : Juillet 2025",

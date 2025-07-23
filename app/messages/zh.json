@@ -68,6 +68,15 @@
   "success": {
     "signedOut": "登出成功"
   },
+  "status": {
+    "disconnected": "已断开连接",
+    "connecting": "正在连接...",
+    "connected": "已连接",
+    "connectionFailed": "连接失败",
+    "connectionError": "连接错误",
+    "subscriptionFailed": "订阅失败",
+    "failedToConnect": "连接失败"
+  },
   "privacy": {
     "title": "隐私政策",
     "lastUpdated": "最后更新：2025年7月",

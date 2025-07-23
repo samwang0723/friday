@@ -68,6 +68,15 @@
   "success": {
     "signedOut": "登出成功"
   },
+  "status": {
+    "disconnected": "已中斷連線",
+    "connecting": "正在連線...",
+    "connected": "已連線",
+    "connectionFailed": "連線失敗",
+    "connectionError": "連線錯誤",
+    "subscriptionFailed": "訂閱失敗",
+    "failedToConnect": "連線失敗"
+  },
   "privacy": {
     "title": "隱私政策",
     "lastUpdated": "最後更新：2025年7月",

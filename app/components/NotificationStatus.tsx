@@ -1,4 +1,5 @@
 import { ConnectionStatus } from "@/lib/types/pusher";
+import { useTranslations } from "next-intl";
 
 interface NotificationStatusProps {
   status: ConnectionStatus;
@@ -9,6 +10,8 @@ export default function NotificationStatus({
   status,
   statusText
 }: NotificationStatusProps) {
+  const t = useTranslations("status");
+
   const getStatusColor = (status: ConnectionStatus) => {
     switch (status) {
       case "connected":
@@ -22,6 +25,21 @@ export default function NotificationStatus({
       default:
         return "bg-gray-500";
     }
+  };
+
+  // Map statusText keys to translations
+  const getTranslatedStatusText = (statusText: string): string => {
+    const statusMap: Record<string, string> = {
+      disconnected: t("disconnected"),
+      connecting: t("connecting"),
+      connected: t("connected"),
+      connectionFailed: t("connectionFailed"),
+      connectionError: t("connectionError"),
+      subscriptionFailed: t("subscriptionFailed"),
+      failedToConnect: t("failedToConnect")
+    };
+
+    return statusMap[statusText] || statusText;
   };
 
   return (
@@ -40,7 +58,7 @@ export default function NotificationStatus({
         />
       </span>
       <span className="text-gray-400" id="eventStatusText">
-        {statusText}
+        {getTranslatedStatusText(statusText)}
       </span>
     </div>
   );

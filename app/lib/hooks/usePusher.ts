@@ -20,7 +20,7 @@ export function usePusher({
   eventHandlers
 }: UsePusherProps) {
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
-  const [statusText, setStatusText] = useState("Disconnected");
+  const [statusText, setStatusText] = useState("disconnected");
 
   const pusherRef = useRef<Pusher | null>(null);
   const userChannelRef = useRef<Channel | null>(null);
@@ -52,7 +52,7 @@ export function usePusher({
       }, RETRY_DELAY * connectionRetriesRef.current);
     } else {
       console.error("Max Pusher connection retries reached");
-      updateStatus("disconnected", "Connection failed");
+      updateStatus("disconnected", "connectionFailed");
     }
   }, [isAuthenticated, updateStatus]);
 
@@ -70,7 +70,7 @@ export function usePusher({
       pusherRef.current = null;
     }
 
-    updateStatus("disconnected", "Disconnected");
+    updateStatus("disconnected", "disconnected");
     isInitializingRef.current = false;
   }, [updateStatus]);
 
@@ -101,7 +101,7 @@ export function usePusher({
 
     isInitializingRef.current = true;
     console.log("Initializing Pusher connection...");
-    updateStatus("connecting", "Connecting...");
+    updateStatus("connecting", "connecting");
 
     try {
       // Get Pusher configuration from backend
@@ -134,20 +134,20 @@ export function usePusher({
       // Handle connection events
       pusherRef.current.connection.bind("connected", () => {
         console.log("Pusher connected");
-        updateStatus("connected", "Connected");
+        updateStatus("connected", "connected");
         connectionRetriesRef.current = 0;
         isInitializingRef.current = false;
       });
 
       pusherRef.current.connection.bind("disconnected", () => {
         console.log("Pusher disconnected");
-        updateStatus("disconnected", "Disconnected");
+        updateStatus("disconnected", "disconnected");
         isInitializingRef.current = false;
       });
 
       pusherRef.current.connection.bind("error", (error: Error | unknown) => {
         console.error("Pusher connection error:", error);
-        updateStatus("disconnected", "Connection error");
+        updateStatus("disconnected", "connectionError");
         isInitializingRef.current = false;
         handlePusherError();
       });
@@ -155,14 +155,14 @@ export function usePusher({
       // Handle channel subscription events
       userChannelRef.current.bind("pusher:subscription_succeeded", () => {
         console.log("Successfully subscribed to user channel");
-        updateStatus("connected", "Connected");
+        updateStatus("connected", "connected");
       });
 
       userChannelRef.current.bind(
         "pusher:subscription_error",
         (error: Error | unknown) => {
           console.error("Channel subscription error:", error);
-          updateStatus("disconnected", "Subscription failed");
+          updateStatus("disconnected", "subscriptionFailed");
           isInitializingRef.current = false;
           handlePusherError();
         }
@@ -188,7 +188,7 @@ export function usePusher({
       userChannelRef.current.bind("chat_message", eventHandlers.onChatMessage);
     } catch (error) {
       console.error("Failed to initialize Pusher:", error);
-      updateStatus("disconnected", "Failed to connect");
+      updateStatus("disconnected", "failedToConnect");
       isInitializingRef.current = false;
       handlePusherError();
     }
