@@ -3,12 +3,14 @@
  * Handles OAuth authentication with Google using simple functions
  */
 
-interface TokenData {
+interface UserData {
   access_token: string;
-  token_type: string;
-  expires_in: number;
-  refresh_token?: string;
-  timestamp: number;
+  user_id: string;
+  user_info: {
+    email: string;
+    name: string;
+    picture: string;
+  };
 }
 
 interface AuthState {
@@ -35,28 +37,96 @@ const config = {
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
     "https://www.googleapis.com/auth/calendar.events"
-  ]
+  ],
+  // Remove hardcoded domain - let browser handle it automatically
+  cookieDomain: undefined // Will work for current domain
 };
 
-// Simple storage helpers
-const storage = {
-  store: (key: string, data: TokenData) => {
-    sessionStorage.setItem(key, JSON.stringify(data));
+// Cookie utilities
+const cookieUtils = {
+  set: (name: string, value: string, days: number = 7, domain?: string) => {
+    const maxAge = days * 24 * 60 * 60; // Convert days to seconds
+
+    let cookie = `${name}=${encodeURIComponent(value)}; Max-Age=${maxAge}; path=/; SameSite=Lax`;
+
+    // Only set Secure flag if we're on HTTPS (not localhost)
+    if (
+      typeof window !== "undefined" &&
+      window.location.protocol === "https:"
+    ) {
+      cookie += "; Secure";
+    }
+
+    // Only set domain if explicitly provided and not localhost
+    if (domain && !window.location.hostname.includes("localhost")) {
+      cookie += `; domain=${domain}`;
+    }
+
+    document.cookie = cookie;
   },
-  retrieve: (key: string): TokenData | null => {
-    const data = sessionStorage.getItem(key);
-    return data ? JSON.parse(data) : null;
+
+  get: (name: string): string | null => {
+    if (typeof document === "undefined") return null;
+
+    const nameEQ = name + "=";
+    const ca = document.cookie.split(";");
+
+    for (let i = 0; i < ca.length; i++) {
+      let c = ca[i];
+      while (c.charAt(0) === " ") c = c.substring(1, c.length);
+      if (c.indexOf(nameEQ) === 0) {
+        return decodeURIComponent(c.substring(nameEQ.length, c.length));
+      }
+    }
+    return null;
+  },
+
+  delete: (name: string, domain?: string) => {
+    let cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/`;
+
+    // Only set domain if explicitly provided and not localhost
+    if (domain && !window.location.hostname.includes("localhost")) {
+      cookie += `; domain=${domain}`;
+    }
+
+    document.cookie = cookie;
+  }
+};
+
+// Simple storage helpers using cookies
+const storage = {
+  store: (key: string, data: UserData) => {
+    const jsonData = JSON.stringify(data);
+    cookieUtils.set(key, jsonData, 7, config.cookieDomain);
+
+    // Also store the token separately for easy access
+    cookieUtils.set("auth_token", data.access_token, 7, config.cookieDomain);
+  },
+  retrieve: (key: string): UserData | null => {
+    try {
+      const data = cookieUtils.get(key);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error(`Error parsing stored data for key '${key}':`, error);
+      return null;
+    }
+  },
+  retrieveToken: (): string | null => {
+    return cookieUtils.get("auth_token");
   },
   remove: (key: string) => {
-    sessionStorage.removeItem(key);
+    cookieUtils.delete(key, config.cookieDomain);
+    // Also remove the auth token
+    cookieUtils.delete("auth_token", config.cookieDomain);
   }
 };
 
 // Helper functions
-const isTokenExpired = (token: TokenData): boolean => {
-  if (!token.expires_in || !token.timestamp) return false;
-  const expirationTime = token.timestamp + token.expires_in * 1000;
-  return Date.now() >= expirationTime;
+const isTokenExpired = (): boolean => {
+  // With cookies and maxAge, if the cookie exists, it's still valid
+  // If it doesn't exist, it has either expired or was never set
+  const token = storage.retrieveToken();
+  return token === null;
 };
 
 const updateAuthState = (updates: Partial<AuthState>) => {
@@ -85,14 +155,15 @@ export const authService = {
     updateAuthState({ loading: true });
 
     try {
-      // Check for existing token
-      const existingToken = storage.retrieve("oauth_token");
+      // Check for existing token and user data
+      const existingToken = storage.retrieveToken();
+      const existingUserData = storage.retrieve("user_data");
 
-      if (existingToken && !isTokenExpired(existingToken)) {
+      if (existingToken && existingUserData && !isTokenExpired()) {
         updateAuthState({
           isAuthenticated: true,
           loading: false,
-          token: existingToken.access_token
+          token: existingToken
         });
         return true;
       }
@@ -109,20 +180,19 @@ export const authService = {
 
       if (code) {
         const redirectUri = `${window.location.origin}${window.location.pathname}`;
-        const tokenData = await apiCall("/auth/oauth/token", {
+        const userData = await apiCall("/auth/oauth/token", {
           code,
           grant_type: "authorization_code",
           redirect_uri: redirectUri,
           state
         });
 
-        tokenData.timestamp = Date.now();
-        storage.store("oauth_token", tokenData);
+        storage.store("user_data", userData);
 
         updateAuthState({
           isAuthenticated: true,
           loading: false,
-          token: tokenData.access_token
+          token: userData.access_token
         });
 
         // Clean up URL
@@ -178,7 +248,7 @@ export const authService = {
 
   // Logout
   async logout(): Promise<void> {
-    storage.remove("oauth_token");
+    storage.remove("user_data");
     updateAuthState({
       isAuthenticated: false,
       loading: false,
@@ -195,6 +265,19 @@ export const authService = {
   onStateChange(listener: (state: AuthState) => void): () => void {
     authListeners.add(listener);
     return () => authListeners.delete(listener);
+  },
+
+  // Debug function to troubleshoot cookie issues
+  debug(): void {
+    console.log("=== Auth Debug Info ===");
+    console.log("Current domain:", window.location.hostname);
+    console.log("Protocol:", window.location.protocol);
+    console.log("All cookies:", document.cookie);
+    console.log("Auth token:", storage.retrieveToken());
+    console.log("User data:", storage.retrieve("user_data"));
+    console.log("Auth state:", authState);
+    console.log("Token expired?", isTokenExpired());
+    console.log("======================");
   }
 };
 
