@@ -31,8 +31,6 @@ export default function ChatForm({
       className={clsx(
         "rounded-full bg-neutral-200/80 dark:bg-neutral-800/80 flex items-center w-full max-w-3xl border border-transparent transition-all duration-500",
         {
-          "hover:drop-shadow-lg hover:drop-shadow-[0_0_15px_rgba(34,211,238,0.3)] focus-within:drop-shadow-xl focus-within:drop-shadow-[0_0_25px_rgba(34,211,238,0.4)] focus-within:ring-2 focus-within:ring-cyan-500/30 dark:hover:drop-shadow-[0_0_15px_rgba(34,211,238,0.4)] dark:focus-within:drop-shadow-[0_0_25px_rgba(34,211,238,0.5)] dark:focus-within:ring-cyan-400/30":
-            isAuthenticated,
           "opacity-50 cursor-not-allowed": !isAuthenticated,
           "opacity-40 blur-sm pointer-events-none": isSettingsOpen
         }
