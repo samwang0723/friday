@@ -49,7 +49,11 @@ export default function ChatForm({
           WebkitTapHighlightColor: 'transparent',
           outline: 'none',
           border: 'none',
-          boxShadow: 'none'
+          boxShadow: 'none',
+          background: 'transparent !important',
+          backgroundColor: 'transparent !important',
+          WebkitBoxShadow: 'none',
+          MozBoxShadow: 'none'
         }}
         required
         placeholder={
