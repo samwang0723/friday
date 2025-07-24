@@ -144,7 +144,7 @@ export function useVADManager(
     const timeSinceAudioStart = now - audioStartTimeRef.current;
 
     // Filter out speech detection that happens very soon after audio starts
-    const isLikelyEcho = context.isStreaming && timeSinceAudioStart < 500;
+    const isLikelyEcho = context.isStreaming && timeSinceAudioStart < 200;
 
     console.log(
       `VAD: Speech detected - Time since audio start: ${timeSinceAudioStart}ms, Is likely echo: ${isLikelyEcho}, Is streaming: ${context.isStreaming}`
@@ -375,7 +375,7 @@ export function useVADManager(
     minSpeechFrames: config.minSpeechFrames || 8,
     negativeSpeechThreshold: 0.5, // Lower threshold to be less aggressive about ending
     redemptionFrames: 8, // Increased to allow for natural pauses in speech
-    preSpeechPadFrames: 2, // More padding for natural starts
+    preSpeechPadFrames: 5, // More padding for natural starts
     // frameSamples: 480, // Aligned with RNNoise frame size
     stream: audioStream
   });

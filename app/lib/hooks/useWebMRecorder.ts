@@ -47,7 +47,7 @@ export function useWebMRecorder(
   // Default configuration
   const mimeType = config.mimeType || "audio/webm;codecs=opus";
   const audioBitsPerSecond = config.audioBitsPerSecond || 128000;
-  const timeSlice = config.timeSlice || 10; // 10ms chunks
+  const timeSlice = config.timeSlice || 100; // 100ms chunks
   const maxDuration = config.maxDuration || 60000; // 60 seconds max
   const minBlobSize = config.minBlobSize || 512; // 512 bytes minimum
 
