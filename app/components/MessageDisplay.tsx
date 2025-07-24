@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import { useLocale, useTranslations } from "next-intl";
+import { useEffect, useRef } from "react";
 import Link from "./Link";
 
 type Message = {
@@ -33,15 +34,34 @@ export default function MessageDisplay({
   const t = useTranslations();
   const locale = useLocale();
 
+  const messageContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when content changes
+  useEffect(() => {
+    if (messageContainerRef.current) {
+      messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+    }
+  }, [currentMessage, messages]);
+
   return (
-    <div
-      className={clsx(
-        "text-neutral-400 dark:text-neutral-500 pt-4 text-center max-w-lg text-balance min-h-28 space-y-4 transition-all duration-500",
-        {
-          "scale-95 -translate-y-2 opacity-40 blur-sm": isSettingsOpen
-        }
-      )}
-    >
+    <div className={clsx(
+      "relative transition-all duration-500",
+      {
+        "scale-95 -translate-y-2 opacity-40 blur-sm": isSettingsOpen
+      }
+    )}>
+      {/* Fade overlay at top */}
+      <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-white dark:from-black to-transparent pointer-events-none z-10" />
+      
+      {/* Scrollable content container */}
+      <div
+        ref={messageContainerRef}
+        className="text-neutral-400 dark:text-neutral-500 pt-4 text-center max-w-lg text-balance h-[9rem] overflow-y-auto scrollbar-hide space-y-4 px-4"
+        style={{
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none'
+        }}
+      >
       {authLoading && <p>{t("auth.checkingAuth")}</p>}
 
       {!authLoading && !isAuthenticated && <p>{t("auth.pleaseSignIn")}</p>}
@@ -172,6 +192,10 @@ export default function MessageDisplay({
             )}
           </>
         )}
+      </div>
+      
+      {/* Fade overlay at bottom */}
+      <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-white dark:from-black to-transparent pointer-events-none z-10" />
     </div>
   );
 }
