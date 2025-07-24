@@ -65,19 +65,21 @@ export default function MessageDisplay({
             "linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%)"
         }}
       >
-        {authLoading && <p>{t("auth.checkingAuth")}</p>}
+        {authLoading && <p className="pb-2 pt-2">{t("auth.checkingAuth")}</p>}
 
-        {!authLoading && !isAuthenticated && <p>{t("auth.pleaseSignIn")}</p>}
+        {!authLoading && !isAuthenticated && (
+          <p className="pb-2 pt-2">{t("auth.pleaseSignIn")}</p>
+        )}
 
         {!authLoading && isAuthenticated && currentMessage && (
-          <p>{currentMessage}</p>
+          <p className="pb-2 pt-2">{currentMessage}</p>
         )}
 
         {!authLoading &&
           isAuthenticated &&
           messages.length > 0 &&
           !currentMessage && (
-            <p className="pb-4">
+            <p className="pb-2 pt-2">
               {messages.at(-1)?.content}
               <span className="text-xs font-mono text-neutral-300 dark:text-neutral-700">
                 {" "}
@@ -91,7 +93,7 @@ export default function MessageDisplay({
           messages.length === 0 &&
           !currentMessage && (
             <>
-              <p>
+              <p className="pb-2 pt-2">
                 {locale === "zh" || locale === "zh-TW" ? (
                   <>
                     {t("assistant.description")}{" "}

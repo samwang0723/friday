@@ -855,6 +855,42 @@ export default function Home() {
     [addNotification]
   );
 
+  // Chat message queue system
+  const messageQueueRef = useRef<ChatMessageData[]>([]);
+  const isProcessingRef = useRef(false);
+
+  const processMessageQueue = useCallback(async () => {
+    if (isProcessingRef.current || messageQueueRef.current.length === 0) {
+      return;
+    }
+
+    isProcessingRef.current = true;
+
+    while (messageQueueRef.current.length > 0) {
+      const data = messageQueueRef.current.shift()!;
+      
+      addNotification({
+        type: "chat",
+        title: "Proactive Message",
+        message: data.message,
+        data
+      });
+
+      console.log("Submitting transcript:", data.message);
+      startTransition(() => {
+        console.log("Inside transition, calling submit with:", {
+          transcript: data.message
+        });
+        submit({ transcript: data.message });
+      });
+
+      // Wait before processing next message to allow TTS completion
+      await new Promise(resolve => setTimeout(resolve, 4000)); // 4 second delay
+    }
+
+    isProcessingRef.current = false;
+  }, [submit, addNotification]);
+
   const handleChatMessage = useCallback(
     (data: ChatMessageData) => {
       console.log("Proactive chat message:", data);
@@ -864,23 +900,16 @@ export default function Home() {
         return;
       }
 
-      addNotification({
-        type: "chat",
-        title: "Proactive Message",
-        message: data.message,
-        data
-      });
-
-      // Use the existing submit function with transcript object to leverage full SSE/audio pipeline
-      console.log("Submitting transcript:", data.message);
-      startTransition(() => {
-        console.log("Inside transition, calling submit with:", {
-          transcript: data.message
-        });
-        submit({ transcript: data.message });
-      });
+      // Add to queue
+      messageQueueRef.current.push(data);
+      console.log(`Added message to queue. Queue length: ${messageQueueRef.current.length}`);
+      
+      // Process queue if not already processing
+      if (!isProcessingRef.current) {
+        processMessageQueue();
+      }
     },
-    [auth, submit, t, addNotification]
+    [auth, t, processMessageQueue]
   );
 
   // Pusher hook
