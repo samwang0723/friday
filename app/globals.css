@@ -71,3 +71,62 @@
     "Google Sans", "Inter", ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
+
+/* Mobile input field overrides to prevent browser styling */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+textarea {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: none !important;
+  -webkit-content-zooming: none !important;
+  -webkit-user-drag: none !important;
+  -webkit-autofill-strong-password-viewable: transparent !important;
+}
+
+/* Prevent autofill styling on all browsers */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: inherit !important;
+  transition: background-color 5000s ease-in-out 0s !important;
+  background-color: transparent !important;
+  background: transparent !important;
+  box-shadow: 0 0 0px 1000px transparent inset !important;
+  -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
+}
+
+/* Specific targeting for our chat input */
+#chat-input {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: none !important;
+  background-color: transparent !important;
+  background: transparent !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: inherit !important;
+  caret-color: auto !important;
+}
+
+#chat-input:-webkit-autofill,
+#chat-input:-webkit-autofill:hover,
+#chat-input:-webkit-autofill:focus,
+#chat-input:-webkit-autofill:active {
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: inherit !important;
+  transition: background-color 5000s ease-in-out 0s !important;
+  background-color: transparent !important;
+  background: transparent !important;
+  box-shadow: 0 0 0px 1000px transparent inset !important;
+  -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
+}

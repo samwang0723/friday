@@ -47,6 +47,7 @@ export default function ChatForm({
         className="bg-transparent focus:outline-none focus:ring-0 focus:border-transparent pl-6 pr-4 py-4 w-full placeholder:text-neutral-600 dark:placeholder:text-neutral-400 disabled:cursor-not-allowed appearance-none border-none"
         style={{
           WebkitAppearance: "none",
+          appearance: "none",
           WebkitTapHighlightColor: "transparent",
           outline: "none",
           border: "none",
@@ -56,7 +57,6 @@ export default function ChatForm({
           WebkitBoxShadow: "none",
           MozBoxShadow: "none",
           WebkitTextFillColor: "inherit",
-          WebkitBackgroundClip: "text",
           transition: "background-color 5000s ease-in-out 0s"
         }}
         required
