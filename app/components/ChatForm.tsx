@@ -43,7 +43,14 @@ export default function ChatForm({
         id="chat-input"
         name="chatInput"
         type="text"
-        className="bg-transparent focus:outline-hidden pl-6 pr-4 py-4 w-full placeholder:text-neutral-600 dark:placeholder:text-neutral-400 disabled:cursor-not-allowed"
+        className="bg-transparent focus:outline-none focus:ring-0 focus:border-transparent pl-6 pr-4 py-4 w-full placeholder:text-neutral-600 dark:placeholder:text-neutral-400 disabled:cursor-not-allowed appearance-none border-none"
+        style={{
+          WebkitAppearance: 'none',
+          WebkitTapHighlightColor: 'transparent',
+          outline: 'none',
+          border: 'none',
+          boxShadow: 'none'
+        }}
         required
         placeholder={
           isAuthenticated
