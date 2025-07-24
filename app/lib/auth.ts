@@ -137,7 +137,10 @@ const updateAuthState = (updates: Partial<AuthState>) => {
 const apiCall = async (endpoint: string, data?: any) => {
   const response = await fetch(`${config.agentCoreAPI}${endpoint}`, {
     method: data ? "POST" : "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-Client-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone
+    },
     body: data ? JSON.stringify(data) : undefined
   });
 
