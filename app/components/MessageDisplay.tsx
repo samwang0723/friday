@@ -72,14 +72,14 @@ export default function MessageDisplay({
         )}
 
         {!authLoading && isAuthenticated && currentMessage && (
-          <p className="pb-2 pt-2">{currentMessage}</p>
+          <p className="pb-4 pt-2">{currentMessage}</p>
         )}
 
         {!authLoading &&
           isAuthenticated &&
           messages.length > 0 &&
           !currentMessage && (
-            <p className="pb-2 pt-2">
+            <p className="pb-4 pt-2">
               {messages.at(-1)?.content}
               <span className="text-xs font-mono text-neutral-300 dark:text-neutral-700">
                 {" "}
