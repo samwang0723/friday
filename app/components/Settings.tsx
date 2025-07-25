@@ -57,10 +57,10 @@ export default function Settings({
     if (!settingsLoaded) return;
 
     // Simple rule: Chinese locales always use minimax, others always use elevenlabs
-    const expectedEngine = isChineseLocale ? "minimax" : "elevenlabs";
+    const expectedEngine = isChineseLocale ? "cartesiachinese" : "elevenlabs";
 
     if (settings.ttsEngine !== expectedEngine) {
-      if (isEnglishLocale && settings.ttsEngine === "cartesia") {
+      if (isEnglishLocale && settings.ttsEngine === "cartesiachinese") {
         return;
       }
       console.log(
@@ -180,7 +180,7 @@ export default function Settings({
                   {isEnglishLocale
                     ? t("textToSpeechDescription")
                     : isChineseLocale
-                      ? t("textToSpeechChineseOnly")
+                      ? t("textToSpeechDescription")
                       : t("textToSpeechNonEnglish")}
                 </span>
               </div>
@@ -208,7 +208,9 @@ export default function Settings({
                 <option value="elevenlabs">ElevenLabs</option>
               )}
               {isEnglishLocale && <option value="cartesia">Cartesia</option>}
-              {isChineseLocale && <option value="minimax">Minimax</option>}
+              {isChineseLocale && (
+                <option value="cartesiachinese">Cartesia</option>
+              )}
             </select>
           </div>
 

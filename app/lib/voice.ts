@@ -92,8 +92,11 @@ export async function synthesizeSpeech(
       return new Response("Invalid text content", { status: 400 });
     }
 
-    if (engine === "cartesia") {
-      const config = ttsConfigs.cartesia as TextToSpeechConfig;
+    if (engine === "cartesia" || engine === "cartesiachinese") {
+      const config =
+        engine === "cartesia"
+          ? ttsConfigs.cartesia
+          : ttsConfigs.cartesiachinese;
       if (!config || !config.apiKey || !config.voiceId) {
         console.error(
           "Cartesia API key or Voice ID is not configured for TTS."
@@ -268,8 +271,11 @@ export function synthesizeSpeechStream(
     async start(controller) {
       try {
         // Add initial configuration validation and diagnostics
-        if (engine === "cartesia") {
-          const config = ttsConfigs.cartesia as TextToSpeechConfig;
+        if (engine === "cartesia" || engine === "cartesiachinese") {
+          const config =
+            engine === "cartesia"
+              ? ttsConfigs.cartesia
+              : ttsConfigs.cartesiachinese;
           if (!config || !config.apiKey || !config.voiceId) {
             throw new Error(
               "Cartesia API key or Voice ID is not configured for TTS."
@@ -371,8 +377,11 @@ export function synthesizeSpeechStream(
           }
         };
 
-        if (engine === "cartesia") {
-          const config = ttsConfigs.cartesia as TextToSpeechConfig;
+        if (engine === "cartesia" || engine === "cartesiachinese") {
+          const config =
+            engine === "cartesia"
+              ? ttsConfigs.cartesia
+              : ttsConfigs.cartesiachinese;
           if (!config || !config.apiKey || !config.voiceId) {
             throw new Error(
               "Cartesia API key or Voice ID is not configured for TTS."
