@@ -79,6 +79,24 @@
     "subscriptionFailed": "Échec d'abonnement",
     "failedToConnect": "Échec de connexion"
   },
+  "notifications": {
+    "title": "Notifications",
+    "authRequired": "Authentification Requise",
+    "authRequiredMessage": "Veuillez vous connecter pour voir vos notifications.",
+    "markAllAsRead": "Marquer toutes comme lues",
+    "clearAll": "Effacer toutes les notifications",
+    "close": "Fermer",
+    "empty": {
+      "title": "Pas encore de notifications",
+      "message": "Lorsque vous recevrez des notifications, elles apparaîtront ici."
+    },
+    "timeAgo": {
+      "justNow": "À l'instant",
+      "minutesAgo": "il y a {minutes}m",
+      "hoursAgo": "il y a {hours}h",
+      "daysAgo": "il y a {days}j"
+    }
+  },
   "privacy": {
     "title": "Politique de Confidentialité",
     "lastUpdated": "Dernière mise à jour : Juillet 2025",

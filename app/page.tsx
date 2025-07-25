@@ -4,6 +4,7 @@ import ChatForm from "@/components/ChatForm";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import MessageDisplay from "@/components/MessageDisplay";
 import NotificationButton from "@/components/NotificationButton";
+import NotificationModal from "@/components/NotificationModal";
 import NotificationStatus from "@/components/NotificationStatus";
 import Settings from "@/components/Settings";
 import SettingsButton from "@/components/SettingsButton";
@@ -118,6 +119,7 @@ export default function Home() {
 
   // UI state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const { settings, updateSettings, isLoaded: settingsLoaded } = useSettings();
 
   // Chat state
@@ -1001,7 +1003,7 @@ export default function Home() {
 
   const handleClearHistory = async () => {
     if (!auth.isAuthenticated || !agentCoreRef.current) return;
-    
+
     try {
       const accessToken = auth.getToken();
       if (accessToken) {
@@ -1068,7 +1070,9 @@ export default function Home() {
       {/* Notification Button - Top Right */}
       {auth.isAuthenticated && (
         <div className="fixed top-4 right-4 z-10">
-          <NotificationButton />
+          <NotificationButton
+            onClick={() => setIsNotificationModalOpen(true)}
+          />
         </div>
       )}
 
@@ -1082,6 +1086,12 @@ export default function Home() {
         settings={settings}
         settingsLoaded={settingsLoaded}
         onSettingsChange={handleSettingsChange}
+      />
+
+      {/* Notification Modal */}
+      <NotificationModal
+        isOpen={isNotificationModalOpen}
+        onClose={() => setIsNotificationModalOpen(false)}
       />
 
       {/* Privacy Policy Link and Company Disclaimer */}

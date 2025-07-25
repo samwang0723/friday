@@ -80,6 +80,24 @@
     "subscriptionFailed": "訂閱失敗",
     "failedToConnect": "連線失敗"
   },
+  "notifications": {
+    "title": "通知",
+    "authRequired": "需要認證",
+    "authRequiredMessage": "請登入以查看您的通知。",
+    "markAllAsRead": "全部標記為已讀",
+    "clearAll": "清除所有通知",
+    "close": "關閉",
+    "empty": {
+      "title": "暫無通知",
+      "message": "當您收到通知時，它們會出現在這裡。"
+    },
+    "timeAgo": {
+      "justNow": "剛剛",
+      "minutesAgo": "{minutes}分鐘前",
+      "hoursAgo": "{hours}小時前",
+      "daysAgo": "{days}天前"
+    }
+  },
   "privacy": {
     "title": "隱私政策",
     "lastUpdated": "最後更新：2025年7月",

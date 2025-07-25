@@ -448,42 +448,42 @@ This section documents the complete flow between the VAD (Voice Activity Detecti
 ```mermaid
 flowchart TD
     Start([User Starts Speaking]) --> VAD_Detect{VAD Detects Speech?}
-    
+
     VAD_Detect -->|Yes| Echo_Check{Is Likely Echo?<br/>timeSinceAudioStart < 200ms}
     VAD_Detect -->|No - Misfire| VAD_Misfire[VAD Misfire Detected]
-    
+
     Echo_Check -->|Yes - Echo| Suppress_Callback[Suppress onSpeechStart<br/>actualUserSpeaking = true<br/>userSpeaking = false]
     Echo_Check -->|No - Real Speech| Trigger_Callback[Trigger onSpeechStart<br/>actualUserSpeaking = true<br/>userSpeaking = true]
-    
+
     Trigger_Callback --> Start_Recording[WebM Recorder Starts]
     Suppress_Callback --> No_Recording[WebM Recorder NOT Started]
-    
+
     Start_Recording --> User_Speaking[User Continues Speaking]
     No_Recording --> User_Speaking
-    
+
     User_Speaking --> Speech_End{User Stops Speaking}
-    
+
     Speech_End --> VAD_End_Detect{VAD Detects Speech End?}
-    
+
     VAD_End_Detect -->|Yes| Audio_Analysis[Analyze Audio:<br/>- RMS Level Check<br/>- Duration Check<br/>- Speech-like Analysis]
     VAD_End_Detect -->|No - VAD Stuck| Timeout_Stop[Max Duration Timeout<br/>60s WebM Auto-Stop]
-    
+
     Audio_Analysis --> Valid_Speech{Audio Analysis Valid?}
-    
+
     Valid_Speech -->|Yes| Process_Audio[onSpeechEnd with isValid=true<br/>Stop WebM & Process Audio<br/>Submit for transcription]
     Valid_Speech -->|No - Filtered Out| Filter_Audio[onSpeechEnd with isValid=false<br/>Stop WebM but DON'T Process]
-    
+
     VAD_Misfire --> Reset_State[Reset VAD State:<br/>actualUserSpeaking = false<br/>userSpeaking = false<br/>shouldShowOrb = false]
-    
+
     Reset_State --> Stop_WebM[Stop WebM Recording<br/>onVADMisfire callback<br/>DON'T process audio]
-    
+
     Stop_WebM --> Clean_State[Clean State - No Orphaned Recording]
-    
+
     Filter_Audio --> Clean_Stop[Clean Stop - No Orphaned Recording]
     Process_Audio --> Clean_Stop
-    
+
     Timeout_Stop --> Force_Stop[Force Stop WebM<br/>May lose valid audio]
-    
+
     style VAD_Misfire fill:#99ff99
     style Stop_WebM fill:#99ff99
     style Clean_State fill:#99ff99
@@ -497,11 +497,13 @@ flowchart TD
 #### ✅ **Enhanced onSpeechEnd Callback**
 
 **Before:**
+
 ```typescript
 onSpeechEnd?: (audio: Float32Array) => void;
 ```
 
 **After:**
+
 ```typescript
 onSpeechEnd?: (isValid: boolean, audio: Float32Array) => void;
 ```
@@ -511,11 +513,13 @@ The callback now receives an `isValid` flag that indicates whether the VAD analy
 #### ✅ **Improved VAD Misfire Handling**
 
 **Before:**
+
 - VAD misfires left WebM recordings running indefinitely
 - No mechanism to stop orphaned recordings
 - Inconsistent state between VAD and WebM recorder
 
 **After:**
+
 - VAD misfires properly stop WebM recording via `onVADMisfire` callback
 - Audio data is discarded appropriately for false positives
 - Clean state management prevents orphaned recordings
@@ -523,11 +527,13 @@ The callback now receives an `isValid` flag that indicates whether the VAD analy
 #### ✅ **Better Audio Filtering Integration**
 
 **Before:**
+
 - Filtered audio left WebM recorder running with no cleanup
 - `onSpeechEnd` was not called for invalid audio
 - Manual cleanup required or timeout dependency
 
 **After:**
+
 - `onSpeechEnd(false, audio)` called for filtered audio
 - WebM recorder stopped even when audio is deemed invalid
 - Consistent cleanup across all audio processing paths
@@ -539,8 +545,9 @@ The callback now receives an `isValid` flag that indicates whether the VAD analy
 **Problem:** VAD misfires and filtered audio scenarios left WebM recordings running indefinitely with no proper cleanup mechanism.
 
 **Solution:** All flow paths now properly stop the WebM recorder:
+
 - Valid speech: `onSpeechEnd(true, audio)` → stops WebM and processes audio
-- Invalid speech: `onSpeechEnd(false, audio)` → stops WebM but discards audio  
+- Invalid speech: `onSpeechEnd(false, audio)` → stops WebM but discards audio
 - VAD misfire: `onVADMisfire()` → stops WebM and discards audio
 - Timeout: Max duration limit → stops WebM (backup safety)
 
@@ -559,26 +566,30 @@ The callback now receives an `isValid` flag that indicates whether the VAD analy
 ### Flow Scenarios
 
 #### Scenario 1: Valid Speech Detection
+
 ```
-User Speaks → VAD Detects → Start WebM → User Stops → Audio Analysis (Valid) 
+User Speaks → VAD Detects → Start WebM → User Stops → Audio Analysis (Valid)
 → onSpeechEnd(true, audio) → Stop WebM → Process Audio → Submit to API
 ```
 
 #### Scenario 2: Invalid Audio (Filtered)
+
 ```
-User Speaks → VAD Detects → Start WebM → User Stops → Audio Analysis (Invalid) 
+User Speaks → VAD Detects → Start WebM → User Stops → Audio Analysis (Invalid)
 → onSpeechEnd(false, audio) → Stop WebM → Discard Audio
 ```
 
 #### Scenario 3: VAD Misfire
+
 ```
-False Detection → VAD Misfire → Reset VAD State → onVADMisfire() 
+False Detection → VAD Misfire → Reset VAD State → onVADMisfire()
 → Stop WebM → Discard Audio → Clean State
 ```
 
 #### Scenario 4: Echo Detection
+
 ```
-AI Audio Playing → User Speech Detected → Echo Filter → Suppress Recording 
+AI Audio Playing → User Speech Detected → Echo Filter → Suppress Recording
 → No WebM Start → Continue Normal Flow
 ```
 
@@ -587,7 +598,7 @@ AI Audio Playing → User Speech Detected → Echo Filter → Suppress Recording
 When testing the VAD and WebM integration, verify these scenarios:
 
 1. **Normal Speech Flow**: Ensure valid speech is properly recorded and submitted
-2. **Short Speech Filtering**: Verify short sounds are filtered but WebM stops cleanly  
+2. **Short Speech Filtering**: Verify short sounds are filtered but WebM stops cleanly
 3. **VAD Misfire Recovery**: Test that misfires don't leave orphaned recordings
 4. **Echo Prevention**: Ensure AI audio doesn't trigger false speech detection
 5. **Long Recording Timeout**: Verify 60-second timeout properly stops recording

@@ -80,6 +80,24 @@
     "subscriptionFailed": "Subscription failed",
     "failedToConnect": "Failed to connect"
   },
+  "notifications": {
+    "title": "Notifications",
+    "authRequired": "Authentication Required",
+    "authRequiredMessage": "Please sign in to view your notifications.",
+    "markAllAsRead": "Mark all as read",
+    "clearAll": "Clear all notifications",
+    "close": "Close",
+    "empty": {
+      "title": "No notifications yet",
+      "message": "When you receive notifications, they'll appear here."
+    },
+    "timeAgo": {
+      "justNow": "Just now",
+      "minutesAgo": "{minutes}m ago",
+      "hoursAgo": "{hours}h ago",
+      "daysAgo": "{days}d ago"
+    }
+  },
   "privacy": {
     "title": "Privacy Policy",
     "lastUpdated": "Last updated: July 2025",

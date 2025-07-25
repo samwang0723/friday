@@ -79,6 +79,24 @@
     "subscriptionFailed": "サブスクリプション失敗",
     "failedToConnect": "接続失敗"
   },
+  "notifications": {
+    "title": "通知",
+    "authRequired": "認証が必要です",
+    "authRequiredMessage": "通知を表示するにはサインインしてください。",
+    "markAllAsRead": "すべて既読にする",
+    "clearAll": "すべて削除",
+    "close": "閉じる",
+    "empty": {
+      "title": "通知はまだありません",
+      "message": "通知を受信すると、ここに表示されます。"
+    },
+    "timeAgo": {
+      "justNow": "たった今",
+      "minutesAgo": "{minutes}分前",
+      "hoursAgo": "{hours}時間前",
+      "daysAgo": "{days}日前"
+    }
+  },
   "privacy": {
     "title": "プライバシーポリシー",
     "lastUpdated": "最終更新：2025年7月",

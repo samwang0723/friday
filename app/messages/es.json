@@ -79,6 +79,24 @@
     "subscriptionFailed": "Error de suscripción",
     "failedToConnect": "Error al conectar"
   },
+  "notifications": {
+    "title": "Notificaciones",
+    "authRequired": "Autenticación Requerida",
+    "authRequiredMessage": "Por favor inicia sesión para ver tus notificaciones.",
+    "markAllAsRead": "Marcar todas como leídas",
+    "clearAll": "Borrar todas las notificaciones",
+    "close": "Cerrar",
+    "empty": {
+      "title": "Aún no hay notificaciones",
+      "message": "Cuando recibas notificaciones, aparecerán aquí."
+    },
+    "timeAgo": {
+      "justNow": "Ahora mismo",
+      "minutesAgo": "hace {minutes}m",
+      "hoursAgo": "hace {hours}h",
+      "daysAgo": "hace {days}d"
+    }
+  },
   "privacy": {
     "title": "Política de Privacidad",
     "lastUpdated": "Última actualización: Julio 2025",

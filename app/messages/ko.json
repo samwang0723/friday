@@ -79,6 +79,24 @@
     "subscriptionFailed": "구독 실패",
     "failedToConnect": "연결 실패"
   },
+  "notifications": {
+    "title": "알림",
+    "authRequired": "인증이 필요합니다",
+    "authRequiredMessage": "알림을 보려면 로그인해 주세요.",
+    "markAllAsRead": "모두 읽음으로 표시",
+    "clearAll": "모든 알림 삭제",
+    "close": "닫기",
+    "empty": {
+      "title": "아직 알림이 없습니다",
+      "message": "알림을 받으면 여기에 표시됩니다."
+    },
+    "timeAgo": {
+      "justNow": "방금 전",
+      "minutesAgo": "{minutes}분 전",
+      "hoursAgo": "{hours}시간 전",
+      "daysAgo": "{days}일 전"
+    }
+  },
   "privacy": {
     "title": "개인정보 보호정책",
     "lastUpdated": "최종 업데이트: 2025년 7월",

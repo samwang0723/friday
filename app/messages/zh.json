@@ -80,6 +80,24 @@
     "subscriptionFailed": "订阅失败",
     "failedToConnect": "连接失败"
   },
+  "notifications": {
+    "title": "通知",
+    "authRequired": "需要认证",
+    "authRequiredMessage": "请登录以查看您的通知。",
+    "markAllAsRead": "全部标记为已读",
+    "clearAll": "清除所有通知",
+    "close": "关闭",
+    "empty": {
+      "title": "暂无通知",
+      "message": "当您收到通知时，它们会出现在这里。"
+    },
+    "timeAgo": {
+      "justNow": "刚刚",
+      "minutesAgo": "{minutes}分钟前",
+      "hoursAgo": "{hours}小时前",
+      "daysAgo": "{days}天前"
+    }
+  },
   "privacy": {
     "title": "隐私政策",
     "lastUpdated": "最后更新：2025年7月",
