@@ -45,6 +45,9 @@
     "streamingDescription": "Stream responses as they're generated",
     "audioEnabled": "Speech to Speech Mode",
     "audioEnabledDescription": "Enable voice responses with text-to-speech",
+    "clearHistory": "Clear Chat History",
+    "clearHistoryDescription": "Delete all conversation history",
+    "clearHistoryButton": "Clear",
     "settingsButton": "Settings",
     "auth": {
       "signOut": "Sign out"

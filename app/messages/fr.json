@@ -44,6 +44,9 @@
     "streamingDescription": "Diffuser les réponses au fur et à mesure de leur génération",
     "audioEnabled": "Mode Parole à Parole",
     "audioEnabledDescription": "Activer les réponses vocales avec synthèse vocale",
+    "clearHistory": "Effacer l'Historique de Chat",
+    "clearHistoryDescription": "Supprimer tout l'historique de conversation",
+    "clearHistoryButton": "Effacer",
     "settingsButton": "Paramètres",
     "auth": {
       "signOut": "Se déconnecter"

@@ -999,6 +999,26 @@ export default function Home() {
     console.log("Settings updated:", newSettings);
   };
 
+  const handleClearHistory = async () => {
+    if (!auth.isAuthenticated || !agentCoreRef.current) return;
+    
+    try {
+      const accessToken = auth.getToken();
+      if (accessToken) {
+        const currentLocale = getCurrentLocale();
+        await agentCoreRef.current.clearHistory(accessToken, {
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          clientDatetime: new Date().toISOString(),
+          locale: currentLocale
+        });
+        toast.success("Chat history cleared successfully");
+      }
+    } catch (error) {
+      console.error("Failed to clear chat history:", error);
+      toast.error("Failed to clear chat history");
+    }
+  };
+
   return (
     <>
       <div className="pb-4 min-h-28" />
@@ -1057,6 +1077,7 @@ export default function Home() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onLogout={handleLogout}
+        onClearHistory={handleClearHistory}
         isAuthenticated={auth.isAuthenticated}
         settings={settings}
         settingsLoaded={settingsLoaded}

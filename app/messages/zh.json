@@ -45,6 +45,9 @@
     "streamingDescription": "在生成时流式传输响应",
     "audioEnabled": "语音对话模式",
     "audioEnabledDescription": "启用语音响应与文本转语音",
+    "clearHistory": "清除聊天记录",
+    "clearHistoryDescription": "删除所有对话历史记录",
+    "clearHistoryButton": "清除",
     "settingsButton": "设置",
     "auth": {
       "signOut": "登出"

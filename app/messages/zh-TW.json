@@ -45,6 +45,9 @@
     "streamingDescription": "在生成時串流響應",
     "audioEnabled": "語音對話模式",
     "audioEnabledDescription": "啟用語音響應與文字轉語音",
+    "clearHistory": "清除聊天紀錄",
+    "clearHistoryDescription": "刪除所有對話歷史紀錄",
+    "clearHistoryButton": "清除",
     "settingsButton": "設定",
     "auth": {
       "signOut": "登出"

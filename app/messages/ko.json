@@ -44,6 +44,9 @@
     "streamingDescription": "응답이 생성되는 동안 스트리밍",
     "audioEnabled": "음성 대화 모드",
     "audioEnabledDescription": "텍스트 음성 변환으로 음성 응답 활성화",
+    "clearHistory": "채팅 기록 삭제",
+    "clearHistoryDescription": "모든 대화 기록을 삭제합니다",
+    "clearHistoryButton": "삭제",
     "settingsButton": "설정",
     "auth": {
       "signOut": "로그아웃"

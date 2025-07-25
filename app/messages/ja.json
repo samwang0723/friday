@@ -44,6 +44,9 @@
     "streamingDescription": "応答の生成と同時にストリーミングする",
     "audioEnabled": "音声対話モード",
     "audioEnabledDescription": "音声合成による音声応答を有効にする",
+    "clearHistory": "チャット履歴を消去",
+    "clearHistoryDescription": "すべての会話履歴を削除する",
+    "clearHistoryButton": "消去",
     "settingsButton": "設定",
     "auth": {
       "signOut": "サインアウト"

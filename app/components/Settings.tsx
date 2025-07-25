@@ -9,6 +9,7 @@ interface SettingsProps {
   isOpen: boolean;
   onClose: () => void;
   onLogout: () => void;
+  onClearHistory: () => void;
   isAuthenticated: boolean;
   settings: {
     sttEngine: string;
@@ -25,6 +26,7 @@ export default function Settings({
   isOpen,
   onClose,
   onLogout,
+  onClearHistory,
   isAuthenticated,
   settings,
   settingsLoaded,
@@ -350,6 +352,47 @@ export default function Settings({
 
           {/* Language Switcher */}
           <LanguageSwitcher />
+
+          {/* Clear Chat History */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <svg
+                className="h-5 w-5 text-red-400"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.5"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+              <div className="flex flex-col">
+                <span className="text-white text-sm">{t("clearHistory")}</span>
+                <span className="text-gray-400 text-xs">
+                  {t("clearHistoryDescription")}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={onClearHistory}
+              disabled={!isAuthenticated}
+              className={clsx(
+                "text-sm py-2 px-4 rounded-md transition-colors",
+                {
+                  "bg-red-500 hover:bg-red-700 text-white cursor-pointer":
+                    isAuthenticated,
+                  "bg-gray-600 text-gray-400 cursor-not-allowed":
+                    !isAuthenticated
+                }
+              )}
+            >
+              {t("clearHistoryButton")}
+            </button>
+          </div>
 
           {/* Logout Button */}
           <div className="flex items-center justify-end pt-6">

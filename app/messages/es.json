@@ -44,6 +44,9 @@
     "streamingDescription": "Transmitir respuestas mientras se generan",
     "audioEnabled": "Modo Voz a Voz",
     "audioEnabledDescription": "Habilitar respuestas de voz con texto a voz",
+    "clearHistory": "Borrar Historial de Chat",
+    "clearHistoryDescription": "Eliminar todo el historial de conversación",
+    "clearHistoryButton": "Borrar",
     "settingsButton": "Configuración",
     "auth": {
       "signOut": "Cerrar sesión"
