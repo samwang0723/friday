@@ -100,7 +100,8 @@ export interface StreamingProcessorHookReturn {
     onTextUpdate: (text: string) => void,
     onAudioChunk: (chunk: ArrayBuffer) => void,
     onStreamComplete: (finalText: string, latency: number) => void,
-    onError: (error: Error) => void
+    onError: (error: Error) => void,
+    submittedAt: number
   ) => Promise<void>;
   stopTypingAnimation: () => void;
 }

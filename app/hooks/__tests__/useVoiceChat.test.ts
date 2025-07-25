@@ -257,7 +257,8 @@ describe("useVoiceChat", () => {
           onTextUpdate: (text: string) => void,
           onAudioChunk: (chunk: ArrayBuffer) => void,
           onStreamComplete: (finalText: string, latency: number) => void,
-          onError: (error: Error) => void
+          onError: (error: Error) => void,
+          submittedAt: number
         ) => {
           // Simulate streaming updates
           setTimeout(() => {

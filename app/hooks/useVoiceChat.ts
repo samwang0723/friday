@@ -319,7 +319,8 @@ export function useVoiceChat({
           (error: Error) => {
             handleStreamError(error);
             reject(error);
-          }
+          },
+          submittedAt
         );
       });
     },

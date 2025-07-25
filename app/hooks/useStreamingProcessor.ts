@@ -11,15 +11,15 @@ export function useStreamingProcessor(): StreamingProcessorHookReturn {
       onTextUpdate: (text: string) => void,
       onAudioChunk: (chunk: ArrayBuffer) => void,
       onStreamComplete: (finalText: string, latency: number) => void,
-      onError: (error: Error) => void
+      onError: (error: Error) => void,
+      submittedAt: number
     ): Promise<void> => {
       // Clean up any existing processor
       if (processorRef.current) {
         processorRef.current.stop();
       }
 
-      // Create new processor
-      const submittedAt = Date.now();
+      // Create new processor with the original submission timestamp
       processorRef.current = new SSEProcessor(
         onTextUpdate,
         onAudioChunk,

@@ -52,7 +52,8 @@ describe("useStreamingProcessor", () => {
           onTextUpdate,
           onAudioChunk,
           onStreamComplete,
-          onError
+          onError,
+          Date.now()
         );
       });
 
@@ -88,7 +89,8 @@ describe("useStreamingProcessor", () => {
           callbacks.onTextUpdate,
           callbacks.onAudioChunk,
           callbacks.onStreamComplete,
-          callbacks.onError
+          callbacks.onError,
+          Date.now()
         );
       });
 
@@ -109,7 +111,8 @@ describe("useStreamingProcessor", () => {
           callbacks.onTextUpdate,
           callbacks.onAudioChunk,
           callbacks.onStreamComplete,
-          callbacks.onError
+          callbacks.onError,
+          Date.now()
         );
       });
 
@@ -135,7 +138,8 @@ describe("useStreamingProcessor", () => {
           onTextUpdate,
           onAudioChunk,
           onStreamComplete,
-          onError
+          onError,
+          Date.now()
         );
       });
 
@@ -161,7 +165,8 @@ describe("useStreamingProcessor", () => {
           callbacks.onTextUpdate,
           callbacks.onAudioChunk,
           callbacks.onStreamComplete,
-          callbacks.onError
+          callbacks.onError,
+          Date.now()
         );
       });
 
@@ -194,7 +199,8 @@ describe("useStreamingProcessor", () => {
           callbacks.onTextUpdate,
           callbacks.onAudioChunk,
           callbacks.onStreamComplete,
-          callbacks.onError
+          callbacks.onError,
+          Date.now()
         );
       });
 
@@ -226,7 +232,8 @@ describe("useStreamingProcessor", () => {
           callbacks.onTextUpdate,
           callbacks.onAudioChunk,
           callbacks.onStreamComplete,
-          callbacks.onError
+          callbacks.onError,
+          Date.now()
         );
       });
 
@@ -270,7 +277,8 @@ describe("useStreamingProcessor", () => {
           callbacks.onTextUpdate,
           callbacks.onAudioChunk,
           callbacks.onStreamComplete,
-          callbacks.onError
+          callbacks.onError,
+          Date.now()
         );
       });
 
@@ -315,7 +323,8 @@ describe("useStreamingProcessor", () => {
           callbacks.onTextUpdate,
           callbacks.onAudioChunk,
           callbacks.onStreamComplete,
-          callbacks.onError
+          callbacks.onError,
+          Date.now()
         );
       });
 
@@ -355,7 +364,8 @@ describe("useStreamingProcessor", () => {
           callbacks.onTextUpdate,
           callbacks.onAudioChunk,
           callbacks.onStreamComplete,
-          callbacks.onError
+          callbacks.onError,
+          Date.now()
         );
       });
 
@@ -390,7 +400,8 @@ describe("useStreamingProcessor", () => {
           callbacks.onTextUpdate,
           callbacks.onAudioChunk,
           callbacks.onStreamComplete,
-          callbacks.onError
+          callbacks.onError,
+          Date.now()
         );
       });
 
@@ -445,7 +456,8 @@ describe("useStreamingProcessor", () => {
           callbacks1.onTextUpdate,
           callbacks1.onAudioChunk,
           callbacks1.onStreamComplete,
-          callbacks1.onError
+          callbacks1.onError,
+          Date.now()
         );
       });
 
@@ -456,7 +468,8 @@ describe("useStreamingProcessor", () => {
           callbacks2.onTextUpdate,
           callbacks2.onAudioChunk,
           callbacks2.onStreamComplete,
-          callbacks2.onError
+          callbacks2.onError,
+          Date.now()
         );
       });
 
@@ -495,7 +508,8 @@ describe("useStreamingProcessor", () => {
           callbacks.onTextUpdate,
           callbacks.onAudioChunk,
           callbacks.onStreamComplete,
-          callbacks.onError
+          callbacks.onError,
+          Date.now()
         );
       });
 
