@@ -164,9 +164,8 @@ export default function Home() {
     auth.isAuthenticated,
     agentCore.isInitialized,
     agentCore.instance,
-    localeManager.isLocaleInitialized,
-    localeManager.getCurrentLocale,
-    auth.getToken
+    localeManager.isLocaleInitialized
+    // Removed function references that change on every render
   ]);
 
   // Reset agent core state on logout
@@ -214,7 +213,7 @@ export default function Home() {
       console.log("Interrupting current stream - user started speaking");
       voiceChat.stopCurrentRequest();
     }
-  }, [auth.isAuthenticated]); // Remove voiceChat dependency
+  }, [auth.isAuthenticated, voiceChat.stopCurrentRequest, voiceChat.chatState.message, voiceChat.chatState.isStreaming]);
 
   const onSpeechEnd = useCallback(
     async (isValid: boolean, _audio: Float32Array) => {
@@ -244,7 +243,7 @@ export default function Home() {
         console.error("Error with WebM recording:", error);
       }
     },
-    [auth.isAuthenticated] // Remove voiceChat.submit dependency
+    [auth.isAuthenticated, voiceChat.submit]
   );
 
   const onVADMisfire = useCallback(async () => {
@@ -358,7 +357,7 @@ export default function Home() {
       const inputValue = (formData.get("chatInput") as string) || "";
       startTransition(() => voiceChat.submit(inputValue));
     },
-    [auth.isAuthenticated, t] // Remove voiceChat dependencies
+    [auth.isAuthenticated, t, voiceChat.submit]
   );
 
   const handleLogout = useCallback(async () => {
@@ -371,7 +370,7 @@ export default function Home() {
       console.error("Failed to logout:", error);
       toast.error(t("errors.signOutFailed"));
     }
-  }, [voiceChat, auth, t]);
+  }, [voiceChat.stopCurrentRequest, voiceChat.resetMessages, auth.logout, t]);
 
   const handleSettingsChange = useCallback(
     (newSettings: typeof settings) => {
@@ -411,10 +410,9 @@ export default function Home() {
     }
   }, [
     auth.isAuthenticated,
-    auth.getToken,
     agentCore.instance,
-    localeManager.getCurrentLocale,
     t
+    // Removed function references that change on every render
   ]);
 
   // Performance monitoring in development (after all hooks are defined)

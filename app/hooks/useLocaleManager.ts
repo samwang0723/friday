@@ -78,12 +78,14 @@ export function useLocaleManager(): LocaleManagerHookReturn {
   );
 
   // Memoize return object to prevent unnecessary re-renders
+  // Only include stable values in dependencies
   return useMemo(
     () => ({
       clientLocale,
       getCurrentLocale: getCurrentLocaleValue,
       isLocaleInitialized
     }),
-    [clientLocale, getCurrentLocaleValue, isLocaleInitialized]
+    [clientLocale, isLocaleInitialized]
+    // getCurrentLocaleValue is stable based on its dependencies
   );
 }

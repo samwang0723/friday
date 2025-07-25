@@ -345,6 +345,7 @@ export function useVoiceChat({
   }, []); // Empty deps - submit should be stable from useActionState
 
   // Memoize return object to prevent unnecessary re-renders
+  // Only include stable properties of player in dependencies
   return useMemo(() => ({
     messages,
     submit,
@@ -362,6 +363,6 @@ export function useVoiceChat({
     updateChatState,
     stopCurrentRequest,
     resetMessages,
-    player
+    player.isPlayerInitialized // Only include stable property instead of entire player object
   ]);
 }
