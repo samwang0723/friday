@@ -48,6 +48,11 @@
     "clearHistory": "清除聊天记录",
     "clearHistoryDescription": "删除所有对话历史记录",
     "clearHistoryButton": "清除",
+    "clearHistorySuccess": "聊天记录已成功清除",
+    "clearHistoryLoginRequired": "请先登录以清除聊天记录",
+    "clearHistoryNotInitialized": "服务尚未初始化，请重试",
+    "clearHistoryNoToken": "认证失败，请重新登录",
+    "clearHistoryFailed": "清除聊天记录失败",
     "settingsButton": "设置",
     "auth": {
       "signOut": "登出"

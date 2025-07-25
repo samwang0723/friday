@@ -47,6 +47,11 @@
     "clearHistory": "Effacer l'Historique de Chat",
     "clearHistoryDescription": "Supprimer tout l'historique de conversation",
     "clearHistoryButton": "Effacer",
+    "clearHistorySuccess": "Historique de chat effacé avec succès",
+    "clearHistoryLoginRequired": "Veuillez vous connecter pour effacer l'historique de chat",
+    "clearHistoryNotInitialized": "Service non initialisé, veuillez réessayer",
+    "clearHistoryNoToken": "Authentification échouée, veuillez vous reconnecter",
+    "clearHistoryFailed": "Échec de l'effacement de l'historique de chat",
     "settingsButton": "Paramètres",
     "auth": {
       "signOut": "Se déconnecter"

@@ -101,17 +101,27 @@ export default function Home() {
 
   // Initialize Agent Core service
   useEffect(() => {
-    if (!agentCore.instance) {
+    if (!agentCore.instance && auth.isAuthenticated) {
+      console.log("Creating new AgentCore instance");
       setAgentCore({
         instance: new AgentCoreService(),
         isInitialized: false
       });
     }
-  }, [agentCore.instance]);
+  }, [agentCore.instance, auth.isAuthenticated]);
 
   // Initialize Agent Core chat session after authentication
   useEffect(() => {
     const initAgentCore = async () => {
+      // Debug: Log all initialization conditions
+      console.log("AgentCore init check:", {
+        isAuthenticated: auth.isAuthenticated,
+        isInitialized: agentCore.isInitialized,
+        hasInstance: !!agentCore.instance,
+        isLocaleInitialized: localeManager.isLocaleInitialized,
+        locale: localeManager.getCurrentLocale()
+      });
+
       if (
         auth.isAuthenticated &&
         !agentCore.isInitialized &&
@@ -136,10 +146,16 @@ export default function Home() {
             }));
 
             console.log("Agent Core chat session initialized");
+          } else {
+            console.warn(
+              "No access token available for AgentCore initialization"
+            );
           }
         } catch (error) {
           console.error("Failed to initialize Agent Core:", error);
         }
+      } else {
+        console.log("AgentCore initialization skipped - conditions not met");
       }
     };
 
@@ -267,7 +283,7 @@ export default function Home() {
 
   // Extract streaming state separately to avoid infinite loops
   const isStreaming = voiceChat.chatState.isStreaming;
-  
+
   const vadManagerState = useMemo(
     () => ({
       isStreaming,
@@ -275,12 +291,7 @@ export default function Home() {
       audioEnabled: settings.audioEnabled,
       settingsLoaded: settingsLoaded
     }),
-    [
-      isStreaming,
-      auth.isAuthenticated,
-      settings.audioEnabled,
-      settingsLoaded
-    ]
+    [isStreaming, auth.isAuthenticated, settings.audioEnabled, settingsLoaded]
   );
 
   // VAD Manager setup
@@ -344,7 +355,7 @@ export default function Home() {
       }
       // Get current input value directly from the form element
       const formData = new FormData(e.target as HTMLFormElement);
-      const inputValue = formData.get('chatInput') as string || '';
+      const inputValue = (formData.get("chatInput") as string) || "";
       startTransition(() => voiceChat.submit(inputValue));
     },
     [auth.isAuthenticated, t] // Remove voiceChat dependencies
@@ -371,7 +382,15 @@ export default function Home() {
   );
 
   const handleClearHistory = useCallback(async () => {
-    if (!auth.isAuthenticated || !agentCore.instance) return;
+    if (!auth.isAuthenticated) {
+      toast.error(t("settings.clearHistoryLoginRequired"));
+      return;
+    }
+
+    if (!agentCore.instance) {
+      toast.error(t("settings.clearHistoryNotInitialized"));
+      return;
+    }
 
     try {
       const accessToken = auth.getToken();
@@ -382,21 +401,29 @@ export default function Home() {
           clientDatetime: new Date().toISOString(),
           locale: currentLocale
         });
-        toast.success("Chat history cleared successfully");
+        toast.success(t("settings.clearHistorySuccess"));
+      } else {
+        toast.error(t("settings.clearHistoryNoToken"));
       }
     } catch (error) {
       console.error("Failed to clear chat history:", error);
-      toast.error("Failed to clear chat history");
+      toast.error(t("settings.clearHistoryFailed"));
     }
-  }, [auth.isAuthenticated, auth.getToken, agentCore.instance, localeManager]);
+  }, [
+    auth.isAuthenticated,
+    auth.getToken,
+    agentCore.instance,
+    localeManager.getCurrentLocale,
+    t
+  ]);
 
   // Performance monitoring in development (after all hooks are defined)
   // Only track stable properties to avoid re-renders from streaming message updates
   useRenderTracking("HomePage", [
     auth.isAuthenticated,
-    voiceChat.chatState.isStreaming,  // Only track streaming state, not the changing message
-    settings.audioEnabled,            // Only track relevant settings that affect rendering
-    debouncedVadState.userSpeaking    // Use debounced VAD state
+    voiceChat.chatState.isStreaming, // Only track streaming state, not the changing message
+    settings.audioEnabled, // Only track relevant settings that affect rendering
+    debouncedVadState.userSpeaking // Use debounced VAD state
   ]);
 
   return (

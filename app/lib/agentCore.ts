@@ -311,14 +311,15 @@ export class AgentCoreService {
   async clearHistory(token: string, context?: ClientContext): Promise<void> {
     try {
       console.info("Clearing agent-core chat history");
-
+      const headers = this.getHeaders(
+        token,
+        context?.timezone,
+        context?.clientDatetime,
+        context?.locale
+      );
       const response = await fetch(`${this.baseURL}/chat/history`, {
         method: "DELETE",
-        headers: this.getHeaders(
-          token,
-          context?.timezone,
-          context?.clientDatetime
-        )
+        headers
       });
 
       await this.handleResponse(response);

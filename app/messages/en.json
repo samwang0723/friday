@@ -48,6 +48,11 @@
     "clearHistory": "Clear Chat History",
     "clearHistoryDescription": "Delete all conversation history",
     "clearHistoryButton": "Clear",
+    "clearHistorySuccess": "Chat history cleared successfully",
+    "clearHistoryLoginRequired": "Please login to clear chat history",
+    "clearHistoryNotInitialized": "Service not initialized, please try again",
+    "clearHistoryNoToken": "Authentication failed, please sign in again",
+    "clearHistoryFailed": "Failed to clear chat history",
     "settingsButton": "Settings",
     "auth": {
       "signOut": "Sign out"

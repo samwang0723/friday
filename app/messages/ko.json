@@ -47,6 +47,11 @@
     "clearHistory": "채팅 기록 삭제",
     "clearHistoryDescription": "모든 대화 기록을 삭제합니다",
     "clearHistoryButton": "삭제",
+    "clearHistorySuccess": "채팅 기록이 성공적으로 삭제되었습니다",
+    "clearHistoryLoginRequired": "채팅 기록을 삭제하려면 로그인하세요",
+    "clearHistoryNotInitialized": "서비스가 초기화되지 않았습니다. 다시 시도해주세요",
+    "clearHistoryNoToken": "인증에 실패했습니다. 다시 로그인해주세요",
+    "clearHistoryFailed": "채팅 기록 삭제에 실패했습니다",
     "settingsButton": "설정",
     "auth": {
       "signOut": "로그아웃"
