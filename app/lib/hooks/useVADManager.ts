@@ -144,7 +144,7 @@ export function useVADManager(
     const timeSinceAudioStart = now - audioStartTimeRef.current;
 
     // Filter out speech detection that happens very soon after audio starts
-    const isLikelyEcho = context.isStreaming && timeSinceAudioStart < 200;
+    const isLikelyEcho = context.isStreaming && timeSinceAudioStart < 100;
 
     console.log(
       `VAD: Speech detected - Time since audio start: ${timeSinceAudioStart}ms, Is likely echo: ${isLikelyEcho}, Is streaming: ${context.isStreaming}`
