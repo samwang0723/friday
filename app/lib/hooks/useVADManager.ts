@@ -82,7 +82,7 @@ export function getVADConfigForSensitivity(
 
 export interface VADCallbacks {
   onSpeechStart?: () => void;
-  onSpeechEnd?: (audio: Float32Array) => void;
+  onSpeechEnd?: (isValid: boolean, audio: Float32Array) => void;
   onVADMisfire?: () => void;
 }
 
@@ -219,12 +219,7 @@ export function useVADManager(
         ...(speechAnalysis.isValid && { lastSpeechTime: now })
       }));
 
-      // Only trigger callback for valid speech
-      if (speechAnalysis.isValid) {
-        callbacks.onSpeechEnd?.(audio);
-      } else {
-        console.log("VAD: Speech filtered out, not calling onSpeechEnd");
-      }
+      callbacks.onSpeechEnd?.(speechAnalysis.isValid, audio);
     },
     [config, context.isStreaming, callbacks.onSpeechEnd]
   );

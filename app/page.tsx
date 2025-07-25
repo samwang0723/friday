@@ -698,47 +698,58 @@ export default function Home() {
     }
   }, []);
 
-  const onSpeechEnd = useCallback(async (_audio: Float32Array) => {
-    if (!authRef.current.isAuthenticated) return;
+  const onSpeechEnd = useCallback(
+    async (isValid: boolean, _audio: Float32Array) => {
+      if (!authRef.current.isAuthenticated) return;
 
-    // Note: We ignore the Float32Array parameter from VAD and use WebM recorder instead
+      // Stop any remaining audio playback before processing new input
+      playerRef.current.stop();
 
-    // Stop any remaining audio playback before processing new input
-    playerRef.current.stop();
+      try {
+        // Stop WebM recording and get the blob directly
+        const recorder = webmRecorderRef.current;
+        if (recorder?.state.isRecording) {
+          console.log("Stopping WebM recording");
+          const webmBlob = await recorder.stopRecording();
 
+          if (webmBlob && isValid) {
+            console.log("WebM recording completed, blob size:", webmBlob.size);
+
+            // Submit the audio as WebM
+            startTransition(() => submitRef.current(webmBlob));
+
+            track("Speech input");
+          } else {
+            console.warn("No WebM blob received from recorder");
+          }
+        } else {
+          console.warn("WebM recorder was not recording when speech ended");
+        }
+
+        // No browser-specific VAD handling needed
+      } catch (error) {
+        console.error("Error with WebM recording:", error);
+      }
+    },
+    []
+  );
+
+  const onVADMisfire = useCallback(async () => {
+    // Stop the WebM recorder on a VAD misfire
+    console.log("VAD misfire detected");
     try {
       // Stop WebM recording and get the blob directly
       const recorder = webmRecorderRef.current;
       if (recorder?.state.isRecording) {
-        console.log("Stopping WebM recording");
-        const webmBlob = await recorder.stopRecording();
-
-        if (webmBlob) {
-          console.log("WebM recording completed, blob size:", webmBlob.size);
-
-          // Submit the audio as WebM
-          startTransition(() => submitRef.current(webmBlob));
-
-          track("Speech input");
-        } else {
-          console.warn("No WebM blob received from recorder");
-        }
+        console.log("Stopping WebM recording on VAD misfire and do nothing");
+        await recorder.stopRecording();
       } else {
-        console.warn("WebM recorder was not recording when speech ended");
+        console.warn("WebM recorder was not recording when VAD misfire");
       }
 
       // No browser-specific VAD handling needed
     } catch (error) {
       console.error("Error with WebM recording:", error);
-    }
-  }, []);
-
-  const onVADMisfire = useCallback(() => {
-    // Stop the WebM recorder on a VAD misfire
-    const recorder = webmRecorderRef.current;
-    if (recorder?.state.isRecording) {
-      console.log("VAD misfire detected, stopping WebM recording");
-      recorder.stopRecording();
     }
   }, []);
 
@@ -868,7 +879,7 @@ export default function Home() {
 
     while (messageQueueRef.current.length > 0) {
       const data = messageQueueRef.current.shift()!;
-      
+
       addNotification({
         type: "chat",
         title: "Proactive Message",
@@ -902,8 +913,10 @@ export default function Home() {
 
       // Add to queue
       messageQueueRef.current.push(data);
-      console.log(`Added message to queue. Queue length: ${messageQueueRef.current.length}`);
-      
+      console.log(
+        `Added message to queue. Queue length: ${messageQueueRef.current.length}`
+      );
+
       // Process queue if not already processing
       if (!isProcessingRef.current) {
         processMessageQueue();
