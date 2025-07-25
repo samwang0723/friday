@@ -60,7 +60,7 @@ export default function Settings({
     const expectedEngine = isChineseLocale ? "cartesiachinese" : "elevenlabs";
 
     if (settings.ttsEngine !== expectedEngine) {
-      if (isEnglishLocale && settings.ttsEngine === "cartesiachinese") {
+      if (isEnglishLocale && settings.ttsEngine === "cartesia") {
         return;
       }
       console.log(
