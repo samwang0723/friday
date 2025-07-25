@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 
 export interface SettingsState {
   sttEngine: string;
@@ -71,29 +71,36 @@ export function useSettings() {
   }, []);
 
   // Save settings to localStorage whenever they change
-  const updateSettings = (newSettings: Partial<SettingsState>) => {
-    const updatedSettings = { ...settings, ...newSettings };
-    setSettings(updatedSettings);
+  const updateSettings = useCallback((newSettings: Partial<SettingsState>) => {
+    setSettings(prevSettings => {
+      const updatedSettings = { ...prevSettings, ...newSettings };
 
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedSettings));
-        console.log("Saved settings to localStorage:", updatedSettings);
-      } catch (error) {
-        console.error("Failed to save settings to localStorage:", error);
+      // Use requestAnimationFrame to avoid synchronous updates during render
+      if (typeof window !== "undefined") {
+        requestAnimationFrame(() => {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedSettings));
+            console.log("Saved settings to localStorage:", updatedSettings);
+          } catch (error) {
+            console.error("Failed to save settings to localStorage:", error);
+          }
+        });
       }
-    }
-  };
+      
+      return updatedSettings;
+    });
+  }, []); // Empty dependency array since we use functional state update
 
   // Update individual setting
-  const updateSetting = (key: keyof SettingsState, value: unknown) => {
+  const updateSetting = useCallback((key: keyof SettingsState, value: unknown) => {
     updateSettings({ [key]: value } as Partial<SettingsState>);
-  };
+  }, [updateSettings]);
 
-  return {
+  // Memoize return object to prevent unnecessary re-renders
+  return useMemo(() => ({
     settings,
     updateSettings,
     updateSetting,
     isLoaded
-  };
+  }), [settings, updateSettings, updateSetting, isLoaded]);
 }

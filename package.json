@@ -1,6 +1,6 @@
 {
   "name": "friday",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -13,7 +13,16 @@
     "type-check": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --watchAll=false",
+    "test:debug": "jest --no-cache --detectOpenHandles",
+    "test:unit": "jest --testPathPattern='__tests__'",
+    "test:hooks": "jest --testPathPattern='hooks/__tests__'",
+    "test:services": "jest --testPathPattern='services/__tests__'",
+    "test:utils": "jest --testPathPattern='utils/__tests__'",
+    "test:components": "jest --testPathPattern='components/__tests__'",
+    "test:silent": "jest --silent",
+    "test:verbose": "jest --verbose"
   },
   "dependencies": {
     "@cartesia/cartesia-js": "^2.2.5",
