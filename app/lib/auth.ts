@@ -134,12 +134,21 @@ const updateAuthState = (updates: Partial<AuthState>) => {
   authListeners.forEach(listener => listener(authState));
 };
 
+const getCurrentLocale = (): string => {
+  if (typeof document === "undefined") return "en";
+
+  // Read locale from next-intl cookie
+  const localeCookie = cookieUtils.get("locale");
+  return localeCookie || "en";
+};
+
 const apiCall = async (endpoint: string, data?: any) => {
   const response = await fetch(`${config.agentCoreAPI}${endpoint}`, {
     method: data ? "POST" : "GET",
     headers: {
       "Content-Type": "application/json",
-      "X-Client-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone
+      "X-Client-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone,
+      "X-Locale": getCurrentLocale()
     },
     body: data ? JSON.stringify(data) : undefined
   });
