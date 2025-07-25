@@ -34,7 +34,7 @@ export default async function RootLayout({
       </head>
       <body
         className={clsx(
-          "py-8 px-6 lg:p-10 dark:text-white bg-white min-h-dvh flex flex-col justify-between antialiased font-sans select-none"
+          "py-8 px-6 lg:p-10 dark:text-white min-h-dvh flex flex-col justify-between antialiased font-sans select-none"
         )}
         style={{ backgroundColor: "#09051a" }}
       >
