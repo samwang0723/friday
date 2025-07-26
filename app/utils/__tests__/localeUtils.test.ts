@@ -151,7 +151,7 @@ describe("localeUtils", () => {
     });
 
     it("should return default when navigator is not available", () => {
-      // @ts-expect-error
+      // @ts-expect-error - we want to test the default case
       delete global.navigator;
 
       const result = detectBrowserLocale();
@@ -166,7 +166,7 @@ describe("localeUtils", () => {
     });
 
     it("should handle unavailable localStorage gracefully", () => {
-      // @ts-expect-error
+      // @ts-expect-error - we want to test the default case
       delete global.localStorage;
 
       expect(() => setLocaleInStorage("ko")).not.toThrow();
@@ -188,7 +188,7 @@ describe("localeUtils", () => {
     });
 
     it("should handle unavailable document gracefully", () => {
-      // @ts-expect-error
+      // @ts-expect-error - we want to test the default case
       delete global.document;
 
       expect(() => setLocaleCookie("zh")).not.toThrow();
