@@ -27,7 +27,7 @@
   "dependencies": {
     "@cartesia/cartesia-js": "^2.2.5",
     "@elevenlabs/elevenlabs-js": "^2.6.0",
-    "@ricky0123/vad-react": "^0.0.28",
+    "@ricky0123/vad-react": "^0.0.30",
     "@ricky0123/vad-web": "^0.0.22",
     "@vercel/analytics": "^1.5.0",
     "clsx": "^2.1.1",

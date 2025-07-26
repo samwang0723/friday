@@ -15,8 +15,8 @@ importers:
         specifier: ^2.6.0
         version: 2.7.0
       '@ricky0123/vad-react':
-        specifier: ^0.0.28
-        version: 0.0.28(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+        specifier: ^0.0.30
+        version: 0.0.30(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       '@ricky0123/vad-web':
         specifier: ^0.0.22
         version: 0.0.22
@@ -791,14 +791,17 @@ packages:
   '@protobufjs/utf8@1.1.0':
     resolution: {integrity: sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==}
 
-  '@ricky0123/vad-react@0.0.28':
-    resolution: {integrity: sha512-V2vcxhT31/tXCxqlYLJz+JzywXijMWUhp2FN30OL/NeuSwwprArhaAoUZSdjg6Hzsfe5t2lwASoUaEmGrQ/S+Q==}
+  '@ricky0123/vad-react@0.0.30':
+    resolution: {integrity: sha512-uHSJdpQgi2UpL1Z6PgJWQ3wRy+zXLWkT9zBwGIBK3NDloZPKf0xJuXDw0aoypfS+Url1dJafi+M2vyaFBh+9wA==}
     peerDependencies:
       react: '18'
       react-dom: '18'
 
   '@ricky0123/vad-web@0.0.22':
     resolution: {integrity: sha512-679R6sfwXx4jkquK+FJ9RC2W29oulWC+9ZINK6LVpuy90IBV7UaTGNN79oQXufpJTJs5z4X/22nw1DQ4+Rh8CA==}
+
+  '@ricky0123/vad-web@0.0.24':
+    resolution: {integrity: sha512-uv6GWW/kq8BkVErMQzXp3uwSyYMT3w/3QJiUerVaaKp7EwhOTIRY+96EoyFdG2WOFU5RkLk/2CVGbI7nDlxhEg==}
 
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
@@ -4267,14 +4270,18 @@ snapshots:
 
   '@protobufjs/utf8@1.1.0': {}
 
-  '@ricky0123/vad-react@0.0.28(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
+  '@ricky0123/vad-react@0.0.30(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
     dependencies:
-      '@ricky0123/vad-web': 0.0.22
+      '@ricky0123/vad-web': 0.0.24
       onnxruntime-web: 1.14.0
       react: 19.1.0
       react-dom: 19.1.0(react@19.1.0)
 
   '@ricky0123/vad-web@0.0.22':
+    dependencies:
+      onnxruntime-web: 1.14.0
+
+  '@ricky0123/vad-web@0.0.24':
     dependencies:
       onnxruntime-web: 1.14.0
 
