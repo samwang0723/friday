@@ -47,6 +47,11 @@
     "clearHistory": "チャット履歴を消去",
     "clearHistoryDescription": "すべての会話履歴を削除する",
     "clearHistoryButton": "消去",
+    "clearHistorySuccess": "チャット履歴が正常に消去されました",
+    "clearHistoryLoginRequired": "チャット履歴を消去するにはログインしてください",
+    "clearHistoryNotInitialized": "サービスが初期化されていません。もう一度お試しください",
+    "clearHistoryNoToken": "認証に失敗しました。再度サインインしてください",
+    "clearHistoryFailed": "チャット履歴の消去に失敗しました",
     "settingsButton": "設定",
     "auth": {
       "signOut": "サインアウト"

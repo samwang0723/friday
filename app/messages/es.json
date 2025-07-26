@@ -47,6 +47,11 @@
     "clearHistory": "Borrar Historial de Chat",
     "clearHistoryDescription": "Eliminar todo el historial de conversación",
     "clearHistoryButton": "Borrar",
+    "clearHistorySuccess": "Historial de chat borrado exitosamente",
+    "clearHistoryLoginRequired": "Por favor inicia sesión para borrar el historial de chat",
+    "clearHistoryNotInitialized": "Servicio no inicializado, por favor intenta de nuevo",
+    "clearHistoryNoToken": "Autenticación fallida, por favor inicia sesión de nuevo",
+    "clearHistoryFailed": "Error al borrar el historial de chat",
     "settingsButton": "Configuración",
     "auth": {
       "signOut": "Cerrar sesión"

@@ -1,5 +1,5 @@
 import { useMicVAD } from "@ricky0123/vad-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 
 // Calculate RMS energy in dBFS from audio samples
 function calculateRMSdBFS(audioData: Float32Array): number {
@@ -139,6 +139,11 @@ export function useVADManager(
     }
   }, [context.isStreaming]);
 
+  // Memoize callback functions to prevent recreation
+  const onSpeechStartCallback = useCallback(() => {
+    callbacks.onSpeechStart?.();
+  }, [callbacks.onSpeechStart]);
+
   const onSpeechStart = useCallback(() => {
     const now = Date.now();
     const timeSinceAudioStart = now - audioStartTimeRef.current;
@@ -162,13 +167,18 @@ export function useVADManager(
     // Only trigger interruption for actual user speech, not echo
     if (!isLikelyEcho) {
       console.log("VAD: Triggering speech start callback");
-      callbacks.onSpeechStart?.();
+      onSpeechStartCallback();
     } else {
       console.log(
         "VAD: Suppressing speech start callback due to echo detection"
       );
     }
-  }, [context.isStreaming, callbacks.onSpeechStart]);
+  }, [context.isStreaming, onSpeechStartCallback]);
+
+  // Memoize speech end callback to prevent recreation
+  const onSpeechEndCallback = useCallback((isValid: boolean, audio: Float32Array) => {
+    callbacks.onSpeechEnd?.(isValid, audio);
+  }, [callbacks.onSpeechEnd]);
 
   const onSpeechEnd = useCallback(
     (audio: Float32Array) => {
@@ -219,9 +229,9 @@ export function useVADManager(
         ...(speechAnalysis.isValid && { lastSpeechTime: now })
       }));
 
-      callbacks.onSpeechEnd?.(speechAnalysis.isValid, audio);
+      onSpeechEndCallback(speechAnalysis.isValid, audio);
     },
-    [config, context.isStreaming, callbacks.onSpeechEnd]
+    [config, context.isStreaming, onSpeechEndCallback]
   );
 
   // Create enhanced audio stream
@@ -350,6 +360,11 @@ export function useVADManager(
     cleanupAudioStream
   ]);
 
+  // Memoize VAD misfire callback
+  const onVADMisfireCallback = useCallback(() => {
+    callbacks.onVADMisfire?.();
+  }, [callbacks.onVADMisfire]);
+
   // Initialize VAD with error handling
   const vad = useMicVAD({
     startOnLoad: false,
@@ -363,7 +378,7 @@ export function useVADManager(
         userSpeaking: false,
         shouldShowOrb: false
       }));
-      callbacks.onVADMisfire?.();
+      onVADMisfireCallback();
     },
     // model: "v5",
     positiveSpeechThreshold: config.positiveSpeechThreshold || 0.7,
@@ -580,16 +595,20 @@ export function useVADManager(
     };
   }, []);
 
-  return {
-    state: {
-      loading: vadState.loading,
-      errored: vadState.errored,
-      userSpeaking: vadState.shouldShowOrb,
-      actualUserSpeaking: vadState.actualUserSpeaking
-    },
+  // Memoize the state object to prevent infinite re-renders
+  const memoizedState = useMemo(() => ({
+    loading: vadState.loading,
+    errored: vadState.errored,
+    userSpeaking: vadState.shouldShowOrb,
+    actualUserSpeaking: vadState.actualUserSpeaking
+  }), [vadState.loading, vadState.errored, vadState.shouldShowOrb, vadState.actualUserSpeaking]);
+
+  // Memoize the entire return object
+  return useMemo(() => ({
+    state: memoizedState,
     start,
     pause,
     isRunning: isActiveRef.current,
     audioStream: audioStream
-  };
+  }), [memoizedState, start, pause, audioStream]);
 }

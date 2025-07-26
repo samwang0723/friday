@@ -1,16 +1,57 @@
 "use client";
 
+import { track } from "@vercel/analytics";
+import { useTranslations } from "next-intl";
+import React, {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
+import { toast } from "sonner";
+
+// Debounce utility for high-frequency updates
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
+// Components
 import ChatForm from "@/components/ChatForm";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import MessageDisplay from "@/components/MessageDisplay";
 import NotificationButton from "@/components/NotificationButton";
 import NotificationModal from "@/components/NotificationModal";
 import NotificationStatus from "@/components/NotificationStatus";
+import {
+  PerformanceMonitor,
+  useRenderTracking
+} from "@/components/PerformanceMonitor";
 import Settings from "@/components/Settings";
 import SettingsButton from "@/components/SettingsButton";
 import VoiceOrb from "@/components/VoiceOrb";
+
+// Services and utilities
 import { AgentCoreService } from "@/lib/agentCore";
-import { useAudioPlayer } from "@/lib/hooks/useAudioPlayer";
+
+// Hooks
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useLocaleManager } from "@/hooks/useLocaleManager";
+import { useNotificationHandlers } from "@/hooks/useNotificationHandlers";
+import { useVoiceChat } from "@/hooks/useVoiceChat";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useNotifications } from "@/lib/hooks/useNotifications";
 import { usePusher } from "@/lib/hooks/usePusher";
@@ -20,657 +61,145 @@ import {
   useVADManager
 } from "@/lib/hooks/useVADManager";
 import { useWebMRecorder } from "@/lib/hooks/useWebMRecorder";
-import type {
-  CalendarEventData,
-  ChatMessageData,
-  EmailNotificationData,
-  SystemNotificationData
-} from "@/lib/types/pusher";
-import { track } from "@vercel/analytics";
-import { useLocale, useTranslations } from "next-intl";
-import React, {
-  startTransition,
-  useActionState,
-  useCallback,
-  useEffect,
-  useRef,
-  useState
-} from "react";
-import { toast } from "sonner";
 
-type Message = {
-  role: "user" | "assistant";
-  content: string;
-  latency?: number;
-};
+// Types
 
-interface ChatState {
-  isStreaming: boolean;
-  message: string;
-  input: string;
-  agentCoreInitialized: boolean;
-}
-
-// Helper function to get current locale from client-side sources
-function getCurrentLocale(): string {
-  if (typeof document !== "undefined") {
-    // Check URL parameters first
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlLocale = urlParams.get("locale");
-    if (urlLocale) {
-      console.log("Found locale in URL:", urlLocale);
-      return urlLocale;
-    }
-
-    // Check cookies
-    const cookies = document.cookie.split(";");
-    const localeCookie = cookies.find(cookie =>
-      cookie.trim().startsWith("locale=")
-    );
-    if (localeCookie) {
-      const localeValue = localeCookie.split("=")[1];
-      console.log("Found locale cookie:", localeValue);
-      return localeValue;
-    }
-
-    // Check localStorage as fallback
-    const storedLocale = localStorage.getItem("locale");
-    if (storedLocale) {
-      console.log("Found locale in localStorage:", storedLocale);
-      return storedLocale;
-    }
-
-    console.log("No locale found, available cookies:", document.cookie);
-    console.log("Current URL:", window.location.href);
-  }
-  console.log("Document not available (SSR)");
-  return "en"; // fallback to default
+interface AgentCoreState {
+  instance: AgentCoreService | null;
+  isInitialized: boolean;
 }
 
 export default function Home() {
   const t = useTranslations();
-  const locale = useLocale();
-
-  // Map API error messages to translation keys
-  const getTranslatedError = (apiErrorMessage: string): string => {
-    const errorMap: Record<string, string> = {
-      "Invalid audio": t("errors.invalidAudio"),
-      "Request cancelled": t("errors.requestCancelled"),
-      "Authorization required": t("errors.authRequired"),
-      "Valid Bearer token required": t("errors.tokenRequired"),
-      "Invalid request": t("errors.invalidRequest"),
-      "TTS generation failed": t("errors.ttsGenerationFailed"),
-      "Request failed": t("errors.requestFailed")
-    };
-
-    return errorMap[apiErrorMessage] || apiErrorMessage || t("common.error");
-  };
-  const [clientLocale, setClientLocale] = useState<string>("en");
-
-  // Get locale from client-side cookie after component mounts
-  useEffect(() => {
-    const currentLocale = getCurrentLocale();
-    setClientLocale(currentLocale);
-  }, []);
   const inputRef = useRef<HTMLInputElement>(null);
-  const player = useAudioPlayer();
-  const agentCoreRef = useRef<AgentCoreService | null>(null);
-  const currentRequestRef = useRef<AbortController | null>(null);
 
   // UI state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
-  const { settings, updateSettings, isLoaded: settingsLoaded } = useSettings();
 
-  // Chat state
-  const [chatState, setChatState] = useState<ChatState>({
-    isStreaming: false,
-    message: "",
-    input: "",
-    agentCoreInitialized: false
+  // Agent Core state
+  const [agentCore, setAgentCore] = useState<AgentCoreState>({
+    instance: null,
+    isInitialized: false
   });
 
-  // Authentication hook
+  // Core hooks
   const auth = useAuth();
-
-  // Notifications hook
+  const { settings, updateSettings, isLoaded: settingsLoaded } = useSettings();
   const { addNotification } = useNotifications();
+  const localeManager = useLocaleManager();
+
+  // Voice chat functionality
+  const voiceChat = useVoiceChat({ settings, auth });
+
+  // Notification handlers
+  const notificationHandlers = useNotificationHandlers({
+    auth,
+    addNotification,
+    submit: voiceChat.submit
+  });
 
   // Initialize Agent Core service
   useEffect(() => {
-    if (!agentCoreRef.current) {
-      agentCoreRef.current = new AgentCoreService();
+    if (!agentCore.instance && auth.isAuthenticated) {
+      console.log("Creating new AgentCore instance");
+      setAgentCore({
+        instance: new AgentCoreService(),
+        isInitialized: false
+      });
     }
-  }, []);
+  }, [agentCore.instance, auth.isAuthenticated]);
 
   // Initialize Agent Core chat session after authentication
   useEffect(() => {
     const initAgentCore = async () => {
+      // Debug: Log all initialization conditions
+      console.log("AgentCore init check:", {
+        isAuthenticated: auth.isAuthenticated,
+        isInitialized: agentCore.isInitialized,
+        hasInstance: !!agentCore.instance,
+        isLocaleInitialized: localeManager.isLocaleInitialized,
+        locale: localeManager.getCurrentLocale()
+      });
+
       if (
         auth.isAuthenticated &&
-        !chatState.agentCoreInitialized &&
-        agentCoreRef.current
+        !agentCore.isInitialized &&
+        agentCore.instance &&
+        localeManager.isLocaleInitialized
       ) {
         try {
           const accessToken = auth.getToken();
           if (accessToken) {
-            const currentLocale = getCurrentLocale();
-            console.log("Next-intl locale:", locale);
-            console.log("Client locale state:", clientLocale);
-            console.log("Fresh locale check:", currentLocale);
-            await agentCoreRef.current.initChat(accessToken, {
+            const currentLocale = localeManager.getCurrentLocale();
+            console.log("Initializing Agent Core with locale:", currentLocale);
+
+            await agentCore.instance.initChat(accessToken, {
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
               clientDatetime: new Date().toISOString(),
               locale: currentLocale
             });
-            setChatState(prev => ({
+
+            setAgentCore(prev => ({
               ...prev,
-              agentCoreInitialized: true
+              isInitialized: true
             }));
+
             console.log("Agent Core chat session initialized");
+          } else {
+            console.warn(
+              "No access token available for AgentCore initialization"
+            );
           }
         } catch (error) {
           console.error("Failed to initialize Agent Core:", error);
         }
+      } else {
+        console.log("AgentCore initialization skipped - conditions not met");
       }
     };
 
     initAgentCore();
-  }, [auth.isAuthenticated, chatState.agentCoreInitialized, clientLocale]);
+  }, [
+    auth.isAuthenticated,
+    agentCore.isInitialized,
+    agentCore.instance,
+    localeManager.isLocaleInitialized
+    // Removed function references that change on every render
+  ]);
 
-  // Helper function to update chat state
-  const updateChatState = useCallback((updates: Partial<ChatState>) => {
-    setChatState(prev => ({ ...prev, ...updates }));
-  }, []);
-
-  // Helper function to stop current request
-  const stopCurrentRequest = useCallback(() => {
-    if (currentRequestRef.current) {
-      currentRequestRef.current.abort();
-      currentRequestRef.current = null;
-    }
-  }, []);
-
-  // Reset chat state on logout
+  // Reset agent core state on logout
   useEffect(() => {
     if (!auth.isAuthenticated) {
-      stopCurrentRequest();
-      player.stop();
-      setChatState({
-        isStreaming: false,
-        message: "",
-        input: "",
-        agentCoreInitialized: false
+      voiceChat.stopCurrentRequest();
+      setAgentCore({
+        instance: null,
+        isInitialized: false
       });
     }
-  }, [auth.isAuthenticated]);
-
-  // Define the action state
-  const [messages, submit, isPending] = useActionState<
-    Array<Message>,
-    string | Blob | { transcript: string }
-  >(async (prevMessages, data) => {
-    // Handle reset case for logout
-    if (typeof data === "string" && data === "__reset__") {
-      return [];
-    }
-
-    if (!auth.isAuthenticated) {
-      toast.error(t("auth.loginToContinue"));
-      return prevMessages;
-    }
-
-    // Cancel any previous request
-    if (currentRequestRef.current) {
-      console.log("Cancelling previous request in submit");
-      currentRequestRef.current.abort();
-    }
-
-    // Stop any ongoing audio playback
-    player.stop();
-
-    // Create new AbortController for this request
-    const abortController = new AbortController();
-    currentRequestRef.current = abortController;
-
-    const formData = new FormData();
-
-    console.log("Submit action called with data:", data, "type:", typeof data);
-
-    if (typeof data === "string") {
-      console.log("Processing as string input");
-      formData.append("input", data);
-      track("Text input");
-    } else if (data instanceof Blob) {
-      console.log("Processing as blob input");
-      formData.append("input", data, "audio.webm");
-      track("Speech input");
-    } else if (data && typeof data === "object" && "transcript" in data) {
-      console.log("Processing as transcript object:", data.transcript);
-      formData.append("transcript", data.transcript);
-      track("Transcript input");
-    } else {
-      console.error("Unknown data type:", data, typeof data);
-    }
-
-    for (const message of prevMessages) {
-      formData.append("message", JSON.stringify(message));
-    }
-
-    // Use current streaming setting
-    formData.append("settings", JSON.stringify(settings));
-
-    const submittedAt = Date.now();
-    const accessToken = auth.getToken();
-    const currentLocale = getCurrentLocale();
-    const headers: HeadersInit = {};
-
-    if (accessToken) {
-      headers["Authorization"] = `Bearer ${accessToken}`;
-    }
-
-    // Override browser's accept-language with user's selected locale
-    if (currentLocale) {
-      headers["Accept-Language"] = currentLocale;
-    }
-
-    try {
-      updateChatState({
-        isStreaming: true,
-        message: ""
-      });
-
-      const response = await fetch("/api", {
-        method: "POST",
-        headers,
-        body: formData,
-        signal: abortController.signal
-      });
-
-      if (!response.ok) {
-        updateChatState({ isStreaming: false });
-        if (response.status === 401) {
-          await auth.logout();
-          toast.error(t("errors.sessionExpired"));
-        } else if (response.status === 429) {
-          toast.error(t("errors.tooManyRequests"));
-        } else {
-          const apiErrorMessage = await response.text();
-          toast.error(getTranslatedError(apiErrorMessage));
-        }
-        return prevMessages;
-      }
-
-      const transcript = decodeURIComponent(
-        response.headers.get("X-Transcript") || ""
-      );
-
-      if (!transcript) {
-        updateChatState({ isStreaming: false });
-        toast.error(t("errors.noTranscript"));
-        return prevMessages;
-      }
-
-      updateChatState({ input: transcript });
-
-      // Add user message immediately
-      const userMessage: Message = {
-        role: "user",
-        content: transcript
-      };
-
-      const updatedMessages = [...prevMessages, userMessage];
-
-      // Check response type to handle streaming vs single mode
-      const responseType = response.headers.get("X-Response-Type");
-
-      if (responseType === "single") {
-        // Handle single response mode with audio
-        const responseText = decodeURIComponent(
-          response.headers.get("X-Response-Text") || ""
-        );
-
-        if (!responseText) {
-          updateChatState({ isStreaming: false });
-          toast.error(t("errors.noResponse"));
-          return prevMessages;
-        }
-
-        // Display the response text immediately
-        updateChatState({ message: responseText });
-
-        // Play the audio
-        const audioArrayBuffer = await response.arrayBuffer();
-        player.playAudioChunk(audioArrayBuffer);
-
-        // Create assistant message
-        const assistantMessage: Message = {
-          role: "assistant",
-          content: responseText,
-          latency: Date.now() - submittedAt
-        };
-
-        // Reset streaming state
-        updateChatState({
-          isStreaming: false,
-          message: ""
-        });
-
-        return [...updatedMessages, assistantMessage];
-      }
-
-      if (responseType === "text-only") {
-        // Handle text-only response mode (no audio)
-        const responseText = decodeURIComponent(
-          response.headers.get("X-Response-Text") || ""
-        );
-
-        if (!responseText) {
-          updateChatState({ isStreaming: false });
-          toast.error(t("errors.noResponse"));
-          return prevMessages;
-        }
-
-        // Display the response text immediately
-        updateChatState({ message: responseText });
-
-        // Create assistant message
-        const assistantMessage: Message = {
-          role: "assistant",
-          content: responseText,
-          latency: Date.now() - submittedAt
-        };
-
-        // Reset streaming state
-        updateChatState({
-          isStreaming: false,
-          message: ""
-        });
-
-        return [...updatedMessages, assistantMessage];
-      }
-
-      // Handle SSE streaming mode
-      return new Promise<Message[]>((resolve, reject) => {
-        const reader = response.body!.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let accumulatedText = "";
-        let displayedText = "";
-        let textQueue = "";
-        let typingIntervalId: NodeJS.Timeout | null = null;
-        let finalLatency = 0;
-        let firstPacketLatency = 0;
-        let firstPacketReceived = false;
-        let audioStreamStarted = false;
-        let audioStreamClosed = false;
-
-        // Typing animation function
-        const startTypingAnimation = () => {
-          if (typingIntervalId) return; // Already typing
-
-          typingIntervalId = setInterval(() => {
-            if (textQueue.length > 0) {
-              const nextChar = textQueue.charAt(0);
-              textQueue = textQueue.substring(1);
-              displayedText += nextChar;
-              updateChatState({ message: displayedText });
-            } else if (typingIntervalId) {
-              clearInterval(typingIntervalId);
-              typingIntervalId = null;
-            }
-          }, 20); // 20ms between characters for smooth typing
-        };
-
-        const stopTypingAnimation = () => {
-          if (typingIntervalId) {
-            clearInterval(typingIntervalId);
-            typingIntervalId = null;
-          }
-        };
-
-        // Create a ReadableStream for audio playback
-        let audioStreamController: ReadableStreamDefaultController<Uint8Array> | null =
-          null;
-        const audioStream = new ReadableStream<Uint8Array>({
-          start(controller) {
-            audioStreamController = controller;
-          }
-        });
-
-        // Track audio chunks for ordering
-        const audioChunkMap = new Map<number, Uint8Array>();
-        let nextExpectedIndex = 0;
-
-        const closeAudioStream = () => {
-          if (audioStreamController && !audioStreamClosed) {
-            try {
-              audioStreamController.close();
-              audioStreamClosed = true;
-            } catch (error) {
-              console.warn("Audio stream close error:", error);
-            }
-          }
-        };
-
-        const processAudioChunk = (index: number, bytes: Uint8Array) => {
-          // Store chunk
-          audioChunkMap.set(index, bytes);
-
-          // Process any consecutive chunks we have
-          while (audioChunkMap.has(nextExpectedIndex)) {
-            const chunk = audioChunkMap.get(nextExpectedIndex)!;
-
-            // Start audio playback on first chunk
-            if (!audioStreamStarted && audioStreamController) {
-              audioStreamStarted = true;
-              // we are using audio worklet to play audio, so we don't need to do anything here
-            }
-
-            // Feed chunk to audio stream
-            player.playAudioChunk(chunk.slice().buffer);
-
-            // Clean up and move to next
-            audioChunkMap.delete(nextExpectedIndex);
-            nextExpectedIndex++;
-          }
-        };
-
-        const processSSE = async () => {
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-
-              if (done) break;
-
-              buffer += decoder.decode(value, { stream: true });
-
-              // Process complete events from buffer
-              let eventType = "";
-              let eventData = "";
-
-              while (buffer.includes("\n\n")) {
-                const eventEnd = buffer.indexOf("\n\n");
-                const eventText = buffer.substring(0, eventEnd);
-                buffer = buffer.substring(eventEnd + 2);
-
-                const eventLines = eventText.split("\n");
-
-                for (const line of eventLines) {
-                  if (line.startsWith("event:")) {
-                    eventType = line.substring(6).trim();
-                  } else if (line.startsWith("data:")) {
-                    eventData = line.substring(5).trim();
-                  }
-                }
-
-                // Process the complete event
-                if (eventType && eventData) {
-                  try {
-                    const data = JSON.parse(eventData);
-
-                    // Capture first packet latency on first meaningful data
-                    if (
-                      !firstPacketReceived &&
-                      (eventType === "text" || eventType === "audio")
-                    ) {
-                      firstPacketLatency = Date.now() - submittedAt;
-                      firstPacketReceived = true;
-                    }
-
-                    switch (eventType) {
-                      case "text":
-                        accumulatedText += data.content;
-                        textQueue += data.content;
-                        startTypingAnimation();
-                        break;
-
-                      case "audio":
-                        // Decode base64 audio chunk
-                        const binaryString = atob(data.chunk);
-                        const bytes = new Uint8Array(binaryString.length);
-                        for (let j = 0; j < binaryString.length; j++) {
-                          bytes[j] = binaryString.charCodeAt(j);
-                        }
-                        processAudioChunk(data.index || 0, bytes);
-                        break;
-
-                      case "complete":
-                        finalLatency = Date.now() - submittedAt;
-                        accumulatedText = data.fullText;
-
-                        // Ensure all text is typed out before completing
-                        textQueue += data.fullText.substring(
-                          displayedText.length
-                        );
-
-                        // Wait for typing to complete, then reset streaming state
-                        const waitForTyping = () => {
-                          if (textQueue.length === 0 && !typingIntervalId) {
-                            updateChatState({
-                              isStreaming: false,
-                              message: ""
-                            });
-                          } else {
-                            setTimeout(waitForTyping, 50);
-                          }
-                        };
-                        waitForTyping();
-
-                        // Close audio stream after a small delay
-                        setTimeout(() => {
-                          closeAudioStream();
-                        }, 100);
-                        break;
-
-                      case "error":
-                        stopTypingAnimation();
-                        closeAudioStream();
-                        throw new Error(data.message);
-                    }
-                  } catch (error) {
-                    console.error(
-                      "Error parsing SSE data:",
-                      error,
-                      "eventType:",
-                      eventType,
-                      "raw data:",
-                      eventData
-                    );
-                  }
-                }
-
-                // Reset for next event
-                eventType = "";
-                eventData = "";
-              }
-            }
-
-            // After processing all SSE events, resolve with final messages
-            const assistantMessage: Message = {
-              role: "assistant",
-              content: accumulatedText,
-              latency: firstPacketReceived ? firstPacketLatency : finalLatency
-            };
-
-            resolve([...updatedMessages, assistantMessage]);
-          } catch (error) {
-            if (currentRequestRef.current === abortController) {
-              currentRequestRef.current = null;
-            }
-            if (error instanceof Error && error.name === "AbortError") {
-              console.log("SSE stream was cancelled");
-              resolve(prevMessages);
-            } else {
-              console.error("SSE stream error:", error);
-              reject(error);
-            }
-          } finally {
-            // Clean up typing animation
-            stopTypingAnimation();
-
-            // Clean up
-            updateChatState({
-              isStreaming: false,
-              message: ""
-            });
-            if (currentRequestRef.current === abortController) {
-              currentRequestRef.current = null;
-            }
-
-            // Close audio stream if not already closed
-            closeAudioStream();
-          }
-        };
-
-        processSSE();
-      });
-    } catch (error) {
-      if (currentRequestRef.current === abortController) {
-        currentRequestRef.current = null;
-      }
-
-      // Handle AbortError specifically
-      if (error instanceof Error && error.name === "AbortError") {
-        console.log("Request was cancelled");
-        return prevMessages;
-      }
-
-      console.error("Request failed:", error);
-      toast.error(t("errors.requestFailed"));
-      return prevMessages;
-    }
-  }, []);
-
-  // Create refs for stable access to current values
-  const chatStateRef = useRef(chatState);
-  const authRef = useRef(auth);
-  const playerRef = useRef(player);
-  const updateChatStateRef = useRef(updateChatState);
-  const submitRef = useRef(submit);
-
-  // Update refs when values change
+  }, [auth.isAuthenticated]); // Remove voiceChat dependency
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    isAuthenticated: auth.isAuthenticated,
+    inputRef,
+    updateChatState: voiceChat.updateChatState
+  });
+
+  // Initialize audio player when enabled
   useEffect(() => {
-    chatStateRef.current = chatState;
-    authRef.current = auth;
-    playerRef.current = player;
-    updateChatStateRef.current = updateChatState;
-    submitRef.current = submit;
-  }, [chatState, auth, player, updateChatState, submit]);
-
-  useEffect(() => {
-    if (settings.audioEnabled && !player.isPlayerInitialized) {
-      player.initAudioPlayer();
+    if (settings.audioEnabled && !voiceChat.player?.isPlayerInitialized) {
+      voiceChat.player?.initAudioPlayer();
     }
-  }, [settings.audioEnabled, player.isPlayerInitialized]);
+  }, [settings.audioEnabled]); // Remove voiceChat.player dependency
 
-  // Create refs to hold the instances
+  // Refs for VAD and WebM recording
   const vadManagerRef = useRef<any>(null);
   const webmRecorderRef = useRef<any>(null);
 
-  // VAD callbacks using refs to avoid circular dependency
+  // VAD callbacks with performance optimization
   const onSpeechStart = useCallback(() => {
-    if (!authRef.current.isAuthenticated) return;
+    if (!auth.isAuthenticated) return;
 
     // Start WebM recording
     const recorder = webmRecorderRef.current;
@@ -679,33 +208,16 @@ export default function Home() {
       recorder.startRecording();
     }
 
-    // Interrupt immediately when user starts speaking
-    if (chatStateRef.current.message || chatStateRef.current.isStreaming) {
+    // Interrupt current stream when user starts speaking
+    if (voiceChat.chatState.message || voiceChat.chatState.isStreaming) {
       console.log("Interrupting current stream - user started speaking");
-
-      // Cancel current request immediately
-      if (currentRequestRef.current) {
-        console.log("Cancelling current request due to speech start");
-        currentRequestRef.current.abort();
-        currentRequestRef.current = null;
-      }
-
-      // Stop audio playback immediately
-      playerRef.current.stop();
-
-      // Reset streaming state but preserve message
-      updateChatStateRef.current({
-        isStreaming: false
-      });
+      voiceChat.stopCurrentRequest();
     }
-  }, []);
+  }, [auth.isAuthenticated, voiceChat.stopCurrentRequest, voiceChat.chatState.message, voiceChat.chatState.isStreaming]);
 
   const onSpeechEnd = useCallback(
     async (isValid: boolean, _audio: Float32Array) => {
-      if (!authRef.current.isAuthenticated) return;
-
-      // Stop any remaining audio playback before processing new input
-      playerRef.current.stop();
+      if (!auth.isAuthenticated) return;
 
       try {
         // Stop WebM recording and get the blob directly
@@ -718,7 +230,7 @@ export default function Home() {
             console.log("WebM recording completed, blob size:", webmBlob.size);
 
             // Submit the audio as WebM
-            startTransition(() => submitRef.current(webmBlob));
+            startTransition(() => voiceChat.submit(webmBlob));
 
             track("Speech input");
           } else {
@@ -727,13 +239,11 @@ export default function Home() {
         } else {
           console.warn("WebM recorder was not recording when speech ended");
         }
-
-        // No browser-specific VAD handling needed
       } catch (error) {
         console.error("Error with WebM recording:", error);
       }
     },
-    []
+    [auth.isAuthenticated, voiceChat.submit]
   );
 
   const onVADMisfire = useCallback(async () => {
@@ -755,23 +265,40 @@ export default function Home() {
     }
   }, []);
 
-  // VAD Manager setup - use dynamic configuration based on sensitivity setting
-  const vadManager = useVADManager(
-    getVADConfigForSensitivity(settings.vadSensitivity),
-    {
+  // Memoize VAD configuration to prevent unnecessary recalculations
+  const vadConfig = useMemo(
+    () => getVADConfigForSensitivity(settings.vadSensitivity),
+    [settings.vadSensitivity]
+  );
+
+  const vadCallbacks = useMemo(
+    () => ({
       onSpeechStart,
       onSpeechEnd,
       onVADMisfire
-    },
-    {
-      isStreaming: chatState.isStreaming,
+    }),
+    [onSpeechStart, onSpeechEnd, onVADMisfire]
+  );
+
+  // Extract streaming state separately to avoid infinite loops
+  const isStreaming = voiceChat.chatState.isStreaming;
+
+  const vadManagerState = useMemo(
+    () => ({
+      isStreaming,
       isAuthenticated: auth.isAuthenticated,
       audioEnabled: settings.audioEnabled,
       settingsLoaded: settingsLoaded
-    }
+    }),
+    [isStreaming, auth.isAuthenticated, settings.audioEnabled, settingsLoaded]
   );
 
+  // VAD Manager setup
+  const vadManager = useVADManager(vadConfig, vadCallbacks, vadManagerState);
   const vadState = vadManager.state;
+
+  // Debounce VAD state updates to prevent excessive re-renders
+  const debouncedVadState = useDebounce(vadState, 50);
 
   // WebM Recorder setup - uses same audio stream as VAD
   const webmRecorder = useWebMRecorder(vadManager.audioStream);
@@ -782,161 +309,16 @@ export default function Home() {
     webmRecorderRef.current = webmRecorder;
   }, [vadManager, webmRecorder]);
 
-  // Pusher event handlers
-  const handleEmailNotification = useCallback(
-    (data: EmailNotificationData) => {
-      console.log("Important email event:", data);
-      const message = `Important Email: ${data.subject} from ${data.fromAddress}`;
-
-      addNotification({
-        type: "email",
-        title: "Important Email",
-        message: `${data.subject} from ${data.fromAddress}`,
-        data
-      });
-
-      toast.info(message, {
-        duration: 180000
-      });
-    },
-    [addNotification]
-  );
-
-  const handleCalendarUpcoming = useCallback(
-    (data: CalendarEventData) => {
-      console.log("Upcoming calendar event:", data);
-      const timeText =
-        data.timeUntilStart && data.timeUntilStart <= 15
-          ? "starting soon"
-          : `in ${data.timeUntilStart} minutes`;
-      const message = `Upcoming Event: ${data.title} ${timeText}`;
-
-      addNotification({
-        type: "calendar_upcoming",
-        title: "Upcoming Event",
-        message: `${data.title} ${timeText}`,
-        data
-      });
-
-      toast.info(message, {
-        duration: 180000
-      });
-    },
-    [addNotification]
-  );
-
-  const handleCalendarNew = useCallback(
-    (data: CalendarEventData) => {
-      console.log("New calendar event:", data);
-      const eventDate = data.startTime
-        ? new Date(data.startTime).toLocaleDateString()
-        : "soon";
-      const message = `New Event Added: ${data.title} on ${eventDate}`;
-
-      addNotification({
-        type: "calendar_new",
-        title: "New Event Added",
-        message: `${data.title} on ${eventDate}`,
-        data
-      });
-
-      toast.info(message, {
-        duration: 180000
-      });
-    },
-    [addNotification]
-  );
-
-  const handleSystemNotification = useCallback(
-    (data: SystemNotificationData) => {
-      console.log("System notification:", data);
-      const message = data.title
-        ? `${data.title}: ${data.message}`
-        : data.message;
-
-      addNotification({
-        type: "system",
-        title: data.title || "System Notification",
-        message: data.message,
-        data
-      });
-
-      toast.info(message, {
-        duration: 180000
-      });
-    },
-    [addNotification]
-  );
-
-  // Chat message queue system
-  const messageQueueRef = useRef<ChatMessageData[]>([]);
-  const isProcessingRef = useRef(false);
-
-  const processMessageQueue = useCallback(async () => {
-    if (isProcessingRef.current || messageQueueRef.current.length === 0) {
-      return;
-    }
-
-    isProcessingRef.current = true;
-
-    while (messageQueueRef.current.length > 0) {
-      const data = messageQueueRef.current.shift()!;
-
-      addNotification({
-        type: "chat",
-        title: "Proactive Message",
-        message: data.message,
-        data
-      });
-
-      console.log("Submitting transcript:", data.message);
-      startTransition(() => {
-        console.log("Inside transition, calling submit with:", {
-          transcript: data.message
-        });
-        submit({ transcript: data.message });
-      });
-
-      // Wait before processing next message to allow TTS completion
-      await new Promise(resolve => setTimeout(resolve, 4000)); // 4 second delay
-    }
-
-    isProcessingRef.current = false;
-  }, [submit, addNotification]);
-
-  const handleChatMessage = useCallback(
-    (data: ChatMessageData) => {
-      console.log("Proactive chat message:", data);
-
-      if (!auth.isAuthenticated) {
-        toast.error(t("auth.loginToContinue"));
-        return;
-      }
-
-      // Add to queue
-      messageQueueRef.current.push(data);
-      console.log(
-        `Added message to queue. Queue length: ${messageQueueRef.current.length}`
-      );
-
-      // Process queue if not already processing
-      if (!isProcessingRef.current) {
-        processMessageQueue();
-      }
-    },
-    [auth, t, processMessageQueue]
-  );
-
-  // Pusher hook
+  // Pusher integration with notification handlers
   const pusher = usePusher({
     isAuthenticated: auth.isAuthenticated,
     getToken: auth.getToken,
     eventHandlers: {
-      onEmailNotification: handleEmailNotification,
-      onCalendarUpcoming: handleCalendarUpcoming,
-      onCalendarNew: handleCalendarNew,
-      onSystemNotification: handleSystemNotification,
-      onChatMessage: handleChatMessage
+      onEmailNotification: notificationHandlers.handleEmailNotification,
+      onCalendarUpcoming: notificationHandlers.handleCalendarUpcoming,
+      onCalendarNew: notificationHandlers.handleCalendarNew,
+      onSystemNotification: notificationHandlers.handleSystemNotification,
+      onChatMessage: notificationHandlers.handleChatMessage
     }
   });
 
@@ -953,7 +335,7 @@ export default function Home() {
         // Try to restart VAD after a delay
         setTimeout(() => {
           if (auth.isAuthenticated && settings.audioEnabled) {
-            vadManager.start();
+            vadManagerRef.current?.start();
           }
         }, 2000);
       }
@@ -961,68 +343,90 @@ export default function Home() {
 
     window.addEventListener("error", handleError);
     return () => window.removeEventListener("error", handleError);
-  }, [auth.isAuthenticated, settings.audioEnabled]);
+  }, [auth.isAuthenticated, settings.audioEnabled]); // Removed vadManager dependency
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    function keyDown(e: KeyboardEvent) {
-      if (!auth.isAuthenticated) return;
-      if (e.key === "Enter") return inputRef.current?.focus();
-      if (e.key === "Escape") return updateChatState({ input: "" });
-    }
+  const handleFormSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!auth.isAuthenticated) {
+        toast.error(t("auth.loginToContinue"));
+        return;
+      }
+      // Get current input value directly from the form element
+      const formData = new FormData(e.target as HTMLFormElement);
+      const inputValue = (formData.get("chatInput") as string) || "";
+      startTransition(() => voiceChat.submit(inputValue));
+    },
+    [auth.isAuthenticated, t, voiceChat.submit]
+  );
 
-    window.addEventListener("keydown", keyDown);
-    return () => window.removeEventListener("keydown", keyDown);
-  }, [auth.isAuthenticated]);
-
-  function handleFormSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!auth.isAuthenticated) {
-      toast.error(t("auth.loginToContinue"));
-      return;
-    }
-    startTransition(() => submit(chatState.input));
-  }
-
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
-      stopCurrentRequest();
-      startTransition(() => submit("__reset__"));
+      voiceChat.stopCurrentRequest();
+      voiceChat.resetMessages();
       await auth.logout();
       toast.success(t("success.signedOut"));
     } catch (error) {
       console.error("Failed to logout:", error);
       toast.error(t("errors.signOutFailed"));
     }
-  };
+  }, [voiceChat.stopCurrentRequest, voiceChat.resetMessages, auth.logout, t]);
 
-  const handleSettingsChange = (newSettings: typeof settings) => {
-    updateSettings(newSettings);
-    console.log("Settings updated:", newSettings);
-  };
+  const handleSettingsChange = useCallback(
+    (newSettings: typeof settings) => {
+      updateSettings(newSettings);
+      console.log("Settings updated:", newSettings);
+    },
+    [updateSettings]
+  );
 
-  const handleClearHistory = async () => {
-    if (!auth.isAuthenticated || !agentCoreRef.current) return;
+  const handleClearHistory = useCallback(async () => {
+    if (!auth.isAuthenticated) {
+      toast.error(t("settings.clearHistoryLoginRequired"));
+      return;
+    }
+
+    if (!agentCore.instance) {
+      toast.error(t("settings.clearHistoryNotInitialized"));
+      return;
+    }
 
     try {
       const accessToken = auth.getToken();
       if (accessToken) {
-        const currentLocale = getCurrentLocale();
-        await agentCoreRef.current.clearHistory(accessToken, {
+        const currentLocale = localeManager.getCurrentLocale();
+        await agentCore.instance.clearHistory(accessToken, {
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           clientDatetime: new Date().toISOString(),
           locale: currentLocale
         });
-        toast.success("Chat history cleared successfully");
+        toast.success(t("settings.clearHistorySuccess"));
+      } else {
+        toast.error(t("settings.clearHistoryNoToken"));
       }
     } catch (error) {
       console.error("Failed to clear chat history:", error);
-      toast.error("Failed to clear chat history");
+      toast.error(t("settings.clearHistoryFailed"));
     }
-  };
+  }, [
+    auth.isAuthenticated,
+    agentCore.instance,
+    t
+    // Removed function references that change on every render
+  ]);
+
+  // Performance monitoring in development (after all hooks are defined)
+  // Only track stable properties to avoid re-renders from streaming message updates
+  useRenderTracking("HomePage", [
+    auth.isAuthenticated,
+    voiceChat.chatState.isStreaming, // Only track streaming state, not the changing message
+    settings.audioEnabled, // Only track relevant settings that affect rendering
+    debouncedVadState.userSpeaking // Use debounced VAD state
+  ]);
 
   return (
     <>
+      <PerformanceMonitor componentName="HomePage" />
       <div className="pb-4 min-h-28" />
 
       {!auth.isAuthenticated && <GoogleLoginButton disabled={auth.loading} />}
@@ -1030,10 +434,10 @@ export default function Home() {
       <ChatForm
         isAuthenticated={auth.isAuthenticated}
         isSettingsOpen={isSettingsOpen}
-        input={chatState.input}
-        isPending={isPending}
-        isStreaming={chatState.isStreaming}
-        onInputChange={value => updateChatState({ input: value })}
+        input={voiceChat.chatState.input}
+        isPending={voiceChat.isPending}
+        isStreaming={voiceChat.chatState.isStreaming}
+        onInputChange={value => voiceChat.updateChatState({ input: value })}
         onSubmit={handleFormSubmit}
         inputRef={inputRef}
       />
@@ -1042,17 +446,18 @@ export default function Home() {
         isSettingsOpen={isSettingsOpen}
         authLoading={auth.loading}
         isAuthenticated={auth.isAuthenticated}
-        currentMessage={chatState.message}
-        messages={messages}
-        vadState={vadState}
+        currentMessage={voiceChat.chatState.message}
+        messages={voiceChat.messages}
+        vadState={debouncedVadState}
       />
 
+      {/* Memoize VoiceOrb props to prevent unnecessary re-renders */}
       <VoiceOrb
         isAuthenticated={auth.isAuthenticated}
-        isLoading={vadState.loading}
-        isErrored={vadState.errored}
-        isUserSpeaking={vadState.userSpeaking}
-        hasMessage={!!chatState.message}
+        isLoading={debouncedVadState.loading}
+        isErrored={debouncedVadState.errored}
+        isUserSpeaking={debouncedVadState.userSpeaking}
+        hasMessage={!!voiceChat.chatState.message}
       />
 
       <SettingsButton onClick={() => setIsSettingsOpen(true)} />
@@ -1099,11 +504,11 @@ export default function Home() {
         <div className="flex flex-col items-center space-y-2">
           <a
             href="/privacy"
-            className="text-xs text-gray-400 hover:text-gray-300 transition-colors underline"
+            className="text-xs text-gray-400 hover:text-gray-300 transition-colors underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-sm"
           >
             {t("privacy.title")}
           </a>
-          <p className="text-xs text-gray-500 text-center">
+          <p className="text-xs text-gray-500 text-center" role="contentinfo">
             © 2025 Friday Intelligence Inc. All rights reserved.
           </p>
         </div>

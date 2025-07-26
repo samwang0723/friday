@@ -3,7 +3,7 @@
  * Manages authentication state and provides auth functions
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import authService from "@/lib/auth";
 
 interface AuthState {
@@ -47,10 +47,15 @@ export function useAuth() {
     return unsubscribe;
   }, []);
 
+  // Memoize the function references to prevent unnecessary re-renders
+  const login = useMemo(() => authService.loginWithGoogle, []);
+  const logout = useMemo(() => authService.logout, []);
+  const getToken = useMemo(() => authService.getToken, []);
+
   return {
     ...authState,
-    login: authService.loginWithGoogle,
-    logout: authService.logout,
-    getToken: authService.getToken
+    login,
+    logout,
+    getToken
   };
 }
