@@ -1,6 +1,6 @@
-import { renderHook, act, waitFor } from "@testing-library/react";
-import { useStreamingProcessor } from "../useStreamingProcessor";
 import { SSEProcessor } from "@/utils/sseProcessor";
+import { act, renderHook } from "@testing-library/react";
+import { useStreamingProcessor } from "../useStreamingProcessor";
 
 // Mock SSEProcessor
 jest.mock("@/utils/sseProcessor");
@@ -30,13 +30,13 @@ describe("useStreamingProcessor", () => {
     jest.clearAllMocks();
     jest.clearAllTimers();
     jest.resetAllMocks();
-    
+
     // Force cleanup any references
     mockProcessor = {
       processStream: jest.fn(),
       stop: jest.fn()
     } as any;
-    
+
     MockedSSEProcessor.mockClear();
     MockedSSEProcessor.mockImplementation(() => mockProcessor);
   });
@@ -152,7 +152,9 @@ describe("useStreamingProcessor", () => {
       const processingError = new Error("Processing failed");
 
       // Mock console.error to suppress output during error testing
-      const consoleSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       mockProcessor.processStream.mockRejectedValue(processingError);
 
@@ -170,7 +172,7 @@ describe("useStreamingProcessor", () => {
       });
 
       expect(onError).toHaveBeenCalledWith(processingError);
-      
+
       consoleSpy.mockRestore();
     });
 
@@ -218,7 +220,9 @@ describe("useStreamingProcessor", () => {
       const processingError = new Error("Processing failed");
 
       // Mock console.error to suppress output during error testing
-      const consoleSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       mockProcessor.processStream.mockRejectedValue(processingError);
 
@@ -241,7 +245,7 @@ describe("useStreamingProcessor", () => {
       });
 
       expect(() => result.current!.stopTypingAnimation()).not.toThrow();
-      
+
       consoleSpy.mockRestore();
     });
 
@@ -379,7 +383,9 @@ describe("useStreamingProcessor", () => {
       const processingError = new Error("Processing failed");
 
       // Mock console.error to suppress output during testing
-      const consoleSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       mockProcessor.processStream.mockRejectedValue(processingError);
 
@@ -514,7 +520,7 @@ describe("useStreamingProcessor", () => {
         secondComplete = true;
       });
 
-      // Complete second  
+      // Complete second
       resolveSecond();
       await secondPromiseCall;
 
@@ -528,40 +534,40 @@ describe("useStreamingProcessor", () => {
   describe("memory management", () => {
     it("should not leak processors between test runs", () => {
       // Basic memory management test - ensure hook can be created and destroyed
-      let hook1, hook2;
-      
+      let hook1: any, hook2: any;
+
       expect(() => {
         hook1 = renderHook(() => useStreamingProcessor());
       }).not.toThrow();
-      
+
       expect(() => {
         hook1?.unmount();
       }).not.toThrow();
-      
+
       expect(() => {
         hook2 = renderHook(() => useStreamingProcessor());
       }).not.toThrow();
-      
+
       expect(() => {
         hook2?.unmount();
       }).not.toThrow();
-      
+
       // Basic functionality test - ensures hooks can be created independently
       expect(true).toBe(true);
     });
 
     it("should cleanup processor reference properly", () => {
       // Simple cleanup test that doesn't rely on complex mocking
-      let hook;
-      
+      let hook: any;
+
       expect(() => {
         hook = renderHook(() => useStreamingProcessor());
       }).not.toThrow();
-      
+
       expect(() => {
         hook?.unmount();
       }).not.toThrow();
-      
+
       // Test passes if no errors thrown during mount/unmount cycle
       expect(true).toBe(true);
     });

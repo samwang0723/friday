@@ -1,7 +1,9 @@
-import { renderHook, act, waitFor } from "@testing-library/react";
-import { startTransition } from "react";
-import { useVoiceChat } from "../useVoiceChat";
 import { VoiceChatService } from "@/services/voiceChatService";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { track } from "@vercel/analytics";
+import { startTransition } from "react";
+import { toast } from "sonner";
+import { useVoiceChat } from "../useVoiceChat";
 
 // Mock dependencies
 jest.mock("sonner", () => ({
@@ -23,7 +25,7 @@ jest.mock("next-intl", () => ({
 // Mock React's startTransition to execute synchronously in tests
 jest.mock("react", () => ({
   ...jest.requireActual("react"),
-  startTransition: jest.fn((callback) => {
+  startTransition: jest.fn((callback: () => void) => {
     // Execute synchronously in test environment to avoid suspended resource warnings
     callback();
   })
@@ -63,16 +65,18 @@ const mockVoiceChatService = {
   translateError: jest.fn()
 };
 
-// Mock the hooks
-require("@/hooks/useRequestManager").useRequestManager = jest.fn(
-  () => mockRequestManager
-);
-require("@/hooks/useStreamingProcessor").useStreamingProcessor = jest.fn(
-  () => mockStreamingProcessor
-);
-require("@/lib/hooks/useAudioPlayer").useAudioPlayer = jest.fn(
-  () => mockPlayer
-);
+// Mock the hooks using module factory approach
+jest.mock("@/hooks/useRequestManager", () => ({
+  useRequestManager: jest.fn(() => mockRequestManager)
+}));
+
+jest.mock("@/hooks/useStreamingProcessor", () => ({
+  useStreamingProcessor: jest.fn(() => mockStreamingProcessor)
+}));
+
+jest.mock("@/lib/hooks/useAudioPlayer", () => ({
+  useAudioPlayer: jest.fn(() => mockPlayer)
+}));
 
 // Mock VoiceChatService constructor
 (
@@ -103,11 +107,14 @@ describe("useVoiceChat", () => {
     mockVoiceChatService.translateError.mockImplementation(
       (msg: string) => msg
     );
-    
+
     // Suppress console.error warnings for useActionState in test environment
-    jest.spyOn(console, 'error').mockImplementation((message) => {
+    jest.spyOn(console, "error").mockImplementation(message => {
       // Only suppress specific React warnings, let other errors through
-      if (typeof message === 'string' && message.includes('useActionState was called outside of a transition')) {
+      if (
+        typeof message === "string" &&
+        message.includes("useActionState was called outside of a transition")
+      ) {
         return;
       }
       // Let other console.error calls through for debugging
@@ -361,7 +368,6 @@ describe("useVoiceChat", () => {
       });
 
       // Should not show error toast for abort errors
-      const { toast } = require("sonner");
       expect(toast.error).not.toHaveBeenCalled();
     });
 
@@ -394,7 +400,6 @@ describe("useVoiceChat", () => {
         });
       });
 
-      const { toast } = require("sonner");
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
           "translated_errors.tooManyRequests"
@@ -414,7 +419,6 @@ describe("useVoiceChat", () => {
         });
       });
 
-      const { toast } = require("sonner");
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
           "translated_errors.noTranscript"
@@ -474,7 +478,6 @@ describe("useVoiceChat", () => {
         });
       });
 
-      const { track } = require("@vercel/analytics");
       expect(track).toHaveBeenCalledWith("Text input");
     });
 
@@ -489,7 +492,6 @@ describe("useVoiceChat", () => {
         });
       });
 
-      const { track } = require("@vercel/analytics");
       expect(track).toHaveBeenCalledWith("Speech input");
     });
 
@@ -504,7 +506,6 @@ describe("useVoiceChat", () => {
         });
       });
 
-      const { track } = require("@vercel/analytics");
       expect(track).toHaveBeenCalledWith("Transcript input");
     });
   });
@@ -515,17 +516,17 @@ describe("useVoiceChat", () => {
       mockVoiceChatService.getResponseType.mockReturnValue(null); // streaming
 
       // Track state changes
-      let stateChanges: boolean[] = [];
-      
+      const stateChanges: boolean[] = [];
+
       // Mock streaming processor to capture state changes
       mockStreamingProcessor.processSSEStream.mockImplementation(
         (
-          response: Response,
+          _response: Response,
           onTextUpdate: (text: string) => void,
-          onAudioChunk: (chunk: ArrayBuffer) => void,
+          _onAudioChunk: (chunk: ArrayBuffer) => void,
           onStreamComplete: (finalText: string, latency: number) => void,
-          onError: (error: Error) => void,
-          submittedAt: number
+          _onError: (error: Error) => void,
+          _submittedAt: number
         ) => {
           // Simulate some streaming activity
           setTimeout(() => {
@@ -543,7 +544,7 @@ describe("useVoiceChat", () => {
       stateChanges.push(result.current.chatState.isStreaming);
 
       await act(async () => {
-        startTransition(() => {          
+        startTransition(() => {
           result.current.submit("Hello");
         });
       });
@@ -554,7 +555,9 @@ describe("useVoiceChat", () => {
       });
 
       // The test passes if we can successfully submit and get a response
-      expect(result.current.messages[1].content).toBe("Full streaming response");
+      expect(result.current.messages[1].content).toBe(
+        "Full streaming response"
+      );
       expect(result.current.chatState.input).toBe("Mock transcript");
     });
 
@@ -622,7 +625,6 @@ describe("useVoiceChat", () => {
         });
       });
 
-      const { toast } = require("sonner");
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalled();
       });
@@ -643,7 +645,6 @@ describe("useVoiceChat", () => {
         });
       });
 
-      const { toast } = require("sonner");
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalled();
       });

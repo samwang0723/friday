@@ -1,10 +1,10 @@
 import {
-  getCurrentLocale,
   detectBrowserLocale,
-  setLocaleInStorage,
+  getCurrentLocale,
+  normalizeLocale,
   setLocaleCookie,
-  validateLocale,
-  normalizeLocale
+  setLocaleInStorage,
+  validateLocale
 } from "../localeUtils";
 
 // Store original implementations
@@ -15,11 +15,7 @@ const originalNavigator = global.navigator;
 
 describe("localeUtils", () => {
   let mockLocalStorage: any;
-  let mockDocument: any;
-  let mockWindow: any;
-  let mockNavigator: any;
   let urlSearchParamsSpy: jest.SpyInstance;
-  let cookieGetterSpy: jest.SpyInstance;
   let localStorageGetItemSpy: jest.SpyInstance;
   let localStorageSetItemSpy: jest.SpyInstance;
 
@@ -33,14 +29,16 @@ describe("localeUtils", () => {
     };
 
     // Store URLSearchParams behavior for each test
-    let mockSearchParams: Map<string, string> = new Map();
-    
+    const mockSearchParams: Map<string, string> = new Map();
+
     // Mock URLSearchParams to control what it returns
-    urlSearchParamsSpy = jest.spyOn(global, 'URLSearchParams').mockImplementation(() => {
-      return {
-        get: (key: string) => mockSearchParams.get(key) || null
-      } as any;
-    });
+    urlSearchParamsSpy = jest
+      .spyOn(global, "URLSearchParams")
+      .mockImplementation(() => {
+        return {
+          get: (key: string) => mockSearchParams.get(key) || null
+        } as any;
+      });
 
     // Expose method to set mock search params for tests
     (global as any).setMockSearchParams = (params: Record<string, string>) => {
@@ -50,13 +48,15 @@ describe("localeUtils", () => {
       });
     };
 
-    // Store document.cookie value for each test  
+    // Store document.cookie value for each test
     let cookieValue = "";
-    
+
     // Mock document.cookie getter/setter
-    Object.defineProperty(document, 'cookie', {
+    Object.defineProperty(document, "cookie", {
       get: () => cookieValue,
-      set: (value: string) => { cookieValue = value; },
+      set: (value: string) => {
+        cookieValue = value;
+      },
       configurable: true
     });
 
@@ -66,12 +66,16 @@ describe("localeUtils", () => {
     };
 
     // Mock localStorage methods using Jest spies
-    localStorageGetItemSpy = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(mockLocalStorage.getItem);
-    localStorageSetItemSpy = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(mockLocalStorage.setItem);
-    
+    localStorageGetItemSpy = jest
+      .spyOn(Storage.prototype, "getItem")
+      .mockImplementation(mockLocalStorage.getItem);
+    localStorageSetItemSpy = jest
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(mockLocalStorage.setItem);
+
     // Use Object.defineProperty to mock navigator.language
-    Object.defineProperty(global.navigator, 'language', {
-      value: 'en-US',
+    Object.defineProperty(global.navigator, "language", {
+      value: "en-US",
       writable: true,
       configurable: true
     });
@@ -84,11 +88,11 @@ describe("localeUtils", () => {
     urlSearchParamsSpy.mockRestore();
     localStorageGetItemSpy.mockRestore();
     localStorageSetItemSpy.mockRestore();
-    
+
     // Clean up test helpers
     delete (global as any).setMockSearchParams;
     delete (global as any).setMockCookie;
-    
+
     // Restore original globals
     global.window = originalWindow;
     global.document = originalDocument;
@@ -137,8 +141,8 @@ describe("localeUtils", () => {
 
   describe("detectBrowserLocale", () => {
     it("should return browser language without region", () => {
-      Object.defineProperty(global.navigator, 'language', {
-        value: 'fr-FR',
+      Object.defineProperty(global.navigator, "language", {
+        value: "fr-FR",
         writable: true,
         configurable: true
       });
@@ -147,7 +151,7 @@ describe("localeUtils", () => {
     });
 
     it("should return default when navigator is not available", () => {
-      // @ts-ignore
+      // @ts-expect-error
       delete global.navigator;
 
       const result = detectBrowserLocale();
@@ -162,7 +166,7 @@ describe("localeUtils", () => {
     });
 
     it("should handle unavailable localStorage gracefully", () => {
-      // @ts-ignore
+      // @ts-expect-error
       delete global.localStorage;
 
       expect(() => setLocaleInStorage("ko")).not.toThrow();
@@ -184,7 +188,7 @@ describe("localeUtils", () => {
     });
 
     it("should handle unavailable document gracefully", () => {
-      // @ts-ignore
+      // @ts-expect-error
       delete global.document;
 
       expect(() => setLocaleCookie("zh")).not.toThrow();
