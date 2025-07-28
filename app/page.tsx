@@ -111,7 +111,7 @@ export default function Home() {
         isInitialized: false
       });
     }
-  }, [agentCore.instance, auth.isAuthenticated, auth]);
+  }, [agentCore.instance, auth.isAuthenticated, auth.logout]);
 
   // Initialize Agent Core chat session after authentication
   useEffect(() => {
