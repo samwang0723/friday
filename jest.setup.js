@@ -104,13 +104,11 @@ global.AbortController = class MockAbortController {
     this.signal.aborted = true;
     // Trigger abort event
     const event = { type: "abort" };
-    this.signal.addEventListener.mock.calls.forEach(
-      ([eventType, listener]) => {
-        if (eventType === "abort") {
-          listener(event);
-        }
+    this.signal.addEventListener.mock.calls.forEach(([eventType, listener]) => {
+      if (eventType === "abort") {
+        listener(event);
       }
-    );
+    });
   }
 };
 

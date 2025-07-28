@@ -7,7 +7,9 @@ export function useAudioPlayer() {
   const audioPlayerContextRef = useRef<AudioContext | null>(null);
   const initializationPromiseRef = useRef<Promise<void> | null>(null);
   const [isPlayerInitialized, setPlayerInitialized] = useState(false);
-  const [initializationError, setInitializationError] = useState<string | null>(null);
+  const [initializationError, setInitializationError] = useState<string | null>(
+    null
+  );
 
   const initAudioPlayer = useCallback(async () => {
     // Prevent multiple simultaneous initialization attempts
@@ -21,15 +23,15 @@ export function useAudioPlayer() {
       try {
         setInitializationError(null);
         const [node, context] = await startAudioPlayerWorklet();
-        
+
         // Verify the context and node are valid before storing
         if (!context || !node) {
           throw new Error("Invalid audio context or worklet node");
         }
 
         // Add error event listener to the context
-        context.addEventListener('statechange', () => {
-          if (context.state === 'suspended') {
+        context.addEventListener("statechange", () => {
+          if (context.state === "suspended") {
             console.warn("Audio context was suspended");
           }
         });
@@ -37,10 +39,11 @@ export function useAudioPlayer() {
         audioPlayerNodeRef.current = node;
         audioPlayerContextRef.current = context;
         setPlayerInitialized(true);
-        
+
         console.log("Audio player initialized successfully");
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error occurred";
         console.error("Failed to initialize audio player:", error);
         setInitializationError(errorMessage);
         toast.error("Failed to initialize audio player.");
@@ -62,14 +65,14 @@ export function useAudioPlayer() {
       }
 
       const context = audioPlayerContextRef.current;
-      
+
       // Handle suspended context state
       if (context.state === "suspended") {
         context.resume().catch(error => {
           console.error("Failed to resume audio context:", error);
         });
       }
-      
+
       // Verify the worklet node is still connected
       if (audioPlayerNodeRef.current.port) {
         audioPlayerNodeRef.current.port.postMessage(chunk);
@@ -98,14 +101,17 @@ export function useAudioPlayer() {
         audioPlayerNodeRef.current.disconnect();
         audioPlayerNodeRef.current = null;
       }
-      
-      if (audioPlayerContextRef.current && audioPlayerContextRef.current.state !== 'closed') {
+
+      if (
+        audioPlayerContextRef.current &&
+        audioPlayerContextRef.current.state !== "closed"
+      ) {
         audioPlayerContextRef.current.close().catch(error => {
           console.warn("Error closing audio context:", error);
         });
         audioPlayerContextRef.current = null;
       }
-      
+
       setPlayerInitialized(false);
       setInitializationError(null);
     } catch (error) {
@@ -118,12 +124,22 @@ export function useAudioPlayer() {
   }, [cleanup]);
 
   // Memoize return object to prevent unnecessary re-renders
-  return useMemo(() => ({
-    isPlayerInitialized,
-    initializationError,
-    initAudioPlayer,
-    playAudioChunk,
-    stop,
-    cleanup
-  }), [isPlayerInitialized, initializationError, initAudioPlayer, playAudioChunk, stop, cleanup]);
+  return useMemo(
+    () => ({
+      isPlayerInitialized,
+      initializationError,
+      initAudioPlayer,
+      playAudioChunk,
+      stop,
+      cleanup
+    }),
+    [
+      isPlayerInitialized,
+      initializationError,
+      initAudioPlayer,
+      playAudioChunk,
+      stop,
+      cleanup
+    ]
+  );
 }

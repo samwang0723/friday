@@ -86,21 +86,27 @@ export function useSettings() {
           }
         });
       }
-      
+
       return updatedSettings;
     });
   }, []); // Empty dependency array since we use functional state update
 
   // Update individual setting
-  const updateSetting = useCallback((key: keyof SettingsState, value: unknown) => {
-    updateSettings({ [key]: value } as Partial<SettingsState>);
-  }, [updateSettings]);
+  const updateSetting = useCallback(
+    (key: keyof SettingsState, value: unknown) => {
+      updateSettings({ [key]: value } as Partial<SettingsState>);
+    },
+    [updateSettings]
+  );
 
   // Memoize return object to prevent unnecessary re-renders
-  return useMemo(() => ({
-    settings,
-    updateSettings,
-    updateSetting,
-    isLoaded
-  }), [settings, updateSettings, updateSetting, isLoaded]);
+  return useMemo(
+    () => ({
+      settings,
+      updateSettings,
+      updateSetting,
+      isLoaded
+    }),
+    [settings, updateSettings, updateSetting, isLoaded]
+  );
 }

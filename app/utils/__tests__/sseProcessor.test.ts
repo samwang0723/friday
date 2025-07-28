@@ -53,9 +53,9 @@ describe("SSEProcessor", () => {
 
     // Mock atob for base64 decoding in this test (overrides global)
     global.atob = jest.fn(str => str);
-    
+
     // Mock requestAnimationFrame to execute synchronously
-    global.requestAnimationFrame = jest.fn((callback) => {
+    global.requestAnimationFrame = jest.fn(callback => {
       setTimeout(callback, 0);
       return 1;
     });
