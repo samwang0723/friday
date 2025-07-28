@@ -4,7 +4,8 @@ import type { RequestManagerHookReturn } from "@/types/voiceChat";
 export function useRequestManager(): RequestManagerHookReturn {
   const currentControllerRef = useRef<AbortController | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [currentController, setCurrentController] = useState<AbortController | null>(null);
+  const [currentController, setCurrentController] =
+    useState<AbortController | null>(null);
 
   // Create a new request controller and cancel any existing one
   const createNewRequest = useCallback((): AbortController => {

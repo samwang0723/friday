@@ -104,11 +104,14 @@ export default function Home() {
     if (!agentCore.instance && auth.isAuthenticated) {
       console.log("Creating new AgentCore instance");
       setAgentCore({
-        instance: new AgentCoreService(),
+        instance: new AgentCoreService(() => {
+          console.log("401 detected - triggering logout from AgentCore");
+          auth.logout();
+        }),
         isInitialized: false
       });
     }
-  }, [agentCore.instance, auth.isAuthenticated]);
+  }, [agentCore.instance, auth.isAuthenticated, auth.logout]);
 
   // Initialize Agent Core chat session after authentication
   useEffect(() => {
@@ -213,7 +216,12 @@ export default function Home() {
       console.log("Interrupting current stream - user started speaking");
       voiceChat.stopCurrentRequest();
     }
-  }, [auth.isAuthenticated, voiceChat.stopCurrentRequest, voiceChat.chatState.message, voiceChat.chatState.isStreaming]);
+  }, [
+    auth.isAuthenticated,
+    voiceChat.stopCurrentRequest,
+    voiceChat.chatState.message,
+    voiceChat.chatState.isStreaming
+  ]);
 
   const onSpeechEnd = useCallback(
     async (isValid: boolean, _audio: Float32Array) => {

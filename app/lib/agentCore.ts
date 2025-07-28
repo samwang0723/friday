@@ -45,10 +45,12 @@ export interface ClientContext {
 export class AgentCoreService {
   private baseURL: string;
   private streamTimeout: number;
+  private onLogout?: () => void;
 
-  constructor() {
+  constructor(onLogout?: () => void) {
     this.baseURL = agentCoreConfig.baseURL;
     this.streamTimeout = agentCoreConfig.streamTimeout;
+    this.onLogout = onLogout;
     console.info(
       `Initialized Agent-Core Engine with base URL: ${this.baseURL}`
     );
@@ -102,6 +104,10 @@ export class AgentCoreService {
 
   private async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
+      if (response.status === 401) {
+        console.warn("Received 401 Unauthorized - triggering logout");
+        this.onLogout?.();
+      }
       const errorText = await response.text().catch(() => "Unknown error");
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
@@ -213,6 +219,12 @@ export class AgentCoreService {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          console.warn(
+            "Received 401 Unauthorized in stream - triggering logout"
+          );
+          this.onLogout?.();
+        }
         await this.handleResponse(response);
       }
 

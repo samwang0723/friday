@@ -176,9 +176,12 @@ export function useVADManager(
   }, [context.isStreaming, onSpeechStartCallback]);
 
   // Memoize speech end callback to prevent recreation
-  const onSpeechEndCallback = useCallback((isValid: boolean, audio: Float32Array) => {
-    callbacks.onSpeechEnd?.(isValid, audio);
-  }, [callbacks.onSpeechEnd]);
+  const onSpeechEndCallback = useCallback(
+    (isValid: boolean, audio: Float32Array) => {
+      callbacks.onSpeechEnd?.(isValid, audio);
+    },
+    [callbacks.onSpeechEnd]
+  );
 
   const onSpeechEnd = useCallback(
     (audio: Float32Array) => {
@@ -596,19 +599,30 @@ export function useVADManager(
   }, []);
 
   // Memoize the state object to prevent infinite re-renders
-  const memoizedState = useMemo(() => ({
-    loading: vadState.loading,
-    errored: vadState.errored,
-    userSpeaking: vadState.shouldShowOrb,
-    actualUserSpeaking: vadState.actualUserSpeaking
-  }), [vadState.loading, vadState.errored, vadState.shouldShowOrb, vadState.actualUserSpeaking]);
+  const memoizedState = useMemo(
+    () => ({
+      loading: vadState.loading,
+      errored: vadState.errored,
+      userSpeaking: vadState.shouldShowOrb,
+      actualUserSpeaking: vadState.actualUserSpeaking
+    }),
+    [
+      vadState.loading,
+      vadState.errored,
+      vadState.shouldShowOrb,
+      vadState.actualUserSpeaking
+    ]
+  );
 
   // Memoize the entire return object
-  return useMemo(() => ({
-    state: memoizedState,
-    start,
-    pause,
-    isRunning: isActiveRef.current,
-    audioStream: audioStream
-  }), [memoizedState, start, pause, audioStream]);
+  return useMemo(
+    () => ({
+      state: memoizedState,
+      start,
+      pause,
+      isRunning: isActiveRef.current,
+      audioStream: audioStream
+    }),
+    [memoizedState, start, pause, audioStream]
+  );
 }

@@ -52,7 +52,7 @@ export function useRenderTracking(componentName: string, deps: any[] = []) {
     if (process.env.NODE_ENV === "development") {
       const now = Date.now();
       const timeSinceLastLog = now - lastLogTime.current;
-      
+
       // Throttle logging to prevent console spam (max once per 100ms)
       if (timeSinceLastLog < 100 && renderCount.current > 1) {
         prevDeps.current = deps;

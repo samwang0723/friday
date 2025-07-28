@@ -29,7 +29,7 @@ describe("useKeyboardShortcuts", () => {
     global.window.removeEventListener = jest.fn();
 
     // Mock console methods
-    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    jest.spyOn(console, "warn").mockImplementation(() => {});
 
     // Mock document methods
     Object.defineProperty(document, "activeElement", {
@@ -411,7 +411,10 @@ describe("useKeyboardShortcuts", () => {
       };
 
       expect(() => keydownHandler(escapeEvent)).not.toThrow();
-      expect(console.warn).toHaveBeenCalledWith('Failed to blur input:', expect.any(Error));
+      expect(console.warn).toHaveBeenCalledWith(
+        "Failed to blur input:",
+        expect.any(Error)
+      );
     });
 
     it("should handle events with missing properties", () => {

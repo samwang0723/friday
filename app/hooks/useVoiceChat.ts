@@ -41,7 +41,7 @@ export function useVoiceChat({
   // Store current values in refs to avoid stale closures
   const settingsRef = useRef(settings);
   const authRef = useRef(auth);
-  
+
   // Update refs on every render
   settingsRef.current = settings;
   authRef.current = auth;
@@ -66,128 +66,121 @@ export function useVoiceChat({
   const [messages, submit, isPending] = useActionState<
     Array<Message>,
     ChatSubmissionData
-  >(
-    async (prevMessages, data) => {
-      // Handle reset case for logout
-      if (typeof data === "string" && data === "__reset__") {
-        return [];
+  >(async (prevMessages, data) => {
+    // Handle reset case for logout
+    if (typeof data === "string" && data === "__reset__") {
+      return [];
+    }
+
+    if (!authRef.current.isAuthenticated) {
+      toast.error(t("auth.loginToContinue"));
+      return prevMessages;
+    }
+
+    try {
+      // Create new request controller (cancels any existing request)
+      const abortController = requestManager.createNewRequest();
+
+      // Stop any ongoing audio playback
+      player.stop();
+
+      // Track analytics
+      if (typeof data === "string") {
+        track("Text input");
+      } else if (data instanceof Blob) {
+        track("Speech input");
+      } else if (data && typeof data === "object" && "transcript" in data) {
+        track("Transcript input");
       }
 
-      if (!authRef.current.isAuthenticated) {
-        toast.error(t("auth.loginToContinue"));
+      // Update chat state to show streaming
+      setChatState(prev => ({
+        ...prev,
+        isStreaming: true,
+        message: ""
+      }));
+
+      const submittedAt = Date.now();
+      const accessToken = authRef.current.getToken();
+
+      // Submit chat request
+      const response = await voiceChatService.submitChat(
+        data,
+        prevMessages,
+        settingsRef.current,
+        accessToken,
+        abortController.signal
+      );
+
+      // Extract transcript from response
+      const transcript = voiceChatService.extractTranscript(response);
+      if (!transcript) {
+        setChatState(prev => ({ ...prev, isStreaming: false }));
+        toast.error(t("errors.noTranscript"));
         return prevMessages;
       }
 
-      try {
-        // Create new request controller (cancels any existing request)
-        const abortController = requestManager.createNewRequest();
+      setChatState(prev => ({ ...prev, input: transcript }));
 
-        // Stop any ongoing audio playback
-        player.stop();
+      // Create user message
+      const userMessage: Message = {
+        role: "user",
+        content: transcript
+      };
 
-        // Track analytics
-        if (typeof data === "string") {
-          track("Text input");
-        } else if (data instanceof Blob) {
-          track("Speech input");
-        } else if (data && typeof data === "object" && "transcript" in data) {
-          track("Transcript input");
-        }
+      const updatedMessages = [...prevMessages, userMessage];
 
-        // Update chat state to show streaming
-        setChatState(prev => ({
-          ...prev,
-          isStreaming: true,
-          message: ""
-        }));
+      // Handle different response types
+      const responseType = voiceChatService.getResponseType(response);
 
-        const submittedAt = Date.now();
-        const accessToken = authRef.current.getToken();
+      switch (responseType) {
+        case "single":
+          return await handleSingleResponse(response, userMessage, submittedAt);
 
-        // Submit chat request
-        const response = await voiceChatService.submitChat(
-          data,
-          prevMessages,
-          settingsRef.current,
-          accessToken,
-          abortController.signal
-        );
+        case "text-only":
+          return await handleTextOnlyResponse(
+            response,
+            userMessage,
+            submittedAt
+          );
 
-        // Extract transcript from response
-        const transcript = voiceChatService.extractTranscript(response);
-        if (!transcript) {
-          setChatState(prev => ({ ...prev, isStreaming: false }));
-          toast.error(t("errors.noTranscript"));
+        default:
+          return await handleStreamingResponse(
+            response,
+            updatedMessages,
+            submittedAt
+          );
+      }
+    } catch (error) {
+      setChatState(prev => ({ ...prev, isStreaming: false }));
+
+      if (error instanceof Error) {
+        if (error.name === "AbortError") {
+          console.log("Request was cancelled");
           return prevMessages;
         }
 
-        setChatState(prev => ({ ...prev, input: transcript }));
-
-        // Create user message
-        const userMessage: Message = {
-          role: "user",
-          content: transcript
-        };
-
-        const updatedMessages = [...prevMessages, userMessage];
-
-        // Handle different response types
-        const responseType = voiceChatService.getResponseType(response);
-
-        switch (responseType) {
-          case "single":
-            return await handleSingleResponse(
-              response,
-              userMessage,
-              submittedAt
-            );
-
-          case "text-only":
-            return await handleTextOnlyResponse(
-              response,
-              userMessage,
-              submittedAt
-            );
-
+        // Handle specific error types
+        switch (error.message) {
+          case "UNAUTHORIZED":
+            await authRef.current.logout();
+            toast.error(t("errors.sessionExpired"));
+            break;
+          case "TOO_MANY_REQUESTS":
+            toast.error(t("errors.tooManyRequests"));
+            break;
           default:
-            return await handleStreamingResponse(
-              response,
-              updatedMessages,
-              submittedAt
+            const translatedError = voiceChatService.translateError(
+              error.message,
+              t
             );
+            toast.error(translatedError);
         }
-      } catch (error) {
-        setChatState(prev => ({ ...prev, isStreaming: false }));
-
-        if (error instanceof Error) {
-          if (error.name === "AbortError") {
-            console.log("Request was cancelled");
-            return prevMessages;
-          }
-
-          // Handle specific error types
-          switch (error.message) {
-            case "UNAUTHORIZED":
-              await authRef.current.logout();
-              toast.error(t("errors.sessionExpired"));
-              break;
-            case "TOO_MANY_REQUESTS":
-              toast.error(t("errors.tooManyRequests"));
-              break;
-            default:
-              const translatedError = voiceChatService.translateError(
-                error.message,
-                t
-              );
-              toast.error(translatedError);
-          }
-        }
-
-        return prevMessages;
       }
-    },
-    []
-  );
+
+      return prevMessages;
+    }
+  }, []);
 
   // Memoize audio chunk handler to prevent recreation
   const handleAudioChunk = useCallback(
@@ -272,12 +265,9 @@ export function useVoiceChat({
     []
   );
 
-  const handleStreamError = useCallback(
-    (error: Error) => {
-      setChatState(prev => ({ ...prev, isStreaming: false }));
-    },
-    []
-  );
+  const handleStreamError = useCallback((error: Error) => {
+    setChatState(prev => ({ ...prev, isStreaming: false }));
+  }, []);
 
   // Handle streaming response
   const handleStreamingResponse = useCallback(
@@ -324,12 +314,7 @@ export function useVoiceChat({
         );
       });
     },
-    [
-      streamingProcessor,
-      handleTextUpdate,
-      handleAudioChunk,
-      handleStreamError
-    ]
+    [streamingProcessor, handleTextUpdate, handleAudioChunk, handleStreamError]
   );
 
   // Stop current request - remove dependencies to prevent infinite loops
@@ -347,23 +332,26 @@ export function useVoiceChat({
 
   // Memoize return object to prevent unnecessary re-renders
   // Only include stable properties of player in dependencies
-  return useMemo(() => ({
-    messages,
-    submit,
-    isPending,
-    chatState,
-    updateChatState,
-    stopCurrentRequest,
-    resetMessages,
-    player
-  }), [
-    messages,
-    submit,
-    isPending,
-    chatState,
-    updateChatState,
-    stopCurrentRequest,
-    resetMessages,
-    player.isPlayerInitialized // Only include stable property instead of entire player object
-  ]);
+  return useMemo(
+    () => ({
+      messages,
+      submit,
+      isPending,
+      chatState,
+      updateChatState,
+      stopCurrentRequest,
+      resetMessages,
+      player
+    }),
+    [
+      messages,
+      submit,
+      isPending,
+      chatState,
+      updateChatState,
+      stopCurrentRequest,
+      resetMessages,
+      player.isPlayerInitialized // Only include stable property instead of entire player object
+    ]
+  );
 }
