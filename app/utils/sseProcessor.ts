@@ -1,11 +1,10 @@
 import type {
-  StreamingState,
-  SSEventData,
-  TextEventData,
   AudioEventData,
   CompleteEventData,
   ErrorEventData,
-  AudioChunkData
+  SSEventData,
+  StreamingState,
+  TextEventData
 } from "@/types/voiceChat";
 
 export class SSEProcessor {
@@ -251,5 +250,9 @@ export class SSEProcessor {
 
   public stop(): void {
     this.cleanup();
+    // Trigger error callback to resolve hanging promises
+    if (this.onError) {
+      this.onError(new Error("STREAM_INTERRUPTED"));
+    }
   }
 }

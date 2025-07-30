@@ -21,7 +21,7 @@ const mockConsoleError = jest.spyOn(console, "error").mockImplementation();
 // Mock ReadableStream for streaming tests
 class MockReadableStream {
   private reader: any;
-  
+
   constructor(private chunks: string[]) {
     this.reader = {
       read: jest.fn().mockImplementation(() => {
@@ -216,7 +216,7 @@ describe("AgentCoreService", () => {
         status: 200,
         body: new MockReadableStream([
           'data: {"text": "Hello"}\n\n',
-          'data: [DONE]\n\n'
+          "data: [DONE]\n\n"
         ])
       } as any;
 
@@ -264,7 +264,7 @@ describe("AgentCoreService", () => {
           method: "POST",
           headers: expect.objectContaining({
             "Content-Type": "application/json",
-            "Authorization": "Bearer valid-token",
+            Authorization: "Bearer valid-token",
             "X-Client-Timezone": "UTC",
             "X-Client-Datetime": "2023-01-01T00:00:00Z",
             "X-Locale": "en"
@@ -299,7 +299,7 @@ describe("AgentCoreService", () => {
         body: new MockReadableStream([
           'data: {"text": "Hello"}\n\n',
           'data: {"text": " world"}\n\n',
-          'data: [DONE]\n\n'
+          "data: [DONE]\n\n"
         ])
       } as any;
 
@@ -321,9 +321,9 @@ describe("AgentCoreService", () => {
     it("should handle network errors", async () => {
       mockFetch.mockRejectedValue(new Error("Network error"));
 
-      await expect(
-        service.chat("test", "valid-token")
-      ).rejects.toThrow("Network error");
+      await expect(service.chat("test", "valid-token")).rejects.toThrow(
+        "Network error"
+      );
 
       expect(mockLogout).not.toHaveBeenCalled();
     });
@@ -336,9 +336,9 @@ describe("AgentCoreService", () => {
 
       mockFetch.mockResolvedValue(mockResponse);
 
-      await expect(
-        service.chat("test", "valid-token")
-      ).rejects.toThrow("Invalid JSON response from server");
+      await expect(service.chat("test", "valid-token")).rejects.toThrow(
+        "Invalid JSON response from server"
+      );
 
       expect(mockLogout).not.toHaveBeenCalled();
     });
@@ -354,7 +354,7 @@ describe("AgentCoreService", () => {
 
       const abortController = new AbortController();
       const generator = service.chatStream(
-        "test message", 
+        "test message",
         "valid-token",
         undefined,
         abortController.signal
@@ -403,9 +403,9 @@ describe("AgentCoreService", () => {
 
       mockFetch.mockResolvedValue(mockResponse);
 
-      await expect(
-        service.healthCheck({ locale: "en" })
-      ).rejects.toThrow("HTTP 401: Unauthorized");
+      await expect(service.healthCheck({ locale: "en" })).rejects.toThrow(
+        "HTTP 401: Unauthorized"
+      );
 
       expect(mockLogout).toHaveBeenCalledTimes(1);
     });
