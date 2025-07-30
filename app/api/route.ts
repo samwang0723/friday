@@ -24,15 +24,24 @@ class RequestManager {
     // Cancel any existing request for this token
     const existingController = this.activeRequests.get(token);
     if (existingController) {
-      console.log(
-        `Cancelling previous request for token: ${token.slice(0, 10)}...`
+      console.debug(
+        `RequestManager: Cancelling previous request for token: ${token.slice(0, 10)}...`
       );
       existingController.abort();
+
+      // Log the state to help debug cancellation issues
+      console.debug(
+        `RequestManager: Previous request aborted. Signal state: ${existingController.signal.aborted}`
+      );
     }
 
     // Create new controller for this request
     const controller = new AbortController();
     this.activeRequests.set(token, controller);
+
+    console.debug(
+      `RequestManager: Created new request for token: ${token.slice(0, 10)}...`
+    );
 
     return controller;
   }
@@ -42,7 +51,11 @@ class RequestManager {
    * @param token - Bearer token to cleanup
    */
   completeRequest(token: string): void {
+    const wasActive = this.activeRequests.has(token);
     this.activeRequests.delete(token);
+    console.debug(
+      `RequestManager: Completed request cleanup for token: ${token.slice(0, 10)}... (was active: ${wasActive})`
+    );
   }
 
   /**
@@ -112,6 +125,14 @@ export async function POST(request: Request) {
   // Create abort controller for this entire request and cancel any previous ones
   const abortController = requestManager.createRequest(accessToken);
 
+  // Ensure cleanup happens regardless of how the request ends
+  const cleanup = () => {
+    console.debug(
+      `Main: Cleaning up request for token: ${accessToken.slice(0, 10)}...`
+    );
+    requestManager.completeRequest(accessToken);
+  };
+
   try {
     const formData = await request.formData();
     console.log("FormData entries:");
@@ -137,7 +158,7 @@ export async function POST(request: Request) {
 
     // Check if request was cancelled during form parsing
     if (abortController.signal.aborted) {
-      console.log("Request cancelled during form parsing");
+      console.log("Main: Request cancelled during form parsing");
       return new Response("Request cancelled", { status: 200 });
     }
 
@@ -152,7 +173,7 @@ export async function POST(request: Request) {
 
     // Check if request was cancelled during transcription
     if (abortController.signal.aborted) {
-      console.log("Request cancelled during transcription");
+      console.log("Main: Request cancelled during transcription");
       return new Response("Request cancelled", { status: 200 });
     }
 
@@ -199,6 +220,9 @@ export async function POST(request: Request) {
       }
 
       if (abortController.signal.aborted) {
+        console.debug(
+          "Main: Request cancelled during non-streaming processing"
+        );
         return new Response("Request cancelled", { status: 200 });
       }
 
@@ -220,7 +244,7 @@ export async function POST(request: Request) {
         const audioBuffer = await audioResponse.arrayBuffer();
 
         // Clean up the request from tracking
-        requestManager.completeRequest(accessToken);
+        cleanup();
 
         // Return combined response with audio and text
         return new Response(audioBuffer, {
@@ -235,7 +259,7 @@ export async function POST(request: Request) {
         });
       } else {
         // Return text-only response when audio is disabled
-        requestManager.completeRequest(accessToken);
+        cleanup();
 
         return new Response("", {
           headers: {
@@ -261,6 +285,9 @@ export async function POST(request: Request) {
 
         // Listen for abort signal to immediately mark controller as closed
         abortController.signal.addEventListener("abort", () => {
+          console.debug(
+            "SSE: Abort signal received, marking controller as closed"
+          );
           isControllerClosed = true;
         });
 
@@ -268,6 +295,9 @@ export async function POST(request: Request) {
         const safeEnqueue = (data: Uint8Array): boolean => {
           // First check if we already know the controller is closed or request is aborted
           if (isControllerClosed || abortController.signal.aborted) {
+            console.debug(
+              "SSE: Skipping enqueue - controller closed or request aborted"
+            );
             return false;
           }
 
@@ -275,6 +305,7 @@ export async function POST(request: Request) {
             // Additional check: try to access controller properties to detect if it's closed
             // This is a more robust way to check controller state
             if (!controller || typeof controller.enqueue !== "function") {
+              console.debug("SSE: Controller is invalid, marking as closed");
               isControllerClosed = true;
               return false;
             }
@@ -288,12 +319,19 @@ export async function POST(request: Request) {
               error?.message?.includes("Controller is already closed") ||
               error?.message?.includes("already been closed")
             ) {
+              console.debug(
+                "SSE: Controller closed error detected:",
+                error?.message
+              );
               isControllerClosed = true;
               return false;
             }
 
             // Log other unexpected errors but still mark controller as closed
-            console.log("Controller enqueue failed:", error?.message || error);
+            console.debug(
+              "SSE: Controller enqueue failed:",
+              error?.message || error
+            );
             isControllerClosed = true;
             return false;
           }
@@ -302,12 +340,14 @@ export async function POST(request: Request) {
         // Safe close helper
         const safeClose = () => {
           if (isControllerClosed) {
+            console.debug("SSE: Controller already closed, skipping close");
             return; // Already closed, nothing to do
           }
 
           try {
             // Check if controller is still valid before closing
             if (controller && typeof controller.close === "function") {
+              console.debug("SSE: Closing controller");
               controller.close();
             }
             isControllerClosed = true;
@@ -318,12 +358,18 @@ export async function POST(request: Request) {
               error?.message?.includes("Controller is already closed") ||
               error?.message?.includes("already been closed")
             ) {
+              console.debug(
+                "SSE: Controller was already closed during close attempt"
+              );
               isControllerClosed = true;
               return;
             }
 
             // Log other unexpected errors
-            console.log("Controller close failed:", error?.message || error);
+            console.debug(
+              "SSE: Controller close failed:",
+              error?.message || error
+            );
             isControllerClosed = true;
           }
         };
@@ -350,6 +396,9 @@ export async function POST(request: Request) {
           async function* textWithSSE() {
             for await (const chunk of textStream) {
               if (abortController.signal.aborted || isControllerClosed) {
+                console.debug(
+                  "SSE: Text streaming interrupted - abort signal or controller closed"
+                );
                 break;
               }
 
@@ -365,12 +414,16 @@ export async function POST(request: Request) {
               })}\n\n`;
 
               if (!safeEnqueue(encoder.encode(textEvent))) {
+                console.debug(
+                  "SSE: Text streaming stopped - failed to enqueue"
+                );
                 break; // Stop if we can't enqueue (controller closed)
               }
 
               // Pass chunk to TTS
               yield chunk;
             }
+            console.debug("SSE: Text streaming completed");
           }
 
           // Create audio stream from text only if audioEnabled is true
@@ -486,6 +539,10 @@ export async function POST(request: Request) {
 
           safeClose();
         } catch (error) {
+          console.debug(
+            "SSE: Error in streaming pipeline:",
+            error instanceof Error ? error.message : error
+          );
           // Send error event only if controller is still open
           if (!isControllerClosed && !abortController.signal.aborted) {
             const errorEvent = `event: error\ndata: ${JSON.stringify({
@@ -499,7 +556,7 @@ export async function POST(request: Request) {
     });
 
     // Clean up the request from tracking since it completed successfully
-    requestManager.completeRequest(accessToken);
+    cleanup();
 
     console.timeEnd(
       "streaming completion " + request.headers.get("x-vercel-id") || "local"
@@ -525,11 +582,11 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     // Clean up the request from tracking if it failed
-    requestManager.completeRequest(accessToken);
+    cleanup();
 
     // Handle AbortError specifically (when request was cancelled)
     if (error instanceof Error && error.name === "AbortError") {
-      console.log("Request was cancelled by newer request");
+      console.debug("Main: Request was cancelled by newer request");
       return new Response("Request cancelled", { status: 200 });
     }
 

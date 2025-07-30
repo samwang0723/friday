@@ -403,7 +403,7 @@ describe("useStreamingProcessor", () => {
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "Error processing SSE stream:",
+        "StreamingProcessor: Error processing SSE stream:",
         processingError
       );
       expect(callbacks.onError).toHaveBeenCalledWith(processingError);

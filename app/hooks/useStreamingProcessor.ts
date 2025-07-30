@@ -1,6 +1,6 @@
-import { useCallback, useRef } from "react";
 import type { StreamingProcessorHookReturn } from "@/types/voiceChat";
 import { SSEProcessor } from "@/utils/sseProcessor";
+import { useCallback, useRef } from "react";
 
 export function useStreamingProcessor(): StreamingProcessorHookReturn {
   const processorRef = useRef<SSEProcessor | null>(null);
@@ -16,6 +16,9 @@ export function useStreamingProcessor(): StreamingProcessorHookReturn {
     ): Promise<void> => {
       // Clean up any existing processor
       if (processorRef.current) {
+        console.debug(
+          "StreamingProcessor: Stopping existing processor for new stream"
+        );
         processorRef.current.stop();
       }
 
@@ -29,11 +32,19 @@ export function useStreamingProcessor(): StreamingProcessorHookReturn {
       );
 
       try {
+        console.debug("StreamingProcessor: Starting stream processing");
         await processorRef.current.processStream(response);
+        console.debug(
+          "StreamingProcessor: Stream processing completed successfully"
+        );
       } catch (error) {
-        console.error("Error processing SSE stream:", error);
+        console.error(
+          "StreamingProcessor: Error processing SSE stream:",
+          error
+        );
         onError(error as Error);
       } finally {
+        console.debug("StreamingProcessor: Cleaning up processor");
         processorRef.current = null;
       }
     },
@@ -42,15 +53,8 @@ export function useStreamingProcessor(): StreamingProcessorHookReturn {
 
   const stopTypingAnimation = useCallback(() => {
     if (processorRef.current) {
+      console.debug("StreamingProcessor: Stopping typing animation");
       processorRef.current.stop();
-    }
-  }, []);
-
-  // Cleanup on unmount
-  const cleanup = useCallback(() => {
-    if (processorRef.current) {
-      processorRef.current.stop();
-      processorRef.current = null;
     }
   }, []);
 

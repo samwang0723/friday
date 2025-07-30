@@ -1,24 +1,25 @@
-import {
-  useState,
-  useCallback,
-  useActionState,
-  startTransition,
-  useMemo,
-  useRef
-} from "react";
-import { toast } from "sonner";
-import { track } from "@vercel/analytics";
-import { useTranslations } from "next-intl";
-import type {
-  Message,
-  ChatState,
-  ChatSubmissionData,
-  VoiceChatHookReturn
-} from "@/types/voiceChat";
-import { VoiceChatService } from "@/services/voiceChatService";
 import { useRequestManager } from "@/hooks/useRequestManager";
 import { useStreamingProcessor } from "@/hooks/useStreamingProcessor";
 import { useAudioPlayer } from "@/lib/hooks/useAudioPlayer";
+import { VoiceChatService } from "@/services/voiceChatService";
+import type {
+  ChatState,
+  ChatSubmissionData,
+  Message,
+  VoiceChatHookReturn
+} from "@/types/voiceChat";
+import { track } from "@vercel/analytics";
+import { useTranslations } from "next-intl";
+import {
+  startTransition,
+  useActionState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
+import { toast } from "sonner";
 
 interface UseVoiceChatProps {
   settings: any;
@@ -69,10 +70,12 @@ export function useVoiceChat({
   >(async (prevMessages, data) => {
     // Handle reset case for logout
     if (typeof data === "string" && data === "__reset__") {
+      setChatState(prev => ({ ...prev, isStreaming: false }));
       return [];
     }
 
     if (!authRef.current.isAuthenticated) {
+      setChatState(prev => ({ ...prev, isStreaming: false }));
       toast.error(t("auth.loginToContinue"));
       return prevMessages;
     }
@@ -152,11 +155,14 @@ export function useVoiceChat({
           );
       }
     } catch (error) {
+      console.error("VoiceChat: Error in chat submission:", error);
       setChatState(prev => ({ ...prev, isStreaming: false }));
 
       if (error instanceof Error) {
         if (error.name === "AbortError") {
-          console.log("Request was cancelled");
+          console.error(
+            "VoiceChat: Request was cancelled - returning previous messages"
+          );
           return prevMessages;
         }
 
@@ -168,6 +174,9 @@ export function useVoiceChat({
             break;
           case "TOO_MANY_REQUESTS":
             toast.error(t("errors.tooManyRequests"));
+            break;
+          case "STREAM_INTERRUPTED":
+            console.error("VoiceChat: Stream interrupted");
             break;
           default:
             const translatedError = voiceChatService.translateError(
@@ -267,6 +276,10 @@ export function useVoiceChat({
 
   const handleStreamError = useCallback((error: Error) => {
     setChatState(prev => ({ ...prev, isStreaming: false }));
+    // Don't show toast for intentional interruptions
+    if (error.message !== "Stream was interrupted") {
+      console.error("Stream error:", error);
+    }
   }, []);
 
   // Handle streaming response
@@ -279,6 +292,22 @@ export function useVoiceChat({
       return new Promise<Message[]>((resolve, reject) => {
         let finalMessage = "";
         let finalLatency = 0;
+        let completed = false;
+
+        // Set up timeout to prevent endless loading
+        const timeout = setTimeout(() => {
+          if (!completed) {
+            console.warn("VoiceChat: Stream timeout after 60 seconds");
+            completed = true;
+            setChatState(prev => ({ ...prev, isStreaming: false }));
+            reject(new Error("Stream timeout"));
+          }
+        }, 60000); // 60 second timeout
+
+        const cleanup = () => {
+          clearTimeout(timeout);
+          completed = true;
+        };
 
         streamingProcessor.processSSEStream(
           response,
@@ -286,6 +315,9 @@ export function useVoiceChat({
           handleAudioChunk,
           // onStreamComplete
           (finalText: string, latency: number) => {
+            if (completed) return;
+            cleanup();
+
             finalMessage = finalText;
             finalLatency = latency;
 
@@ -307,6 +339,10 @@ export function useVoiceChat({
           },
           // onError
           (error: Error) => {
+            if (completed) return;
+            cleanup();
+
+            setChatState(prev => ({ ...prev, isStreaming: false }));
             handleStreamError(error);
             reject(error);
           },
@@ -319,6 +355,7 @@ export function useVoiceChat({
 
   // Stop current request - remove dependencies to prevent infinite loops
   const stopCurrentRequest = useCallback(() => {
+    console.debug("VoiceChat: Stopping current request");
     requestManager.cancelCurrentRequest();
     player.stop();
     streamingProcessor.stopTypingAnimation();
@@ -329,6 +366,88 @@ export function useVoiceChat({
   const resetMessages = useCallback(() => {
     startTransition(() => submit("__reset__"));
   }, []); // Empty deps - submit should be stable from useActionState
+
+  // State consistency validation
+  const validateComponentState = useCallback(() => {
+    const issues = [];
+
+    // Check if streaming state is consistent with request manager
+    if (chatState.isStreaming && !requestManager.isProcessing) {
+      issues.push(
+        "Chat state shows streaming but request manager is not processing"
+      );
+    }
+
+    if (!chatState.isStreaming && requestManager.isProcessing) {
+      issues.push("Request manager is processing but chat state not streaming");
+    }
+
+    // Check if isPending from useActionState is consistent
+    if (isPending && !chatState.isStreaming) {
+      issues.push("useActionState isPending but chat state not streaming");
+    }
+
+    if (issues.length > 0) {
+      console.warn("VoiceChat: State consistency issues detected:", issues);
+
+      // Auto-correct common inconsistencies
+      if (chatState.isStreaming && !requestManager.isProcessing) {
+        console.debug("VoiceChat: Auto-correcting streaming state");
+        setChatState(prev => ({ ...prev, isStreaming: false }));
+      }
+    }
+
+    return issues.length === 0;
+  }, [chatState.isStreaming, requestManager.isProcessing, isPending]);
+
+  // Periodic state validation and stuck loading detection
+  useEffect(() => {
+    let stuckLoadingTimeout: NodeJS.Timeout;
+
+    if (chatState.isStreaming && !requestManager.isProcessing) {
+      // If we're showing streaming but not actually processing, we might be stuck
+      stuckLoadingTimeout = setTimeout(() => {
+        console.warn(
+          "VoiceChat: Detected stuck loading state, auto-recovering"
+        );
+        setChatState(prev => ({ ...prev, isStreaming: false }));
+        toast.error("Request timed out. Please try again.");
+      }, 10000); // 10 second detection for stuck states
+    }
+
+    // Development-only validation
+    if (process.env.NODE_ENV === "development") {
+      const validationInterval = setInterval(validateComponentState, 3000);
+      return () => {
+        clearInterval(validationInterval);
+        clearTimeout(stuckLoadingTimeout);
+      };
+    }
+
+    return () => clearTimeout(stuckLoadingTimeout);
+  }, [
+    chatState.isStreaming,
+    requestManager.isProcessing,
+    validateComponentState
+  ]);
+
+  // Reset loading state when auth changes or component unmounts
+  useEffect(() => {
+    if (!auth.isAuthenticated && chatState.isStreaming) {
+      console.debug("VoiceChat: Resetting loading state due to auth change");
+      setChatState(prev => ({ ...prev, isStreaming: false }));
+    }
+  }, [auth.isAuthenticated, chatState.isStreaming]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (chatState.isStreaming) {
+        console.debug("VoiceChat: Cleaning up loading state on unmount");
+        setChatState(prev => ({ ...prev, isStreaming: false }));
+      }
+    };
+  }, []);
 
   // Memoize return object to prevent unnecessary re-renders
   // Only include stable properties of player in dependencies

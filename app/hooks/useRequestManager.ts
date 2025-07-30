@@ -1,5 +1,5 @@
-import { useRef, useCallback, useState, useEffect, useMemo } from "react";
 import type { RequestManagerHookReturn } from "@/types/voiceChat";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useRequestManager(): RequestManagerHookReturn {
   const currentControllerRef = useRef<AbortController | null>(null);
@@ -11,7 +11,7 @@ export function useRequestManager(): RequestManagerHookReturn {
   const createNewRequest = useCallback((): AbortController => {
     // Cancel current request if it exists
     if (currentControllerRef.current) {
-      console.log("Cancelling previous request");
+      console.log("RequestManager: Cancelling previous client-side request");
       currentControllerRef.current.abort();
       // Don't wait for the event listener - immediately clear the ref
       currentControllerRef.current = null;
@@ -25,8 +25,11 @@ export function useRequestManager(): RequestManagerHookReturn {
     setCurrentController(newController);
     setIsProcessing(true);
 
+    console.debug("RequestManager: Created new client-side request controller");
+
     // Set up abort handler to update processing state
     newController.signal.addEventListener("abort", () => {
+      console.debug("RequestManager: Client-side request aborted");
       // Only update state if this controller is still the current one
       if (currentControllerRef.current === newController) {
         setIsProcessing(false);
@@ -41,17 +44,10 @@ export function useRequestManager(): RequestManagerHookReturn {
   // Cancel current request without creating a new one
   const cancelCurrentRequest = useCallback(() => {
     if (currentControllerRef.current) {
-      console.log("Manually cancelling current request");
+      console.debug(
+        "RequestManager: Manually cancelling current client-side request"
+      );
       currentControllerRef.current.abort();
-      currentControllerRef.current = null;
-      setCurrentController(null);
-      setIsProcessing(false);
-    }
-  }, []);
-
-  // Mark request as completed
-  const completeCurrentRequest = useCallback(() => {
-    if (currentControllerRef.current) {
       currentControllerRef.current = null;
       setCurrentController(null);
       setIsProcessing(false);
