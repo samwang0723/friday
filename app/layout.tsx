@@ -47,7 +47,7 @@ export default async function RootLayout({
               {children}
             </main>
 
-            <Toaster richColors theme="system" />
+            <Toaster richColors theme="system" position="bottom-left" />
             <Analytics />
           </NotificationProvider>
         </NextIntlClientProvider>
