@@ -191,6 +191,13 @@ export const authService = {
       }
 
       if (code) {
+        // Clean up URL immediately to prevent duplicate calls
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname
+        );
+
         const redirectUri = `${window.location.origin}${window.location.pathname}`;
         const userData = await apiCall("/auth/oauth/token", {
           code,
@@ -207,12 +214,6 @@ export const authService = {
           token: userData.access_token
         });
 
-        // Clean up URL
-        window.history.replaceState(
-          {},
-          document.title,
-          window.location.pathname
-        );
         return true;
       }
 
