@@ -54,7 +54,7 @@ export function sanitizeTextForTTS(
     // Remove table syntax (| cell |)
     .replace(/\|/g, " ")
     // Remove HTML tags
-    .replace(/<[^>]*>/g, "")
+    .replace(/(<([^>]+)>)/gi, "")
     // Remove URLs that aren't in markdown format
     .replace(/https?:\/\/[^\s]+/g, "")
     // Remove email addresses
