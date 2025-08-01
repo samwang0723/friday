@@ -159,7 +159,17 @@ export class AgentCoreService {
           context?.clientDatetime,
           context?.locale
         ),
-        body: JSON.stringify({ message })
+        body: JSON.stringify({
+          message: {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: message
+              }
+            ]
+          }
+        })
       });
 
       return await this.handleResponse<ChatResponse>(response);
@@ -214,7 +224,17 @@ export class AgentCoreService {
       const response = await fetch(`${this.baseURL}/chat/stream`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({
+          message: {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: message
+              }
+            ]
+          }
+        }),
         signal: controller.signal
       });
 
