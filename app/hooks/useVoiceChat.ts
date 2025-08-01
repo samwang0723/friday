@@ -383,8 +383,9 @@ export function useVoiceChat({
     }
 
     // Check if isPending from useActionState is consistent
-    if (isPending && !chatState.isStreaming) {
-      issues.push("useActionState isPending but chat state not streaming");
+    // Only flag this as an issue if there's an actual processing mismatch
+    if (isPending && !chatState.isStreaming && !requestManager.isProcessing) {
+      issues.push("useActionState isPending but no active processing");
     }
 
     if (issues.length > 0) {

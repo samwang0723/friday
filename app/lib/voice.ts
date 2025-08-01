@@ -26,16 +26,56 @@ export function sanitizeTextForTTS(
     return null;
   }
 
-  if (cleanText.length < minLength) {
-    console.warn("Text chunk too short, skipping:", cleanText);
+  // Remove markdown links entirely [text](url) or [text](url "title")
+  let sanitizedText = cleanText.replace(/\[([^\]]*)\]\([^)]*\)/g, "");
+
+  // Remove markdown image links entirely ![alt](url) or ![alt](url "title")
+  sanitizedText = sanitizedText.replace(/!\[([^\]]*)\]\([^)]*\)/g, "");
+
+  // Remove markdown formatting characters
+  sanitizedText = sanitizedText
+    // Remove headers (# ## ### etc.)
+    .replace(/^#{1,6}\s*/gm, "")
+    // Remove bold and italic (**text**, __text__, *text*, _text_)
+    .replace(/(\*{1,2}|_{1,2})(.*?)\1/g, "$2")
+    // Remove strikethrough (~~text~~)
+    .replace(/~~(.*?)~~/g, "$1")
+    // Remove inline code (`text`)
+    .replace(/`([^`]*)`/g, "$1")
+    // Remove code blocks (```code```)
+    .replace(/```[\s\S]*?```/g, "")
+    // Remove blockquotes (> text)
+    .replace(/^>\s*/gm, "")
+    // Remove horizontal rules (--- or ***)
+    .replace(/^(-{3,}|\*{3,}|_{3,})$/gm, "")
+    // Remove list markers (- * + 1. 2. etc.)
+    .replace(/^[\s]*[-*+]\s*/gm, "")
+    .replace(/^[\s]*\d+\.\s*/gm, "")
+    // Remove table syntax (| cell |)
+    .replace(/\|/g, " ")
+    // Remove HTML tags
+    .replace(/(<([^>]+)>)/gi, "")
+    // Remove URLs that aren't in markdown format
+    .replace(/https?:\/\/[^\s]+/g, "")
+    // Remove email addresses
+    .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, "")
+    // Remove control characters and non-printable characters
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+    // Remove excessive punctuation (more than 3 consecutive)
+    .replace(/([.!?]){4,}/g, "$1$1$1")
+    // Normalize whitespace (multiple spaces, tabs, newlines)
+    .replace(/\s+/g, " ")
+    // Remove standalone punctuation marks
+    .replace(/^\s*[.!?,:;]\s*/g, "")
+    .trim();
+
+  if (sanitizedText.length < minLength) {
+    console.warn(
+      "Text chunk too short after sanitization, skipping:",
+      sanitizedText
+    );
     return null;
   }
-
-  // Remove problematic characters that might cause API issues
-  const sanitizedText = cleanText
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "") // Remove control characters
-    .replace(/\s+/g, " ") // Normalize whitespace
-    .trim();
 
   if (!sanitizedText) {
     console.warn("Text chunk empty after sanitization, skipping");

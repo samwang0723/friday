@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import DOMPurify from "dompurify";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 import Link from "./Link";
@@ -21,6 +22,22 @@ interface MessageDisplayProps {
   currentMessage: string;
   messages: Message[];
   vadState: VADState;
+}
+
+function parseMarkdown(content: string) {
+  // Simple regex-based parsing for inline markdown elements
+  const html = content
+    // Convert **bold** to <strong>bold</strong>
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    // Convert [text](url) to <a href="url" target="_blank" rel="noopener noreferrer">text</a>
+    .replace(
+      /\[([^\]]+)\]\(([^)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-700">$1</a>'
+    );
+
+  return DOMPurify.sanitize(html, {
+    ADD_ATTR: ["target", "rel", "class"]
+  });
 }
 
 export default function MessageDisplay({
@@ -72,20 +89,27 @@ export default function MessageDisplay({
         )}
 
         {!authLoading && isAuthenticated && currentMessage && (
-          <p className="pb-4 pt-2">{currentMessage}</p>
+          <div
+            className="pb-4 pt-2"
+            dangerouslySetInnerHTML={{ __html: parseMarkdown(currentMessage) }}
+          />
         )}
 
         {!authLoading &&
           isAuthenticated &&
           messages.length > 0 &&
           !currentMessage && (
-            <p className="pb-4 pt-2">
-              {messages.at(-1)?.content}
+            <div className="pb-4 pt-2">
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: parseMarkdown(messages.at(-1)?.content ?? "")
+                }}
+              />
               <span className="text-xs font-mono text-neutral-300 dark:text-neutral-700">
                 {" "}
                 ({messages.at(-1)?.latency}ms)
               </span>
-            </p>
+            </div>
           )}
 
         {!authLoading &&
