@@ -370,7 +370,7 @@ export function useVoiceChat({
                   break;
 
                 case "text":
-                  accumulatedText += data.data;
+                  accumulatedText += `${data.data} `;
                   startTransition(() => {
                     setChatState(prev => ({
                       ...prev,
