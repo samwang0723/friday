@@ -93,17 +93,6 @@ export interface VoiceChatConfig {
   vadRestartDelay: number;
 }
 
-export interface VoiceRealtimeSettings {
-  voiceRealtime?: boolean;
-  sttEngine?: string;
-  ttsEngine?: string;
-  audioEnabled?: boolean;
-  streaming?: boolean;
-  includeText?: boolean;
-  textFormat?: string;
-  includeMetadata?: boolean;
-}
-
 export interface VoiceChatHookReturn {
   messages: Message[];
   submit: (data: ChatSubmissionData) => void;

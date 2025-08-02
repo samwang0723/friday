@@ -48,7 +48,9 @@ describe("SSEProcessor", () => {
       onAudioChunk,
       onStreamComplete,
       onError,
-      Date.now()
+      Date.now(),
+      undefined, // onTranscript callback
+      undefined  // onStatus callback
     );
 
     // Mock atob for base64 decoding in this test (overrides global)
@@ -95,6 +97,9 @@ describe("SSEProcessor", () => {
     ]) as any;
 
     await processor.processStream(mockResponse);
+
+    // Wait for typing animation to complete before checking the callback
+    await new Promise(resolve => setTimeout(resolve, 200));
 
     expect(onStreamComplete).toHaveBeenCalledWith(
       "Hello World",

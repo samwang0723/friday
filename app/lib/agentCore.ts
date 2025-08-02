@@ -381,14 +381,13 @@ export class AgentCoreService {
 
   async *voiceStream(
     audioFile: File,
-    ttsEngine: "cartesia" | "elevenlabs" | "minimax",
+    ttsEngine: "cartesia" | "elevenlabs" | "cartesiachinese",
     token: string,
     context?: ClientContext,
     externalAbort?: AbortSignal,
     settings?: {
       audioEnabled?: boolean;
       includeText?: boolean;
-      textFormat?: string;
       includeMetadata?: boolean;
     }
   ): AsyncGenerator<SseStreamResponse> {
@@ -428,9 +427,6 @@ export class AgentCoreService {
       const queryParams = new URLSearchParams();
       if (settings?.includeText !== undefined) {
         queryParams.append("include_text", settings.includeText.toString());
-      }
-      if (settings?.textFormat) {
-        queryParams.append("text_format", settings.textFormat);
       }
       if (settings?.includeMetadata !== undefined) {
         queryParams.append(

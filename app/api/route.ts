@@ -444,14 +444,13 @@ export async function POST(request: Request) {
 
           const voiceStream = agentCore.voiceStream(
             data.input,
-            settings.ttsEngine as "cartesia" | "elevenlabs" | "minimax",
+            settings.ttsEngine as "cartesia" | "elevenlabs" | "cartesiachinese",
             accessToken as string,
             clientContext,
             abortController.signal,
             {
               audioEnabled: settings.audioEnabled,
               includeText: true,
-              textFormat: "text",
               includeMetadata: true
             }
           );
