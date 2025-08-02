@@ -294,6 +294,44 @@ export function useVoiceChat({
 
       let userTranscript = "";
       let accumulatedText = "";
+      let displayedText = "";
+      let typingTimeoutId: NodeJS.Timeout | null = null;
+      let isTyping = false;
+
+      // Typing animation function
+      const startTypingAnimation = () => {
+        if (isTyping) {
+          return; // Already typing
+        }
+
+        isTyping = true;
+
+        const typeNextChar = () => {
+          if (displayedText.length < accumulatedText.length) {
+            displayedText = accumulatedText.substring(
+              0,
+              displayedText.length + 1
+            );
+
+            // Force immediate React render without startTransition
+            setChatState(prev => {
+              return {
+                ...prev,
+                message: displayedText,
+                streamPhase: "text"
+              };
+            });
+
+            // Continue typing with a shorter delay for faster animation
+            typingTimeoutId = setTimeout(typeNextChar, 10); // 10ms per character for smooth streaming
+          } else {
+            typingTimeoutId = null;
+            isTyping = false;
+          }
+        };
+
+        typeNextChar();
+      };
 
       try {
         if (!response.body) {
@@ -371,13 +409,7 @@ export function useVoiceChat({
 
                 case "text":
                   accumulatedText += `${data.data} `;
-                  startTransition(() => {
-                    setChatState(prev => ({
-                      ...prev,
-                      message: accumulatedText,
-                      streamPhase: "text"
-                    }));
-                  });
+                  startTypingAnimation();
                   break;
 
                 case "audio":
@@ -403,35 +435,81 @@ export function useVoiceChat({
 
                 case "status":
                   // Handle status updates (optional UI feedback)
+                  console.log("Status update:", data.message);
                   break;
 
                 case "complete":
-                  const finalMessage = data.fullText || accumulatedText;
+                  // Store the final complete text separately - don't update accumulatedText yet
+                  let finalCompleteText = data.fullText || accumulatedText;
+
+                  // Don't update accumulatedText here - let typing animation continue with current text
+                  // We'll use finalCompleteText only for the final message creation
+
+                  // We'll use finalCompleteText for the final message
                   const finalLatency = Date.now() - submittedAt;
 
-                  // Create messages
-                  const userMessage: Message = {
-                    role: "user",
-                    content: userTranscript || "Audio input"
+                  // Wait for typing animation to complete naturally before finishing
+                  const waitForTypingAndComplete = async () => {
+                    // First wait for current accumulated text to finish typing
+                    while (
+                      isTyping ||
+                      displayedText.length < accumulatedText.length
+                    ) {
+                      await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+
+                    // If there's more text in the complete message, continue typing that too
+                    if (finalCompleteText.length > accumulatedText.length) {
+                      accumulatedText = finalCompleteText;
+                      if (!isTyping) {
+                        startTypingAnimation();
+                      }
+
+                      // Wait for the complete text to finish typing
+                      while (
+                        isTyping ||
+                        displayedText.length < accumulatedText.length
+                      ) {
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                      }
+                    }
+
+                    // Create messages
+                    const userMessage: Message = {
+                      role: "user",
+                      content: userTranscript || "Audio input"
+                    };
+
+                    const assistantMessage: Message = {
+                      role: "assistant",
+                      content: finalCompleteText,
+                      latency: finalLatency
+                    };
+
+                    // Clean up typing animation
+                    if (typingTimeoutId) {
+                      clearTimeout(typingTimeoutId);
+                      typingTimeoutId = null;
+                    }
+                    isTyping = false;
+
+                    // Small delay before showing completion
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                    // Reset state
+                    startTransition(() => {
+                      setChatState(prev => ({
+                        ...prev,
+                        isStreaming: false,
+                        message: "",
+                        streamPhase: "completed"
+                      }));
+                    });
+
+                    return [...prevMessages, userMessage, assistantMessage];
                   };
 
-                  const assistantMessage: Message = {
-                    role: "assistant",
-                    content: finalMessage,
-                    latency: finalLatency
-                  };
-
-                  // Reset state
-                  startTransition(() => {
-                    setChatState(prev => ({
-                      ...prev,
-                      isStreaming: false,
-                      message: "",
-                      streamPhase: "completed"
-                    }));
-                  });
-
-                  return [...prevMessages, userMessage, assistantMessage];
+                  return await waitForTypingAndComplete();
 
                 case "error":
                   throw new Error(data.message || "Stream error");
@@ -454,6 +532,13 @@ export function useVoiceChat({
           latency: Date.now() - submittedAt
         };
 
+        // Clean up typing animation
+        if (typingTimeoutId) {
+          clearTimeout(typingTimeoutId);
+          typingTimeoutId = null;
+        }
+        isTyping = false;
+
         setChatState(prev => ({
           ...prev,
           isStreaming: false,
@@ -475,6 +560,13 @@ export function useVoiceChat({
           "Error stack:",
           error instanceof Error ? error.stack : "No stack trace"
         );
+
+        // Clean up typing animation
+        if (typingTimeoutId) {
+          clearTimeout(typingTimeoutId);
+          typingTimeoutId = null;
+        }
+        isTyping = false;
 
         startTransition(() => {
           setChatState(prev => ({ ...prev, isStreaming: false }));
