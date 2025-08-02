@@ -1,5 +1,4 @@
 import { useRequestManager } from "@/hooks/useRequestManager";
-import { useStreamingProcessor } from "@/hooks/useStreamingProcessor";
 import { useAudioPlayer } from "@/lib/hooks/useAudioPlayer";
 import { VoiceChatService } from "@/services/voiceChatService";
 import type {
@@ -37,7 +36,6 @@ export function useVoiceChat({
   const t = useTranslations();
   const player = useAudioPlayer();
   const requestManager = useRequestManager();
-  const streamingProcessor = useStreamingProcessor();
 
   // Store current values in refs to avoid stale closures
   const settingsRef = useRef(settings);
@@ -55,7 +53,9 @@ export function useVoiceChat({
     isStreaming: false,
     message: "",
     input: "",
-    agentCoreInitialized: false
+    agentCoreInitialized: false,
+    streamPhase: undefined,
+    audioPlayerReady: false
   });
 
   // Helper function to update chat state
@@ -68,8 +68,12 @@ export function useVoiceChat({
     Array<Message>,
     ChatSubmissionData
   >(async (prevMessages, data) => {
+    console.log("🎯 useActionState called with data:", data);
+    console.log("Previous messages count:", prevMessages.length);
+
     // Handle reset case for logout
     if (typeof data === "string" && data === "__reset__") {
+      console.log("Reset case detected");
       setChatState(prev => ({ ...prev, isStreaming: false }));
       return [];
     }
@@ -115,45 +119,17 @@ export function useVoiceChat({
         abortController.signal
       );
 
-      // Extract transcript from response
-      const transcript = voiceChatService.extractTranscript(response);
-      if (!transcript) {
-        setChatState(prev => ({ ...prev, isStreaming: false }));
-        toast.error(t("errors.noTranscript"));
-        return prevMessages;
-      }
+      // All responses are now realtime SSE streams - bypass legacy logic
+      console.log(
+        "About to call handleStreamingResponse with response:",
+        response
+      );
+      console.log(
+        "Response headers:",
+        Object.fromEntries(response.headers.entries())
+      );
 
-      setChatState(prev => ({ ...prev, input: transcript }));
-
-      // Create user message
-      const userMessage: Message = {
-        role: "user",
-        content: transcript
-      };
-
-      const updatedMessages = [...prevMessages, userMessage];
-
-      // Handle different response types
-      const responseType = voiceChatService.getResponseType(response);
-
-      switch (responseType) {
-        case "single":
-          return await handleSingleResponse(response, userMessage, submittedAt);
-
-        case "text-only":
-          return await handleTextOnlyResponse(
-            response,
-            userMessage,
-            submittedAt
-          );
-
-        default:
-          return await handleStreamingResponse(
-            response,
-            updatedMessages,
-            submittedAt
-          );
-      }
+      return await handleStreamingResponse(response, prevMessages, submittedAt);
     } catch (error) {
       console.error("VoiceChat: Error in chat submission:", error);
       setChatState(prev => ({ ...prev, isStreaming: false }));
@@ -176,7 +152,14 @@ export function useVoiceChat({
             toast.error(t("errors.tooManyRequests"));
             break;
           case "STREAM_INTERRUPTED":
+          case "STREAM_ABORTED":
             console.error("VoiceChat: Stream interrupted");
+            break;
+          case "NETWORK_ERROR":
+            toast.error("Network connection lost. Please try again.");
+            break;
+          case "STREAM_TIMEOUT":
+            toast.error("Request timed out. Please try again.");
             break;
           default:
             const translatedError = voiceChatService.translateError(
@@ -193,7 +176,17 @@ export function useVoiceChat({
 
   // Memoize audio chunk handler to prevent recreation
   const handleAudioChunk = useCallback(
-    (chunk: ArrayBuffer) => player.playAudioChunk(chunk),
+    (chunk: ArrayBuffer) => {
+      // Update stream phase to audio when first chunk arrives
+      setChatState(prev => ({
+        ...prev,
+        streamPhase:
+          prev.streamPhase === "transcript" || prev.streamPhase === "text"
+            ? "audio"
+            : prev.streamPhase
+      }));
+      player.playAudioChunk(chunk);
+    },
     [player]
   );
 
@@ -268,12 +261,7 @@ export function useVoiceChat({
     [voiceChatService, t]
   );
 
-  // Memoize streaming callbacks to prevent recreation
-  const handleTextUpdate = useCallback(
-    (text: string) => setChatState(prev => ({ ...prev, message: text })),
-    []
-  );
-
+  // Simplified stream error handler
   const handleStreamError = useCallback((error: Error) => {
     setChatState(prev => ({ ...prev, isStreaming: false }));
     // Don't show toast for intentional interruptions
@@ -282,75 +270,219 @@ export function useVoiceChat({
     }
   }, []);
 
-  // Handle streaming response
+  // Handle streaming response - simplified direct implementation
   const handleStreamingResponse = useCallback(
     async (
       response: Response,
-      updatedMessages: Message[],
+      prevMessages: Message[],
       submittedAt: number
     ): Promise<Message[]> => {
-      return new Promise<Message[]>((resolve, reject) => {
-        let finalMessage = "";
-        let finalLatency = 0;
-        let completed = false;
+      // Initialize audio player immediately
+      player.initAudioPlayer().catch(error => {
+        console.warn("Failed to initialize audio player:", error);
+      });
 
-        // Set up timeout to prevent endless loading
-        const timeout = setTimeout(() => {
-          if (!completed) {
-            console.warn("VoiceChat: Stream timeout after 60 seconds");
-            completed = true;
-            setChatState(prev => ({ ...prev, isStreaming: false }));
-            reject(new Error("Stream timeout"));
+      // Set up streaming state (use startTransition to prevent render storm)
+      startTransition(() => {
+        setChatState(prev => ({
+          ...prev,
+          isStreaming: true,
+          message: "",
+          streamPhase: "transcript"
+        }));
+      });
+
+      let userTranscript = "";
+      let accumulatedText = "";
+
+      try {
+        if (!response.body) {
+          throw new Error("Response body is null");
+        }
+
+        const reader = response.body.getReader();
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
           }
-        }, 60000); // 60 second timeout
 
-        const cleanup = () => {
-          clearTimeout(timeout);
-          completed = true;
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete SSE events
+          while (buffer.includes("\n\n")) {
+            const eventEnd = buffer.indexOf("\n\n");
+            const eventText = buffer.substring(0, eventEnd);
+            buffer = buffer.substring(eventEnd + 2);
+
+            // Parse SSE event - handle both formats
+            const lines = eventText.split("\n");
+            let eventType = "";
+            let eventData = "";
+
+            for (const line of lines) {
+              if (line.startsWith("event:")) {
+                eventType = line.substring(6).trim();
+              } else if (line.startsWith("data:")) {
+                eventData = line.substring(5).trim();
+              }
+            }
+
+            // If no explicit event type, try to extract from JSON data
+            if (!eventType && eventData) {
+              try {
+                const data = JSON.parse(eventData);
+                eventType = data.type;
+              } catch (parseError) {
+                console.log(
+                  "Could not parse event data to extract type:",
+                  parseError
+                );
+              }
+            }
+
+            // Skip keep-alive and empty events
+            if (eventData === "keep-alive" || !eventData) {
+              continue;
+            }
+
+            if (!eventType) {
+              continue;
+            }
+
+            try {
+              const data = JSON.parse(eventData);
+
+              switch (eventType) {
+                case "transcript":
+                  userTranscript = data.data;
+                  startTransition(() => {
+                    setChatState(prev => ({
+                      ...prev,
+                      input: userTranscript,
+                      streamPhase: "transcript"
+                    }));
+                  });
+                  break;
+
+                case "text":
+                  accumulatedText += data.data;
+                  startTransition(() => {
+                    setChatState(prev => ({
+                      ...prev,
+                      message: accumulatedText,
+                      streamPhase: "text"
+                    }));
+                  });
+                  break;
+
+                case "audio":
+                  if (data.data) {
+                    // Decode base64 audio chunk
+                    const binaryString = atob(data.data);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let j = 0; j < binaryString.length; j++) {
+                      bytes[j] = binaryString.charCodeAt(j);
+                    }
+
+                    // Send to audio player
+                    player.playAudioChunk(bytes.buffer);
+
+                    startTransition(() => {
+                      setChatState(prev => ({
+                        ...prev,
+                        streamPhase: "audio"
+                      }));
+                    });
+                  }
+                  break;
+
+                case "status":
+                  // Handle status updates (optional UI feedback)
+                  break;
+
+                case "complete":
+                  const finalMessage = data.fullText || accumulatedText;
+                  const finalLatency = Date.now() - submittedAt;
+
+                  // Create messages
+                  const userMessage: Message = {
+                    role: "user",
+                    content: userTranscript || "Audio input"
+                  };
+
+                  const assistantMessage: Message = {
+                    role: "assistant",
+                    content: finalMessage,
+                    latency: finalLatency
+                  };
+
+                  // Reset state
+                  startTransition(() => {
+                    setChatState(prev => ({
+                      ...prev,
+                      isStreaming: false,
+                      message: "",
+                      streamPhase: "completed"
+                    }));
+                  });
+
+                  return [...prevMessages, userMessage, assistantMessage];
+
+                case "error":
+                  throw new Error(data.message || "Stream error");
+              }
+            } catch (parseError) {
+              console.error("Error parsing SSE event:", parseError);
+            }
+          }
+        }
+
+        // If we get here without a complete event, handle as completion
+        const userMessage: Message = {
+          role: "user",
+          content: userTranscript || "Audio input"
         };
 
-        streamingProcessor.processSSEStream(
-          response,
-          handleTextUpdate,
-          handleAudioChunk,
-          // onStreamComplete
-          (finalText: string, latency: number) => {
-            if (completed) return;
-            cleanup();
+        const assistantMessage: Message = {
+          role: "assistant",
+          content: accumulatedText,
+          latency: Date.now() - submittedAt
+        };
 
-            finalMessage = finalText;
-            finalLatency = latency;
+        setChatState(prev => ({
+          ...prev,
+          isStreaming: false,
+          message: "",
+          streamPhase: "completed"
+        }));
 
-            // Create assistant message
-            const assistantMessage: Message = {
-              role: "assistant",
-              content: finalMessage,
-              latency: finalLatency
-            };
-
-            // Reset streaming state
-            setChatState(prev => ({
-              ...prev,
-              isStreaming: false,
-              message: ""
-            }));
-
-            resolve([...updatedMessages, assistantMessage]);
-          },
-          // onError
-          (error: Error) => {
-            if (completed) return;
-            cleanup();
-
-            setChatState(prev => ({ ...prev, isStreaming: false }));
-            handleStreamError(error);
-            reject(error);
-          },
-          submittedAt
+        return [...prevMessages, userMessage, assistantMessage];
+      } catch (error) {
+        console.error(
+          "Error type:",
+          error instanceof Error ? error.constructor.name : typeof error
         );
-      });
+        console.error(
+          "Error message:",
+          error instanceof Error ? error.message : error
+        );
+        console.error(
+          "Error stack:",
+          error instanceof Error ? error.stack : "No stack trace"
+        );
+
+        startTransition(() => {
+          setChatState(prev => ({ ...prev, isStreaming: false }));
+        });
+        throw error;
+      }
     },
-    [streamingProcessor, handleTextUpdate, handleAudioChunk, handleStreamError]
+    [player]
   );
 
   // Stop current request - remove dependencies to prevent infinite loops
@@ -358,7 +490,6 @@ export function useVoiceChat({
     console.debug("VoiceChat: Stopping current request");
     requestManager.cancelCurrentRequest();
     player.stop();
-    streamingProcessor.stopTypingAnimation();
     setChatState(prev => ({ ...prev, isStreaming: false }));
   }, []); // Empty deps - using closure values
 

@@ -1,0 +1,249 @@
+openapi: 3.0.3
+info:
+  title: AgentCore Voice Realtime API
+  description: Voice streaming API for real-time audio processing with transcription and TTS
+  version: 1.0.0
+  contact:
+    name: AgentCore API Team
+    
+servers:
+  - url: http://localhost:3030/api/v1
+    description: Development server
+  - url: https://api.agentcore.example.com/v1
+    description: Production server
+
+paths:
+  /voice/realtime:
+    post:
+      summary: Stream voice processing with real-time transcription and TTS
+      description: |
+        Accepts an audio file and streams back transcription, AI response text, and synthesized speech audio.
+        Returns Server-Sent Events (SSE) with different event types for each stage of processing.
+      operationId: voiceRealtimeStream
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - audio
+                - ttsEngine
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                  description: Audio file to transcribe (WAV, WebM, MP3 formats supported)
+                ttsEngine:
+                  type: string
+                  enum: [cartesia, elevenlabs, minimax]
+                  description: Text-to-speech engine selection
+                  example: cartesia
+                settings:
+                  type: string
+                  description: JSON-encoded settings object
+                  example: '{"audioEnabled": true, "streaming": true}'
+                  schema:
+                    type: object
+                    properties:
+                      audioEnabled:
+                        type: boolean
+                        default: true
+                        description: Whether to generate audio output
+                      streaming:
+                        type: boolean
+                        default: true
+                        description: Whether to stream responses
+      parameters:
+        - name: X-Client-Timezone
+          in: header
+          required: false
+          schema:
+            type: string
+            example: "America/New_York"
+          description: Client timezone for contextual responses
+        - name: X-Client-Datetime
+          in: header
+          required: false
+          schema:
+            type: string
+            format: date-time
+            example: "2024-01-15T10:30:00Z"
+          description: Client current date/time
+        - name: X-Locale
+          in: header
+          required: false
+          schema:
+            type: string
+            enum: [en, es, fr, zh, ja, ko]
+            example: "en"
+          description: Client locale for responses
+      responses:
+        '200':
+          description: Server-Sent Events stream with voice processing results
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  SSE stream with the following event types:
+                  
+                  - **transcript**: Initial transcription of the input audio
+                  - **text**: AI response text chunks as they are generated  
+                  - **audio**: Base64-encoded audio chunks of synthesized speech
+                  - **complete**: Final event with complete response text
+                  - **error**: Error event with error details
+              examples:
+                transcript_event:
+                  summary: Transcript event
+                  value: |
+                    event: transcript
+                    data: {"content": "Hello, how are you?"}
+                    
+                text_event:
+                  summary: Text response event
+                  value: |
+                    event: text
+                    data: {"content": "I'm doing well, thank you for asking!"}
+                    
+                audio_event:
+                  summary: Audio chunk event
+                  value: |
+                    event: audio
+                    data: {"chunk": "UklGRiQAAABXQVZFZm10IBAAAA...", "index": 0}
+                    
+                complete_event:
+                  summary: Completion event
+                  value: |
+                    event: complete
+                    data: {"fullText": "I'm doing well, thank you for asking! How can I help you today?"}
+                    
+                error_event:
+                  summary: Error event
+                  value: |
+                    event: error
+                    data: {"message": "TTS engine configuration error"}
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: no-cache
+            Connection:
+              schema:
+                type: string
+                example: keep-alive
+        '400':
+          description: Bad request - invalid audio file or missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_audio:
+                  summary: Invalid audio file
+                  value:
+                    error: "Invalid audio file format"
+                    message: "Audio file must be WAV, WebM, or MP3 format"
+                missing_engine:
+                  summary: Missing TTS engine
+                  value:
+                    error: "Missing required parameter"
+                    message: "ttsEngine parameter is required"
+        '401':
+          description: Unauthorized - invalid or missing Bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Unauthorized"
+                message: "Valid Bearer token required"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                transcription_error:
+                  summary: Transcription service error
+                  value:
+                    error: "Transcription failed"
+                    message: "Unable to process audio file"
+                tts_error:
+                  summary: TTS service error
+                  value:
+                    error: "TTS synthesis failed"
+                    message: "Text-to-speech generation failed"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer token for authentication
+      
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type identifier
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          description: Additional error details
+          additionalProperties: true
+      example:
+        error: "validation_error"
+        message: "Request validation failed"
+        details:
+          field: "audio"
+          reason: "File size exceeds limit"
+          
+    VoiceStreamEvent:
+      type: object
+      description: Server-Sent Event data structure
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [transcript, text, audio, complete, error]
+          description: Type of event
+        transcript:
+          type: string
+          description: Transcribed text (only for transcript events)
+        text:
+          type: string
+          description: AI response text chunk (only for text events)
+        audioChunk:
+          type: string
+          format: base64
+          description: Base64-encoded audio data (only for audio events)
+        index:
+          type: integer
+          description: Audio chunk sequence number (only for audio events)
+        fullText:
+          type: string
+          description: Complete response text (only for complete events)
+        message:
+          type: string
+          description: Error message (only for error events)
+
+tags:
+  - name: Voice Processing
+    description: Real-time voice processing endpoints
+
+externalDocs:
+  description: AgentCore Voice API Documentation
+  url: https://docs.agentcore.example.com/voice-api

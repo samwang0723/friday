@@ -1,5 +1,5 @@
 import { startAudioPlayerWorklet } from "@/lib/audio";
-import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 export function useAudioPlayer() {
@@ -40,6 +40,7 @@ export function useAudioPlayer() {
         audioPlayerContextRef.current = context;
         setPlayerInitialized(true);
 
+        // Audio player ready for immediate use
         console.log("Audio player initialized successfully");
       } catch (error) {
         const errorMessage =
@@ -60,7 +61,8 @@ export function useAudioPlayer() {
   const playAudioChunk = useCallback((chunk: ArrayBuffer) => {
     try {
       if (!audioPlayerNodeRef.current || !audioPlayerContextRef.current) {
-        console.warn("Audio player not initialized, cannot play chunk");
+        // Simple fallback - just log and skip if not ready
+        console.warn("Audio player not ready, skipping chunk");
         return;
       }
 
@@ -68,12 +70,21 @@ export function useAudioPlayer() {
 
       // Handle suspended context state
       if (context.state === "suspended") {
-        context.resume().catch(error => {
-          console.error("Failed to resume audio context:", error);
-        });
+        context
+          .resume()
+          .then(() => {
+            // Send chunk after resuming
+            if (audioPlayerNodeRef.current?.port) {
+              audioPlayerNodeRef.current.port.postMessage(chunk);
+            }
+          })
+          .catch(error => {
+            console.error("Failed to resume audio context:", error);
+          });
+        return;
       }
 
-      // Verify the worklet node is still connected
+      // Send chunk directly
       if (audioPlayerNodeRef.current.port) {
         audioPlayerNodeRef.current.port.postMessage(chunk);
       } else {

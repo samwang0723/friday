@@ -9,6 +9,10 @@ export interface ChatState {
   message: string;
   input: string;
   agentCoreInitialized: boolean;
+  transcript?: string;
+  status?: string;
+  streamPhase?: 'transcript' | 'text' | 'audio' | 'completing' | 'completed';
+  audioPlayerReady?: boolean;
 }
 
 export interface LocaleState {
@@ -61,6 +65,25 @@ export interface ErrorEventData {
   message: string;
 }
 
+export interface TranscriptEventData {
+  content: string;
+}
+
+export interface StatusEventData {
+  message: string;
+}
+
+export interface VoiceRealtimeEvent {
+  type: 'transcript' | 'text' | 'audio' | 'complete' | 'status' | 'error';
+  transcript?: string;
+  text?: string;
+  audioChunk?: ArrayBuffer;
+  index?: number;
+  fullText?: string;
+  message?: string;
+  metadata?: any;
+}
+
 export type ChatSubmissionData = string | Blob | { transcript: string };
 
 export interface VoiceChatConfig {
@@ -68,6 +91,17 @@ export interface VoiceChatConfig {
   audioStreamCloseDelay: number;
   messageQueueDelay: number;
   vadRestartDelay: number;
+}
+
+export interface VoiceRealtimeSettings {
+  voiceRealtime?: boolean;
+  sttEngine?: string;
+  ttsEngine?: string;
+  audioEnabled?: boolean;
+  streaming?: boolean;
+  includeText?: boolean;
+  textFormat?: string;
+  includeMetadata?: boolean;
 }
 
 export interface VoiceChatHookReturn {
@@ -101,9 +135,13 @@ export interface StreamingProcessorHookReturn {
     onAudioChunk: (chunk: ArrayBuffer) => void,
     onStreamComplete: (finalText: string, latency: number) => void,
     onError: (error: Error) => void,
-    submittedAt: number
+    submittedAt: number,
+    onTranscript?: (transcript: string) => void,
+    onStatus?: (status: string) => void
   ) => Promise<void>;
   stopTypingAnimation: () => void;
+  getProcessorState: () => StreamingState | null;
+  isProcessorActive: () => boolean;
 }
 
 export interface ErrorTranslationMap {
