@@ -36,7 +36,7 @@ export interface ChatResponse {
   response: string;
 }
 
-export interface VoiceStreamResponse {
+export interface SseStreamResponse {
   transcript?: string;
   text?: string;
   audioChunk?: ArrayBuffer;
@@ -160,7 +160,7 @@ export class AgentCoreService {
     token: string,
     context?: ClientContext,
     externalAbort?: AbortSignal
-  ): AsyncGenerator<string> {
+  ): AsyncGenerator<SseStreamResponse> {
     try {
       console.info("Starting agent-core chat stream");
 
@@ -233,10 +233,17 @@ export class AgentCoreService {
       let buffer = "";
 
       try {
+        let chunkCount = 0;
+
         while (true) {
           const { done, value } = await reader.read();
+          chunkCount++;
+          console.log(
+            `AgentCore: Read chunk #${chunkCount}, done: ${done}, valueLength: ${value?.length}`
+          );
 
           if (done) {
+            console.log(`AgentCore: Stream done after ${chunkCount} chunks`);
             if (timeoutId) {
               clearTimeout(timeoutId);
             }
@@ -264,9 +271,43 @@ export class AgentCoreService {
               }
             }
 
+            // If no explicit event type, try to extract from JSON data
+            if (!eventType && data) {
+              try {
+                const parsed = JSON.parse(data);
+                eventType = parsed.type;
+              } catch (parseError) {
+                console.log(
+                  "Could not parse data to extract type:",
+                  parseError
+                );
+              }
+            }
+
+            // Skip keep-alive and empty events
+            if (data === "keep-alive" || !data) {
+              console.log("Skipping keep-alive or empty event");
+              continue;
+            }
+
             // Handle different event types
             if (eventType === "error") {
-              throw new Error(`Stream error: ${data}`);
+              try {
+                const errorData = JSON.parse(data);
+                yield {
+                  type: "error",
+                  message: errorData.message || "Voice stream error"
+                };
+                throw new Error(
+                  `Voice stream error: ${errorData.message || data}`
+                );
+              } catch {
+                yield {
+                  type: "error",
+                  message: "Voice stream error"
+                };
+                throw new Error(`Voice stream error: ${data}`);
+              }
             }
 
             if (data === "[DONE]") {
@@ -278,16 +319,38 @@ export class AgentCoreService {
 
             if (data && data !== "") {
               try {
-                // Try to parse as JSON first
                 const parsed = JSON.parse(data);
-                if (parsed.text) {
-                  yield parsed.text;
-                } else if (typeof parsed === "string") {
-                  yield parsed;
+
+                if (eventType === "text") {
+                  yield {
+                    type: "text",
+                    text: parsed.data || parsed.content || parsed.text,
+                    metadata: parsed.metadata
+                  };
+                } else if (eventType === "status") {
+                  yield {
+                    type: "status",
+                    message: parsed.message || parsed.status,
+                    metadata: parsed.metadata
+                  };
+                } else if (eventType === "complete") {
+                  yield {
+                    type: "complete",
+                    fullText: parsed.fullText,
+                    metadata: parsed.metadata
+                  };
+                  if (timeoutId) {
+                    clearTimeout(timeoutId);
+                  }
+                  return;
                 }
-              } catch {
-                // If not JSON, yield as plain text
-                yield data;
+              } catch (parseError) {
+                console.warn(
+                  "Failed to parse voice stream data:",
+                  parseError,
+                  data
+                );
+                // Continue processing other messages instead of failing
               }
             }
           }
@@ -328,7 +391,7 @@ export class AgentCoreService {
       textFormat?: string;
       includeMetadata?: boolean;
     }
-  ): AsyncGenerator<VoiceStreamResponse> {
+  ): AsyncGenerator<SseStreamResponse> {
     try {
       // Create local AbortController for timeout management
       const controller = new AbortController();

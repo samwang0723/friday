@@ -346,7 +346,7 @@ export function useVoiceChat({
                   break;
 
                 case "text":
-                  accumulatedText += `${data.data} `;
+                  accumulatedText += data.data;
                   startTypingAnimation();
                   break;
 
@@ -378,7 +378,7 @@ export function useVoiceChat({
 
                 case "complete":
                   // Store the final complete text separately - don't update accumulatedText yet
-                  let finalCompleteText = data.fullText || accumulatedText;
+                  const finalCompleteText = data.fullText || accumulatedText;
 
                   // Don't update accumulatedText here - let typing animation continue with current text
                   // We'll use finalCompleteText only for the final message creation

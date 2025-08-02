@@ -69,7 +69,6 @@ const requestManager = new RequestManager();
 const schema = zfd
   .formData({
     input: z.union([zfd.text(), zfd.file()]).optional(),
-    transcript: zfd.text().optional(),
     message: zfd.repeatableOfType(
       zfd.json(
         z.object({
@@ -88,8 +87,8 @@ const schema = zfd
       )
       .optional()
   })
-  .refine(data => data.input !== undefined || data.transcript !== undefined, {
-    message: "Either input or transcript must be provided"
+  .refine(data => data.input !== undefined, {
+    message: "Data input must be provided"
   });
 
 export async function POST(request: Request) {
@@ -188,7 +187,7 @@ export async function POST(request: Request) {
         const encoder = new TextEncoder();
         let isControllerClosed = false;
         let currentTranscript = "";
-        let responseHeaders: Record<string, string> = {};
+        const responseHeaders: Record<string, string> = {};
 
         // Listen for abort signal
         abortController.signal.addEventListener("abort", () => {
@@ -277,11 +276,151 @@ export async function POST(request: Request) {
           }
         };
 
+        // Helper function to format events as SSE - reusable for both text and voice
+        const formatEventAsSSE = (event: {
+          type: string;
+          [key: string]: any;
+        }): string => {
+          let sseEvent = "";
+
+          switch (event.type) {
+            case "transcript":
+              currentTranscript = event.transcript || "";
+              console.log(
+                "Received transcript from AgentCore:",
+                currentTranscript
+              );
+
+              // Store transcript for response header
+              if (currentTranscript) {
+                responseHeaders["X-Transcript"] =
+                  encodeURIComponent(currentTranscript);
+              }
+
+              sseEvent = `event: transcript\ndata: ${JSON.stringify({
+                data: event.transcript
+              })}\n\n`;
+              break;
+
+            case "text":
+              sseEvent = `event: text\ndata: ${JSON.stringify({
+                data: event.text
+              })}\n\n`;
+              break;
+
+            case "audio":
+              if (event.audioChunk) {
+                // Convert ArrayBuffer to base64
+                const base64Audio = Buffer.from(event.audioChunk).toString(
+                  "base64"
+                );
+                sseEvent = `event: audio\ndata: ${JSON.stringify({
+                  data: base64Audio,
+                  index: event.index || 0
+                })}\n\n`;
+              }
+              break;
+
+            case "complete":
+              sseEvent = `event: complete\ndata: ${JSON.stringify({
+                fullText: event.fullText
+              })}\n\n`;
+              break;
+
+            case "status":
+              sseEvent = `event: status\ndata: ${JSON.stringify({
+                message: event.message || "Status update"
+              })}\n\n`;
+              break;
+
+            case "error":
+              sseEvent = `event: error\ndata: ${JSON.stringify({
+                message: event.message || "Stream error"
+              })}\n\n`;
+              break;
+          }
+
+          return sseEvent;
+        };
+
         try {
-          // Validate that we have file input for voice streaming
-          if (!data.input || !(data.input instanceof File)) {
+          // Detect input type and route accordingly
+          if (!data.input) {
+            console.error("No input provided");
+            const errorEvent = `event: error\ndata: ${JSON.stringify({
+              message: "Input is required"
+            })}\n\n`;
+            safeEnqueue(encoder.encode(errorEvent));
+            safeClose();
+            return;
+          }
+
+          // Handle text input using chatStream
+          if (typeof data.input === "string") {
+            console.debug("Text SSE: Processing text input:", data.input);
+
+            // Use AgentCore chat streaming for text-only input
+            const chatStream = agentCore.chatStream(
+              data.input,
+              accessToken as string,
+              clientContext,
+              abortController.signal
+            );
+
+            console.debug("Text SSE: chatStream created successfully");
+
+            // Process chat stream events
+            let eventCount = 0;
+            for await (const event of chatStream) {
+              eventCount++;
+
+              console.debug(
+                `Text SSE: Received chunk #${eventCount}:`,
+                event.type,
+                event
+              );
+
+              if (abortController.signal.aborted || isControllerClosed) {
+                console.debug(
+                  "Text SSE: Text streaming interrupted - abort signal or controller closed"
+                );
+                break;
+              }
+
+              // Use reusable event formatting function
+              const sseEvent = formatEventAsSSE(event);
+
+              if (sseEvent && !safeEnqueue(encoder.encode(sseEvent))) {
+                console.debug(
+                  "Text SSE: Text streaming stopped - failed to enqueue"
+                );
+                break;
+              }
+
+              // Exit after complete or error events
+              if (event.type === "complete" || event.type === "error") {
+                break;
+              }
+            }
+            console.debug(
+              `Text SSE: Text streaming completed after ${eventCount} chunks`
+            );
+            if (eventCount === 0) {
+              console.error(
+                "Text SSE: No chunks received from agentCore.chatStream!"
+              );
+            }
+            safeClose();
+
+            // Clean up request tracking after stream completion
+            cleanup();
+            return;
+          }
+
+          // Handle file input for voice streaming
+          if (!(data.input instanceof File)) {
             console.error(
-              "Voice streaming requires file input, but got:",
+              "Invalid input type for voice streaming, got:",
               typeof data.input
             );
             const errorEvent = `event: error\ndata: ${JSON.stringify({
@@ -338,64 +477,8 @@ export async function POST(request: Request) {
               break;
             }
 
-            let sseEvent = "";
-
-            switch (event.type) {
-              case "transcript":
-                currentTranscript = event.transcript || "";
-                console.log(
-                  "Received transcript from AgentCore:",
-                  currentTranscript
-                );
-
-                // Store transcript for response header
-                if (currentTranscript) {
-                  responseHeaders["X-Transcript"] =
-                    encodeURIComponent(currentTranscript);
-                }
-
-                sseEvent = `event: transcript\ndata: ${JSON.stringify({
-                  data: event.transcript
-                })}\n\n`;
-                break;
-
-              case "text":
-                sseEvent = `event: text\ndata: ${JSON.stringify({
-                  data: event.text
-                })}\n\n`;
-                break;
-
-              case "audio":
-                if (event.audioChunk) {
-                  // Convert ArrayBuffer to base64
-                  const base64Audio = Buffer.from(event.audioChunk).toString(
-                    "base64"
-                  );
-                  sseEvent = `event: audio\ndata: ${JSON.stringify({
-                    data: base64Audio,
-                    index: event.index || 0
-                  })}\n\n`;
-                }
-                break;
-
-              case "complete":
-                sseEvent = `event: complete\ndata: ${JSON.stringify({
-                  fullText: event.fullText
-                })}\n\n`;
-                break;
-
-              case "status":
-                sseEvent = `event: status\ndata: ${JSON.stringify({
-                  message: event.message || "Status update"
-                })}\n\n`;
-                break;
-
-              case "error":
-                sseEvent = `event: error\ndata: ${JSON.stringify({
-                  message: event.message || "Voice stream error"
-                })}\n\n`;
-                break;
-            }
+            // Use reusable event formatting function
+            const sseEvent = formatEventAsSSE(event);
 
             if (sseEvent && !safeEnqueue(encoder.encode(sseEvent))) {
               console.debug(
@@ -441,13 +524,21 @@ export async function POST(request: Request) {
       }
     });
 
-    // Build response headers
+    // Build response headers based on input type
     const finalResponseHeaders: Record<string, string> = {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-      "X-Response-Type": "voice-realtime-stream"
+      Connection: "keep-alive"
     };
+
+    // Set response type based on input
+    if (data.input && typeof data.input === "string") {
+      finalResponseHeaders["X-Response-Type"] = "text-stream";
+      finalResponseHeaders["X-Input-Type"] = "text";
+    } else {
+      finalResponseHeaders["X-Response-Type"] = "voice-realtime-stream";
+      finalResponseHeaders["X-Input-Type"] = "audio";
+    }
 
     // Return response - cleanup will be handled by stream controller
     return new Response(sseStream, {

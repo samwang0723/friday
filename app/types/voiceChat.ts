@@ -11,7 +11,7 @@ export interface ChatState {
   agentCoreInitialized: boolean;
   transcript?: string;
   status?: string;
-  streamPhase?: 'transcript' | 'text' | 'audio' | 'completing' | 'completed';
+  streamPhase?: "transcript" | "text" | "audio" | "completing" | "completed";
   audioPlayerReady?: boolean;
 }
 
@@ -74,7 +74,7 @@ export interface StatusEventData {
 }
 
 export interface VoiceRealtimeEvent {
-  type: 'transcript' | 'text' | 'audio' | 'complete' | 'status' | 'error';
+  type: "transcript" | "text" | "audio" | "complete" | "status" | "error";
   transcript?: string;
   text?: string;
   audioChunk?: ArrayBuffer;

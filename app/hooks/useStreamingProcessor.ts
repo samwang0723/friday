@@ -46,7 +46,7 @@ export function useStreamingProcessor(): StreamingProcessorHookReturn {
           "StreamingProcessor: Error processing SSE stream:",
           error
         );
-        
+
         // Enhanced error categorization
         const typedError = error as Error;
         if (typedError.name === "AbortError") {
