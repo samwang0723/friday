@@ -1,11 +1,5 @@
 import { AgentCoreService } from "@/lib/agentCore";
-import {
-  synthesizeSpeech,
-  synthesizeSpeechStream,
-  transcribeAudio
-} from "@/lib/voice";
 import { headers } from "next/headers";
-import { after } from "next/server";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 
@@ -75,7 +69,6 @@ const requestManager = new RequestManager();
 const schema = zfd
   .formData({
     input: z.union([zfd.text(), zfd.file()]).optional(),
-    transcript: zfd.text().optional(),
     message: zfd.repeatableOfType(
       zfd.json(
         z.object({
@@ -89,14 +82,13 @@ const schema = zfd
         z.object({
           sttEngine: z.string(),
           ttsEngine: z.string(),
-          streaming: z.boolean().optional(),
           audioEnabled: z.boolean().optional()
         })
       )
       .optional()
   })
-  .refine(data => data.input !== undefined || data.transcript !== undefined, {
-    message: "Either input or transcript must be provided"
+  .refine(data => data.input !== undefined, {
+    message: "Data input must be provided"
   });
 
 export async function POST(request: Request) {
@@ -150,7 +142,6 @@ export async function POST(request: Request) {
     const settings = data.settings || {
       sttEngine: "groq",
       ttsEngine: "elevenlabs",
-      streaming: false,
       audioEnabled: true
     };
 
@@ -161,15 +152,6 @@ export async function POST(request: Request) {
       console.log("Main: Request cancelled during form parsing");
       return new Response("Request cancelled", { status: 200 });
     }
-
-    // Handle transcript processing
-    const transcript =
-      data.transcript ||
-      (data.input ? await getTranscript(data.input, settings.sttEngine) : null);
-    if (!transcript)
-      return new Response("Invalid audio or transcript", { status: 400 });
-
-    console.log("Transcript:", transcript);
 
     // Check if request was cancelled during transcription
     if (abortController.signal.aborted) {
@@ -199,113 +181,36 @@ export async function POST(request: Request) {
       locale: locale
     };
 
-    // Check if streaming is enabled
-    if (settings.streaming === false) {
-      console.log("Using single response mode (non-streaming)");
-
-      // Handle direct transcript vs user input
-      let chatResponse;
-      if (data.transcript) {
-        console.log("Direct transcript provided, skipping AgentCore");
-        chatResponse = { response: data.transcript };
-      } else {
-        // Use Agent Core chat function for user input
-        const startTime = Date.now();
-        chatResponse = await agentCore.chat(
-          transcript,
-          accessToken as string,
-          clientContext
-        );
-        console.log("AgentCore chat took", Date.now() - startTime, "ms");
-      }
-
-      if (abortController.signal.aborted) {
-        console.debug(
-          "Main: Request cancelled during non-streaming processing"
-        );
-        return new Response("Request cancelled", { status: 200 });
-      }
-
-      // Generate audio only if audioEnabled is true
-      if (settings.audioEnabled !== false) {
-        // Generate complete audio using synthesizeSpeech
-        const startTime = Date.now();
-        const audioResponse = await synthesizeSpeech(
-          chatResponse.response,
-          settings.ttsEngine,
-          abortController.signal
-        );
-        console.log("Synthesize speech took", Date.now() - startTime, "ms");
-
-        if (!audioResponse.ok) {
-          return new Response("TTS generation failed", { status: 500 });
-        }
-
-        const audioBuffer = await audioResponse.arrayBuffer();
-
-        // Clean up the request from tracking
-        cleanup();
-
-        // Return combined response with audio and text
-        return new Response(audioBuffer, {
-          headers: {
-            "Content-Type": "audio/raw",
-            "X-Transcript": encodeURIComponent(
-              data.transcript ? data.transcript : transcript
-            ),
-            "X-Response-Text": encodeURIComponent(chatResponse.response),
-            "X-Response-Type": "single"
-          }
-        });
-      } else {
-        // Return text-only response when audio is disabled
-        cleanup();
-
-        return new Response("", {
-          headers: {
-            "Content-Type": "text/plain",
-            "X-Transcript": encodeURIComponent(
-              data.transcript ? data.transcript : transcript
-            ),
-            "X-Response-Text": encodeURIComponent(chatResponse.response),
-            "X-Response-Type": "text-only"
-          }
-        });
-      }
-    }
-
-    // Use streaming pipeline with SSE
-    console.log("Using real-time streaming pipeline with SSE");
-
-    // Create SSE response stream
+    // Create SSE response stream for voice realtime
     const sseStream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
         let isControllerClosed = false;
+        let currentTranscript = "";
+        const responseHeaders: Record<string, string> = {};
 
-        // Listen for abort signal to immediately mark controller as closed
+        // Listen for abort signal
         abortController.signal.addEventListener("abort", () => {
           console.debug(
-            "SSE: Abort signal received, marking controller as closed"
+            "Voice SSE: Abort signal received, marking controller as closed"
           );
           isControllerClosed = true;
         });
 
-        // Safe enqueue helper that checks controller state and abort signal
+        // Safe enqueue helper
         const safeEnqueue = (data: Uint8Array): boolean => {
-          // First check if we already know the controller is closed or request is aborted
           if (isControllerClosed || abortController.signal.aborted) {
             console.debug(
-              "SSE: Skipping enqueue - controller closed or request aborted"
+              "Voice SSE: Skipping enqueue - controller closed or request aborted"
             );
             return false;
           }
 
           try {
-            // Additional check: try to access controller properties to detect if it's closed
-            // This is a more robust way to check controller state
             if (!controller || typeof controller.enqueue !== "function") {
-              console.debug("SSE: Controller is invalid, marking as closed");
+              console.debug(
+                "Voice SSE: Controller is invalid, marking as closed"
+              );
               isControllerClosed = true;
               return false;
             }
@@ -313,23 +218,21 @@ export async function POST(request: Request) {
             controller.enqueue(data);
             return true;
           } catch (error: any) {
-            // Handle specific controller closed errors
             if (
               error?.code === "ERR_INVALID_STATE" ||
               error?.message?.includes("Controller is already closed") ||
               error?.message?.includes("already been closed")
             ) {
               console.debug(
-                "SSE: Controller closed error detected:",
+                "Voice SSE: Controller closed error detected:",
                 error?.message
               );
               isControllerClosed = true;
               return false;
             }
 
-            // Log other unexpected errors but still mark controller as closed
             console.debug(
-              "SSE: Controller enqueue failed:",
+              "Voice SSE: Controller enqueue failed:",
               error?.message || error
             );
             isControllerClosed = true;
@@ -340,209 +243,273 @@ export async function POST(request: Request) {
         // Safe close helper
         const safeClose = () => {
           if (isControllerClosed) {
-            console.debug("SSE: Controller already closed, skipping close");
-            return; // Already closed, nothing to do
+            console.debug(
+              "Voice SSE: Controller already closed, skipping close"
+            );
+            return;
           }
 
           try {
-            // Check if controller is still valid before closing
             if (controller && typeof controller.close === "function") {
-              console.debug("SSE: Closing controller");
+              console.debug("Voice SSE: Closing controller");
               controller.close();
             }
             isControllerClosed = true;
           } catch (error: any) {
-            // Handle specific controller closed errors silently
             if (
               error?.code === "ERR_INVALID_STATE" ||
               error?.message?.includes("Controller is already closed") ||
               error?.message?.includes("already been closed")
             ) {
               console.debug(
-                "SSE: Controller was already closed during close attempt"
+                "Voice SSE: Controller was already closed during close attempt"
               );
               isControllerClosed = true;
               return;
             }
 
-            // Log other unexpected errors
             console.debug(
-              "SSE: Controller close failed:",
+              "Voice SSE: Controller close failed:",
               error?.message || error
             );
             isControllerClosed = true;
           }
         };
 
-        try {
-          // Create text stream - either from AgentCore or direct transcript
-          const textStream = data.transcript
-            ? (async function* () {
-                yield data.transcript;
-              })()
-            : agentCore.chatStream(
-                transcript,
-                accessToken as string,
-                clientContext,
-                abortController.signal
+        // Helper function to format events as SSE - reusable for both text and voice
+        const formatEventAsSSE = (event: {
+          type: string;
+          [key: string]: any;
+        }): string => {
+          let sseEvent = "";
+
+          switch (event.type) {
+            case "transcript":
+              currentTranscript = event.transcript || "";
+              console.log(
+                "Received transcript from AgentCore:",
+                currentTranscript
               );
 
-          // Use simplified TTS streaming
+              // Store transcript for response header
+              if (currentTranscript) {
+                responseHeaders["X-Transcript"] =
+                  encodeURIComponent(currentTranscript);
+              }
 
-          // Create a text accumulator for SSE events
-          const textChunks: string[] = [];
+              sseEvent = `event: transcript\ndata: ${JSON.stringify({
+                data: event.transcript
+              })}\n\n`;
+              break;
 
-          // Create an async generator that emits text via SSE and passes to TTS
-          async function* textWithSSE() {
-            for await (const chunk of textStream) {
+            case "text":
+              sseEvent = `event: text\ndata: ${JSON.stringify({
+                data: event.text
+              })}\n\n`;
+              break;
+
+            case "audio":
+              if (event.audioChunk) {
+                // Convert ArrayBuffer to base64
+                const base64Audio = Buffer.from(event.audioChunk).toString(
+                  "base64"
+                );
+                sseEvent = `event: audio\ndata: ${JSON.stringify({
+                  data: base64Audio,
+                  index: event.index || 0
+                })}\n\n`;
+              }
+              break;
+
+            case "complete":
+              sseEvent = `event: complete\ndata: ${JSON.stringify({
+                fullText: event.fullText
+              })}\n\n`;
+              break;
+
+            case "status":
+              sseEvent = `event: status\ndata: ${JSON.stringify({
+                message: event.message || "Status update"
+              })}\n\n`;
+              break;
+
+            case "error":
+              sseEvent = `event: error\ndata: ${JSON.stringify({
+                message: event.message || "Stream error"
+              })}\n\n`;
+              break;
+          }
+
+          return sseEvent;
+        };
+
+        try {
+          // Detect input type and route accordingly
+          if (!data.input) {
+            console.error("No input provided");
+            const errorEvent = `event: error\ndata: ${JSON.stringify({
+              message: "Input is required"
+            })}\n\n`;
+            safeEnqueue(encoder.encode(errorEvent));
+            safeClose();
+            return;
+          }
+
+          // Handle text input using chatStream
+          if (typeof data.input === "string") {
+            console.debug("Text SSE: Processing text input:", data.input);
+
+            // Use AgentCore chat streaming for text-only input
+            const chatStream = agentCore.chatStream(
+              data.input,
+              accessToken as string,
+              clientContext,
+              abortController.signal
+            );
+
+            console.debug("Text SSE: chatStream created successfully");
+
+            // Process chat stream events
+            let eventCount = 0;
+            for await (const event of chatStream) {
+              eventCount++;
+
+              console.debug(
+                `Text SSE: Received chunk #${eventCount}:`,
+                event.type,
+                event
+              );
+
               if (abortController.signal.aborted || isControllerClosed) {
                 console.debug(
-                  "SSE: Text streaming interrupted - abort signal or controller closed"
+                  "Text SSE: Text streaming interrupted - abort signal or controller closed"
                 );
                 break;
               }
 
-              // Skip undefined chunks
-              if (chunk === undefined) {
-                continue;
-              }
+              // Use reusable event formatting function
+              const sseEvent = formatEventAsSSE(event);
 
-              // Store and send text chunk via SSE
-              textChunks.push(chunk);
-              const textEvent = `event: text\ndata: ${JSON.stringify({
-                content: chunk
-              })}\n\n`;
-
-              if (!safeEnqueue(encoder.encode(textEvent))) {
+              if (sseEvent && !safeEnqueue(encoder.encode(sseEvent))) {
                 console.debug(
-                  "SSE: Text streaming stopped - failed to enqueue"
+                  "Text SSE: Text streaming stopped - failed to enqueue"
                 );
-                break; // Stop if we can't enqueue (controller closed)
+                break;
               }
 
-              // Pass chunk to TTS
-              yield chunk;
+              // Exit after complete or error events
+              if (event.type === "complete" || event.type === "error") {
+                break;
+              }
             }
-            console.debug("SSE: Text streaming completed");
+            console.debug(
+              `Text SSE: Text streaming completed after ${eventCount} chunks`
+            );
+            if (eventCount === 0) {
+              console.error(
+                "Text SSE: No chunks received from agentCore.chatStream!"
+              );
+            }
+            safeClose();
+
+            // Clean up request tracking after stream completion
+            cleanup();
+            return;
           }
 
-          // Create audio stream from text only if audioEnabled is true
-          const audioStream =
-            settings.audioEnabled !== false
-              ? synthesizeSpeechStream(
-                  textWithSSE(),
-                  settings.ttsEngine,
-                  abortController.signal
-                )
-              : null;
+          // Handle file input for voice streaming
+          if (!(data.input instanceof File)) {
+            console.error(
+              "Invalid input type for voice streaming, got:",
+              typeof data.input
+            );
+            const errorEvent = `event: error\ndata: ${JSON.stringify({
+              message: "File input required for voice streaming"
+            })}\n\n`;
+            safeEnqueue(encoder.encode(errorEvent));
+            safeClose();
+            return;
+          }
 
-          // Stream audio with buffering for better performance (only if audio is enabled)
-          const reader = audioStream?.getReader();
-          const audioBuffer: Uint8Array[] = [];
-          const BUFFER_SIZE = 16384; // 16KB buffer
-          let currentBufferSize = 0;
-          let audioChunkIndex = 0;
+          // Use AgentCore voice streaming
+          console.debug(
+            "Voice SSE: Creating voiceStream with settings:",
+            settings
+          );
+          console.debug(
+            "Voice SSE: Input file size:",
+            data.input.size,
+            "bytes"
+          );
 
-          // Handle text-only mode when audio is disabled
-          if (!audioStream || !reader) {
-            // For text-only mode, we still need to consume the text stream
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            for await (const _chunk of textWithSSE()) {
-              if (abortController.signal.aborted || isControllerClosed) {
-                break;
-              }
-              // Text chunks are already sent via SSE in textWithSSE()
+          const voiceStream = agentCore.voiceStream(
+            data.input,
+            settings.ttsEngine as "cartesia" | "elevenlabs" | "cartesiachinese",
+            accessToken as string,
+            clientContext,
+            abortController.signal,
+            {
+              audioEnabled: settings.audioEnabled,
+              includeText: true,
+              includeMetadata: true
+            }
+          );
+
+          console.debug("Voice SSE: voiceStream created successfully");
+
+          // Process voice stream events
+          console.debug("Voice SSE: Starting to iterate over voiceStream");
+
+          let eventCount = 0;
+          for await (const event of voiceStream) {
+            eventCount++;
+            console.debug(
+              `Voice SSE: Received event #${eventCount}:`,
+              event.type,
+              event
+            );
+
+            if (abortController.signal.aborted || isControllerClosed) {
+              console.debug(
+                "Voice SSE: Voice streaming interrupted - abort signal or controller closed"
+              );
+              break;
             }
 
-            // Send complete event for text-only mode
-            if (!isControllerClosed && !abortController.signal.aborted) {
-              const completeEvent = `event: complete\ndata: ${JSON.stringify({
-                fullText: textChunks.join("")
-              })}\n\n`;
-              safeEnqueue(encoder.encode(completeEvent));
+            // Use reusable event formatting function
+            const sseEvent = formatEventAsSSE(event);
+
+            if (sseEvent && !safeEnqueue(encoder.encode(sseEvent))) {
+              console.debug(
+                "Voice SSE: Voice streaming stopped - failed to enqueue"
+              );
+              break;
             }
-          } else {
-            // Handle audio + text streaming mode
-            while (true) {
-              // Check abort signal and controller state before each iteration
-              if (abortController.signal.aborted || isControllerClosed) {
-                break;
-              }
 
-              const { done, value } = await reader.read();
-              if (done) {
-                // Send any remaining buffered audio
-                if (
-                  audioBuffer.length > 0 &&
-                  !isControllerClosed &&
-                  !abortController.signal.aborted
-                ) {
-                  const combinedBuffer = new Uint8Array(currentBufferSize);
-                  let offset = 0;
-                  for (const chunk of audioBuffer) {
-                    combinedBuffer.set(chunk, offset);
-                    offset += chunk.length;
-                  }
-
-                  const audioEvent = `event: audio\ndata: ${JSON.stringify({
-                    chunk: Buffer.from(combinedBuffer).toString("base64"),
-                    index: audioChunkIndex++
-                  })}\n\n`;
-                  safeEnqueue(encoder.encode(audioEvent));
-                }
-
-                // Send complete event
-                if (!isControllerClosed && !abortController.signal.aborted) {
-                  const completeEvent = `event: complete\ndata: ${JSON.stringify(
-                    {
-                      fullText: textChunks.join("")
-                    }
-                  )}\n\n`;
-                  safeEnqueue(encoder.encode(completeEvent));
-                }
-                break;
-              }
-
-              if (
-                value &&
-                !isControllerClosed &&
-                !abortController.signal.aborted
-              ) {
-                // Buffer audio chunks
-                audioBuffer.push(new Uint8Array(value));
-                currentBufferSize += value.byteLength;
-                // Send buffered audio when buffer is full
-                if (currentBufferSize >= BUFFER_SIZE) {
-                  const combinedBuffer = new Uint8Array(currentBufferSize);
-                  let offset = 0;
-                  for (const chunk of audioBuffer) {
-                    combinedBuffer.set(chunk, offset);
-                    offset += chunk.length;
-                  }
-
-                  const audioEvent = `event: audio\ndata: ${JSON.stringify({
-                    chunk: Buffer.from(combinedBuffer).toString("base64"),
-                    index: audioChunkIndex++
-                  })}\n\n`;
-
-                  if (!safeEnqueue(encoder.encode(audioEvent))) {
-                    break; // Stop if we can't enqueue (controller closed)
-                  }
-
-                  // Clear buffer
-                  audioBuffer.length = 0;
-                  currentBufferSize = 0;
-                }
-              }
+            // Exit after complete or error events
+            if (event.type === "complete" || event.type === "error") {
+              break;
             }
           }
 
+          console.debug(
+            `Voice SSE: Voice streaming completed after ${eventCount} events`
+          );
+          if (eventCount === 0) {
+            console.error(
+              "Voice SSE: No events received from agentCore.voiceStream!"
+            );
+          }
           safeClose();
+
+          // Clean up request tracking after stream completion
+          cleanup();
         } catch (error) {
           console.debug(
-            "SSE: Error in streaming pipeline:",
+            "Voice SSE: Error in voice streaming pipeline:",
             error instanceof Error ? error.message : error
           );
+
           // Send error event only if controller is still open
           if (!isControllerClosed && !abortController.signal.aborted) {
             const errorEvent = `event: error\ndata: ${JSON.stringify({
@@ -551,34 +518,30 @@ export async function POST(request: Request) {
             safeEnqueue(encoder.encode(errorEvent));
           }
           safeClose();
+          cleanup();
         }
       }
     });
 
-    // Clean up the request from tracking since it completed successfully
-    cleanup();
+    // Build response headers based on input type
+    const finalResponseHeaders: Record<string, string> = {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive"
+    };
 
-    console.timeEnd(
-      "streaming completion " + request.headers.get("x-vercel-id") || "local"
-    );
+    // Set response type based on input
+    if (data.input && typeof data.input === "string") {
+      finalResponseHeaders["X-Response-Type"] = "text-stream";
+      finalResponseHeaders["X-Input-Type"] = "text";
+    } else {
+      finalResponseHeaders["X-Response-Type"] = "voice-realtime-stream";
+      finalResponseHeaders["X-Input-Type"] = "audio";
+    }
 
-    console.time("stream " + request.headers.get("x-vercel-id") || "local");
-    after(() => {
-      console.timeEnd(
-        "stream " + request.headers.get("x-vercel-id") || "local"
-      );
-    });
-
+    // Return response - cleanup will be handled by stream controller
     return new Response(sseStream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-        "X-Transcript": encodeURIComponent(
-          data.transcript ? data.transcript : transcript
-        ),
-        "X-Response-Type": "sse-stream"
-      }
+      headers: finalResponseHeaders
     });
   } catch (error) {
     // Clean up the request from tracking if it failed
@@ -592,38 +555,5 @@ export async function POST(request: Request) {
 
     console.error("Request failed:", error);
     return new Response("Request failed", { status: 500 });
-  }
-}
-
-async function location() {
-  const headersList = await headers();
-
-  const country = headersList.get("x-vercel-ip-country");
-  const region = headersList.get("x-vercel-ip-country-region");
-  const city = headersList.get("x-vercel-ip-city");
-
-  if (!country || !region || !city) return "unknown";
-
-  return `${city}, ${region}, ${country}`;
-}
-
-async function time() {
-  const headersList = await headers();
-  const timeZone = headersList.get("x-vercel-ip-timezone") || undefined;
-  return new Date().toLocaleString("en-US", { timeZone });
-}
-
-async function getTranscript(input: string | File, sttEngine: string = "groq") {
-  if (typeof input === "string") return input;
-
-  try {
-    const transcript = await transcribeAudio(
-      Buffer.from(await input.arrayBuffer()),
-      sttEngine
-    );
-
-    return transcript.trim() || "";
-  } catch {
-    return null; // Empty audio file
   }
 }

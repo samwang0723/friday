@@ -12,7 +12,9 @@ export function useStreamingProcessor(): StreamingProcessorHookReturn {
       onAudioChunk: (chunk: ArrayBuffer) => void,
       onStreamComplete: (finalText: string, latency: number) => void,
       onError: (error: Error) => void,
-      submittedAt: number
+      submittedAt: number,
+      onTranscript?: (transcript: string) => void,
+      onStatus?: (status: string) => void
     ): Promise<void> => {
       // Clean up any existing processor
       if (processorRef.current) {
@@ -28,7 +30,9 @@ export function useStreamingProcessor(): StreamingProcessorHookReturn {
         onAudioChunk,
         onStreamComplete,
         onError,
-        submittedAt
+        submittedAt,
+        onTranscript,
+        onStatus
       );
 
       try {
@@ -42,7 +46,21 @@ export function useStreamingProcessor(): StreamingProcessorHookReturn {
           "StreamingProcessor: Error processing SSE stream:",
           error
         );
-        onError(error as Error);
+
+        // Enhanced error categorization
+        const typedError = error as Error;
+        if (typedError.name === "AbortError") {
+          console.debug("StreamingProcessor: Stream was aborted");
+          onError(new Error("STREAM_ABORTED"));
+        } else if (typedError.message?.includes("Network")) {
+          console.debug("StreamingProcessor: Network error detected");
+          onError(new Error("NETWORK_ERROR"));
+        } else if (typedError.message?.includes("timeout")) {
+          console.debug("StreamingProcessor: Timeout error detected");
+          onError(new Error("STREAM_TIMEOUT"));
+        } else {
+          onError(typedError);
+        }
       } finally {
         console.debug("StreamingProcessor: Cleaning up processor");
         processorRef.current = null;
@@ -58,8 +76,18 @@ export function useStreamingProcessor(): StreamingProcessorHookReturn {
     }
   }, []);
 
+  const getProcessorState = useCallback(() => {
+    return processorRef.current?.getState() || null;
+  }, []);
+
+  const isProcessorActive = useCallback(() => {
+    return processorRef.current?.isProcessing() || false;
+  }, []);
+
   return {
     processSSEStream,
-    stopTypingAnimation
+    stopTypingAnimation,
+    getProcessorState,
+    isProcessorActive
   };
 }

@@ -3,8 +3,10 @@ import type {
   CompleteEventData,
   ErrorEventData,
   SSEventData,
+  StatusEventData,
   StreamingState,
-  TextEventData
+  TextEventData,
+  TranscriptEventData
 } from "@/types/voiceChat";
 
 export class SSEProcessor {
@@ -15,6 +17,8 @@ export class SSEProcessor {
   private onAudioChunk: (chunk: ArrayBuffer) => void;
   private onStreamComplete: (finalText: string, latency: number) => void;
   private onError: (error: Error) => void;
+  private onTranscript?: (transcript: string) => void;
+  private onStatus?: (status: string) => void;
   private submittedAt: number;
 
   constructor(
@@ -22,7 +26,9 @@ export class SSEProcessor {
     onAudioChunk: (chunk: ArrayBuffer) => void,
     onStreamComplete: (finalText: string, latency: number) => void,
     onError: (error: Error) => void,
-    submittedAt: number
+    submittedAt: number,
+    onTranscript?: (transcript: string) => void,
+    onStatus?: (status: string) => void
   ) {
     this.state = {
       buffer: "",
@@ -40,6 +46,8 @@ export class SSEProcessor {
     this.onAudioChunk = onAudioChunk;
     this.onStreamComplete = onStreamComplete;
     this.onError = onError;
+    this.onTranscript = onTranscript;
+    this.onStatus = onStatus;
     this.submittedAt = submittedAt;
   }
 
@@ -50,19 +58,15 @@ export class SSEProcessor {
     try {
       while (true) {
         const { done, value } = await reader.read();
+        console.log("Processing stream", value);
         if (done) break;
 
         this.state.buffer += decoder.decode(value, { stream: true });
         await this.processEvents();
       }
 
-      // Stream completed successfully
-      const finalMessage = this.state.accumulatedText;
-      const latency = this.state.firstPacketReceived
-        ? this.state.firstPacketLatency
-        : this.state.finalLatency;
-
-      this.onStreamComplete(finalMessage, latency);
+      // Stream completed - completion will be signaled by handleCompleteEvent
+      // when typing animation finishes
     } catch (error) {
       this.cleanup();
       if (error instanceof Error && error.name === "AbortError") {
@@ -111,13 +115,18 @@ export class SSEProcessor {
       // Capture first packet latency
       if (
         !this.state.firstPacketReceived &&
-        (event.eventType === "text" || event.eventType === "audio")
+        (event.eventType === "text" ||
+          event.eventType === "audio" ||
+          event.eventType === "transcript")
       ) {
         this.state.firstPacketLatency = Date.now() - this.submittedAt;
         this.state.firstPacketReceived = true;
       }
 
       switch (event.eventType) {
+        case "transcript":
+          this.handleTranscriptEvent(data as TranscriptEventData);
+          break;
         case "text":
           this.handleTextEvent(data as TextEventData);
           break;
@@ -126,6 +135,9 @@ export class SSEProcessor {
           break;
         case "complete":
           this.handleCompleteEvent(data as CompleteEventData);
+          break;
+        case "status":
+          this.handleStatusEvent(data as StatusEventData);
           break;
         case "error":
           this.handleErrorEvent(data as ErrorEventData);
@@ -170,13 +182,32 @@ export class SSEProcessor {
       this.state.displayedText.length
     );
 
-    // Wait for typing to complete
-    this.waitForTypingComplete();
+    // Wait for typing to complete, then signal stream completion
+    this.waitForTypingComplete().then(() => {
+      const finalMessage = this.state.accumulatedText;
+      const latency = this.state.firstPacketReceived
+        ? this.state.firstPacketLatency
+        : this.state.finalLatency;
+
+      this.onStreamComplete(finalMessage, latency);
+    });
   }
 
   private handleErrorEvent(data: ErrorEventData): void {
     this.stopTypingAnimation();
     this.onError(new Error(data.message));
+  }
+
+  private handleTranscriptEvent(data: TranscriptEventData): void {
+    if (this.onTranscript) {
+      this.onTranscript(data.content);
+    }
+  }
+
+  private handleStatusEvent(data: StatusEventData): void {
+    if (this.onStatus) {
+      this.onStatus(data.message);
+    }
   }
 
   private processAudioChunk(index: number, bytes: Uint8Array): void {
@@ -230,16 +261,18 @@ export class SSEProcessor {
     }
   }
 
-  private waitForTypingComplete(): void {
-    const checkTyping = () => {
-      if (this.state.textQueue.length === 0 && !this.state.typingIntervalId) {
-        // Typing is complete
-        return;
-      } else {
-        setTimeout(checkTyping, 50);
-      }
-    };
-    checkTyping();
+  private waitForTypingComplete(): Promise<void> {
+    return new Promise(resolve => {
+      const checkTyping = () => {
+        if (this.state.textQueue.length === 0 && !this.state.typingIntervalId) {
+          // Typing is complete
+          resolve();
+        } else {
+          setTimeout(checkTyping, 50);
+        }
+      };
+      checkTyping();
+    });
   }
 
   private cleanup(): void {
@@ -249,10 +282,23 @@ export class SSEProcessor {
   }
 
   public stop(): void {
+    console.debug("SSEProcessor: Stopping stream processing");
     this.cleanup();
     // Trigger error callback to resolve hanging promises
     if (this.onError) {
       this.onError(new Error("STREAM_INTERRUPTED"));
     }
+  }
+
+  public isProcessing(): boolean {
+    return (
+      this.state.typingIntervalId !== null ||
+      this.state.textQueue.length > 0 ||
+      this.audioChunkMap.size > 0
+    );
+  }
+
+  public getState(): StreamingState {
+    return { ...this.state };
   }
 }

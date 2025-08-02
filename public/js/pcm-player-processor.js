@@ -17,8 +17,19 @@ class PCMPlayerProcessor extends AudioWorkletProcessor {
         return;
       }
 
-      // Decode the base64 data to int16 array.
-      const int16Samples = new Int16Array(event.data);
+      // Handle ArrayBuffer data (coming from audio chunks)
+      let int16Samples;
+      if (event.data instanceof ArrayBuffer) {
+        // Convert ArrayBuffer to Int16Array
+        int16Samples = new Int16Array(event.data);
+      } else if (event.data instanceof Int16Array) {
+        // Already the correct format
+        int16Samples = event.data;
+      } else {
+        // Invalid data type
+        console.error("PCMPlayerProcessor: Invalid audio data type:", typeof event.data);
+        return;
+      }
 
       // Add the audio data to the buffer
       this._enqueue(int16Samples);

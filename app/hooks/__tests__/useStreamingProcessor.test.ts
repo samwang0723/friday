@@ -19,7 +19,9 @@ describe("useStreamingProcessor", () => {
     // Create fresh mock for each test
     mockProcessor = {
       processStream: jest.fn(),
-      stop: jest.fn()
+      stop: jest.fn(),
+      getState: jest.fn(),
+      isProcessing: jest.fn()
     } as any;
 
     MockedSSEProcessor.mockClear();
@@ -34,7 +36,9 @@ describe("useStreamingProcessor", () => {
     // Force cleanup any references
     mockProcessor = {
       processStream: jest.fn(),
-      stop: jest.fn()
+      stop: jest.fn(),
+      getState: jest.fn(),
+      isProcessing: jest.fn()
     } as any;
 
     MockedSSEProcessor.mockClear();
@@ -47,8 +51,12 @@ describe("useStreamingProcessor", () => {
 
       expect(result.current.processSSEStream).toBeDefined();
       expect(result.current.stopTypingAnimation).toBeDefined();
+      expect(result.current.getProcessorState).toBeDefined();
+      expect(result.current.isProcessorActive).toBeDefined();
       expect(typeof result.current.processSSEStream).toBe("function");
       expect(typeof result.current.stopTypingAnimation).toBe("function");
+      expect(typeof result.current.getProcessorState).toBe("function");
+      expect(typeof result.current.isProcessorActive).toBe("function");
     });
   });
 
@@ -80,7 +88,9 @@ describe("useStreamingProcessor", () => {
         onAudioChunk,
         onStreamComplete,
         onError,
-        expect.any(Number) // submittedAt timestamp
+        expect.any(Number), // submittedAt timestamp
+        undefined, // onTranscript callback
+        undefined  // onStatus callback
       );
 
       expect(mockProcessor.processStream).toHaveBeenCalledWith(mockResponse);
@@ -172,6 +182,109 @@ describe("useStreamingProcessor", () => {
       });
 
       expect(onError).toHaveBeenCalledWith(processingError);
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should handle AbortError specifically", async () => {
+      const mockResponse = new Response();
+      const callbacks = {
+        onTextUpdate: jest.fn(),
+        onAudioChunk: jest.fn(),
+        onStreamComplete: jest.fn(),
+        onError: jest.fn()
+      };
+      const abortError = new Error("The operation was aborted");
+      abortError.name = "AbortError";
+
+      const consoleSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      mockProcessor.processStream.mockRejectedValue(abortError);
+
+      const { result } = renderHook(() => useStreamingProcessor());
+
+      await act(async () => {
+        await result.current!.processSSEStream(
+          mockResponse,
+          callbacks.onTextUpdate,
+          callbacks.onAudioChunk,
+          callbacks.onStreamComplete,
+          callbacks.onError,
+          Date.now()
+        );
+      });
+
+      expect(callbacks.onError).toHaveBeenCalledWith(new Error("STREAM_ABORTED"));
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should handle network errors specifically", async () => {
+      const mockResponse = new Response();
+      const callbacks = {
+        onTextUpdate: jest.fn(),
+        onAudioChunk: jest.fn(),
+        onStreamComplete: jest.fn(),
+        onError: jest.fn()
+      };
+      const networkError = new Error("Network connection lost");
+
+      const consoleSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      mockProcessor.processStream.mockRejectedValue(networkError);
+
+      const { result } = renderHook(() => useStreamingProcessor());
+
+      await act(async () => {
+        await result.current!.processSSEStream(
+          mockResponse,
+          callbacks.onTextUpdate,
+          callbacks.onAudioChunk,
+          callbacks.onStreamComplete,
+          callbacks.onError,
+          Date.now()
+        );
+      });
+
+      expect(callbacks.onError).toHaveBeenCalledWith(new Error("NETWORK_ERROR"));
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should handle timeout errors specifically", async () => {
+      const mockResponse = new Response();
+      const callbacks = {
+        onTextUpdate: jest.fn(),
+        onAudioChunk: jest.fn(),
+        onStreamComplete: jest.fn(),
+        onError: jest.fn()
+      };
+      const timeoutError = new Error("Request timeout exceeded");
+
+      const consoleSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      mockProcessor.processStream.mockRejectedValue(timeoutError);
+
+      const { result } = renderHook(() => useStreamingProcessor());
+
+      await act(async () => {
+        await result.current!.processSSEStream(
+          mockResponse,
+          callbacks.onTextUpdate,
+          callbacks.onAudioChunk,
+          callbacks.onStreamComplete,
+          callbacks.onError,
+          Date.now()
+        );
+      });
+
+      expect(callbacks.onError).toHaveBeenCalledWith(new Error("STREAM_TIMEOUT"));
 
       consoleSpy.mockRestore();
     });
@@ -281,7 +394,9 @@ describe("useStreamingProcessor", () => {
         callbacks.onAudioChunk,
         callbacks.onStreamComplete,
         callbacks.onError,
-        expect.any(Number)
+        expect.any(Number), // submittedAt timestamp
+        undefined, // onTranscript callback
+        undefined  // onStatus callback
       );
 
       const submittedAt = (MockedSSEProcessor as jest.Mock).mock.calls[0][4];
@@ -528,6 +643,91 @@ describe("useStreamingProcessor", () => {
       expect(secondComplete).toBe(true);
 
       expect(MockedSSEProcessor).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("getProcessorState", () => {
+    it("should return null when no processor is active", () => {
+      const { result } = renderHook(() => useStreamingProcessor());
+
+      expect(result.current.getProcessorState()).toBeNull();
+    });
+
+    it("should return processor state when processor is active", async () => {
+      const mockResponse = new Response();
+      const callbacks = {
+        onTextUpdate: jest.fn(),
+        onAudioChunk: jest.fn(),
+        onStreamComplete: jest.fn(),
+        onError: jest.fn()
+      };
+
+      const mockState = { accumulatedText: "test", isProcessing: true };
+      mockProcessor.getState.mockReturnValue(mockState);
+      mockProcessor.processStream.mockImplementation(() => new Promise(() => {})); // Never resolves
+
+      const { result } = renderHook(() => useStreamingProcessor());
+
+      // Start processing but don't await
+      act(() => {
+        result.current.processSSEStream(
+          mockResponse,
+          callbacks.onTextUpdate,
+          callbacks.onAudioChunk,
+          callbacks.onStreamComplete,
+          callbacks.onError,
+          Date.now()
+        );
+      });
+
+      expect(result.current.getProcessorState()).toBe(mockState);
+
+      // Cleanup
+      act(() => {
+        result.current.stopTypingAnimation();
+      });
+    });
+  });
+
+  describe("isProcessorActive", () => {
+    it("should return false when no processor is active", () => {
+      const { result } = renderHook(() => useStreamingProcessor());
+
+      expect(result.current.isProcessorActive()).toBe(false);
+    });
+
+    it("should return true when processor is active", async () => {
+      const mockResponse = new Response();
+      const callbacks = {
+        onTextUpdate: jest.fn(),
+        onAudioChunk: jest.fn(),
+        onStreamComplete: jest.fn(),
+        onError: jest.fn()
+      };
+
+      mockProcessor.isProcessing.mockReturnValue(true);
+      mockProcessor.processStream.mockImplementation(() => new Promise(() => {})); // Never resolves
+
+      const { result } = renderHook(() => useStreamingProcessor());
+
+      // Start processing but don't await
+      act(() => {
+        result.current.processSSEStream(
+          mockResponse,
+          callbacks.onTextUpdate,
+          callbacks.onAudioChunk,
+          callbacks.onStreamComplete,
+          callbacks.onError,
+          Date.now()
+        );
+      });
+
+      expect(result.current.isProcessorActive()).toBe(true);
+
+      // Cleanup
+      act(() => {
+        result.current.stopTypingAnimation();
+      });
     });
   });
 

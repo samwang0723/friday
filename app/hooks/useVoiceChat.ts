@@ -1,5 +1,4 @@
 import { useRequestManager } from "@/hooks/useRequestManager";
-import { useStreamingProcessor } from "@/hooks/useStreamingProcessor";
 import { useAudioPlayer } from "@/lib/hooks/useAudioPlayer";
 import { VoiceChatService } from "@/services/voiceChatService";
 import type {
@@ -37,7 +36,6 @@ export function useVoiceChat({
   const t = useTranslations();
   const player = useAudioPlayer();
   const requestManager = useRequestManager();
-  const streamingProcessor = useStreamingProcessor();
 
   // Store current values in refs to avoid stale closures
   const settingsRef = useRef(settings);
@@ -55,7 +53,9 @@ export function useVoiceChat({
     isStreaming: false,
     message: "",
     input: "",
-    agentCoreInitialized: false
+    agentCoreInitialized: false,
+    streamPhase: undefined,
+    audioPlayerReady: false
   });
 
   // Helper function to update chat state
@@ -68,8 +68,12 @@ export function useVoiceChat({
     Array<Message>,
     ChatSubmissionData
   >(async (prevMessages, data) => {
+    console.log("🎯 useActionState called with data:", data);
+    console.log("Previous messages count:", prevMessages.length);
+
     // Handle reset case for logout
     if (typeof data === "string" && data === "__reset__") {
+      console.log("Reset case detected");
       setChatState(prev => ({ ...prev, isStreaming: false }));
       return [];
     }
@@ -115,45 +119,17 @@ export function useVoiceChat({
         abortController.signal
       );
 
-      // Extract transcript from response
-      const transcript = voiceChatService.extractTranscript(response);
-      if (!transcript) {
-        setChatState(prev => ({ ...prev, isStreaming: false }));
-        toast.error(t("errors.noTranscript"));
-        return prevMessages;
-      }
+      // All responses are now realtime SSE streams - bypass legacy logic
+      console.log(
+        "About to call handleStreamingResponse with response:",
+        response
+      );
+      console.log(
+        "Response headers:",
+        Object.fromEntries(response.headers.entries())
+      );
 
-      setChatState(prev => ({ ...prev, input: transcript }));
-
-      // Create user message
-      const userMessage: Message = {
-        role: "user",
-        content: transcript
-      };
-
-      const updatedMessages = [...prevMessages, userMessage];
-
-      // Handle different response types
-      const responseType = voiceChatService.getResponseType(response);
-
-      switch (responseType) {
-        case "single":
-          return await handleSingleResponse(response, userMessage, submittedAt);
-
-        case "text-only":
-          return await handleTextOnlyResponse(
-            response,
-            userMessage,
-            submittedAt
-          );
-
-        default:
-          return await handleStreamingResponse(
-            response,
-            updatedMessages,
-            submittedAt
-          );
-      }
+      return await handleStreamingResponse(response, prevMessages, submittedAt);
     } catch (error) {
       console.error("VoiceChat: Error in chat submission:", error);
       setChatState(prev => ({ ...prev, isStreaming: false }));
@@ -176,7 +152,14 @@ export function useVoiceChat({
             toast.error(t("errors.tooManyRequests"));
             break;
           case "STREAM_INTERRUPTED":
+          case "STREAM_ABORTED":
             console.error("VoiceChat: Stream interrupted");
+            break;
+          case "NETWORK_ERROR":
+            toast.error("Network connection lost. Please try again.");
+            break;
+          case "STREAM_TIMEOUT":
+            toast.error("Request timed out. Please try again.");
             break;
           default:
             const translatedError = voiceChatService.translateError(
@@ -190,49 +173,6 @@ export function useVoiceChat({
       return prevMessages;
     }
   }, []);
-
-  // Memoize audio chunk handler to prevent recreation
-  const handleAudioChunk = useCallback(
-    (chunk: ArrayBuffer) => player.playAudioChunk(chunk),
-    [player]
-  );
-
-  // Handle single response (with audio)
-  const handleSingleResponse = useCallback(
-    async (
-      response: Response,
-      userMessage: Message,
-      submittedAt: number
-    ): Promise<Message[]> => {
-      try {
-        const messages = await voiceChatService.handleSingleResponse(
-          response,
-          userMessage,
-          submittedAt,
-          handleAudioChunk
-        );
-
-        // Display response text immediately
-        setChatState(prev => ({ ...prev, message: messages[1].content }));
-
-        // Reset streaming state after a delay
-        setTimeout(() => {
-          setChatState(prev => ({
-            ...prev,
-            isStreaming: false,
-            message: ""
-          }));
-        }, 100);
-
-        return messages;
-      } catch (error) {
-        setChatState(prev => ({ ...prev, isStreaming: false }));
-        toast.error(t("errors.noResponse"));
-        throw error;
-      }
-    },
-    [voiceChatService, handleAudioChunk, t]
-  );
 
   // Handle text-only response
   const handleTextOnlyResponse = useCallback(
@@ -268,89 +208,311 @@ export function useVoiceChat({
     [voiceChatService, t]
   );
 
-  // Memoize streaming callbacks to prevent recreation
-  const handleTextUpdate = useCallback(
-    (text: string) => setChatState(prev => ({ ...prev, message: text })),
-    []
-  );
-
-  const handleStreamError = useCallback((error: Error) => {
-    setChatState(prev => ({ ...prev, isStreaming: false }));
-    // Don't show toast for intentional interruptions
-    if (error.message !== "Stream was interrupted") {
-      console.error("Stream error:", error);
-    }
-  }, []);
-
-  // Handle streaming response
+  // Handle streaming response - simplified direct implementation
   const handleStreamingResponse = useCallback(
     async (
       response: Response,
-      updatedMessages: Message[],
+      prevMessages: Message[],
       submittedAt: number
     ): Promise<Message[]> => {
-      return new Promise<Message[]>((resolve, reject) => {
-        let finalMessage = "";
-        let finalLatency = 0;
-        let completed = false;
+      // Initialize audio player immediately
+      player.initAudioPlayer().catch(error => {
+        console.warn("Failed to initialize audio player:", error);
+      });
 
-        // Set up timeout to prevent endless loading
-        const timeout = setTimeout(() => {
-          if (!completed) {
-            console.warn("VoiceChat: Stream timeout after 60 seconds");
-            completed = true;
-            setChatState(prev => ({ ...prev, isStreaming: false }));
-            reject(new Error("Stream timeout"));
+      // Set up streaming state (use startTransition to prevent render storm)
+      startTransition(() => {
+        setChatState(prev => ({
+          ...prev,
+          isStreaming: true,
+          message: "",
+          streamPhase: "transcript"
+        }));
+      });
+
+      let userTranscript = "";
+      let accumulatedText = "";
+      let displayedText = "";
+      let typingTimeoutId: NodeJS.Timeout | null = null;
+      let isTyping = false;
+
+      // Typing animation function
+      const startTypingAnimation = () => {
+        if (isTyping) {
+          return; // Already typing
+        }
+
+        isTyping = true;
+
+        const typeNextChar = () => {
+          if (displayedText.length < accumulatedText.length) {
+            displayedText = accumulatedText.substring(
+              0,
+              displayedText.length + 1
+            );
+
+            // Force immediate React render without startTransition
+            setChatState(prev => {
+              return {
+                ...prev,
+                message: displayedText,
+                streamPhase: "text"
+              };
+            });
+
+            // Continue typing with a shorter delay for faster animation
+            typingTimeoutId = setTimeout(typeNextChar, 10); // 10ms per character for smooth streaming
+          } else {
+            typingTimeoutId = null;
+            isTyping = false;
           }
-        }, 60000); // 60 second timeout
-
-        const cleanup = () => {
-          clearTimeout(timeout);
-          completed = true;
         };
 
-        streamingProcessor.processSSEStream(
-          response,
-          handleTextUpdate,
-          handleAudioChunk,
-          // onStreamComplete
-          (finalText: string, latency: number) => {
-            if (completed) return;
-            cleanup();
+        typeNextChar();
+      };
 
-            finalMessage = finalText;
-            finalLatency = latency;
+      try {
+        if (!response.body) {
+          throw new Error("Response body is null");
+        }
 
-            // Create assistant message
-            const assistantMessage: Message = {
-              role: "assistant",
-              content: finalMessage,
-              latency: finalLatency
-            };
+        const reader = response.body.getReader();
 
-            // Reset streaming state
-            setChatState(prev => ({
-              ...prev,
-              isStreaming: false,
-              message: ""
-            }));
+        const decoder = new TextDecoder();
+        let buffer = "";
 
-            resolve([...updatedMessages, assistantMessage]);
-          },
-          // onError
-          (error: Error) => {
-            if (completed) return;
-            cleanup();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
 
-            setChatState(prev => ({ ...prev, isStreaming: false }));
-            handleStreamError(error);
-            reject(error);
-          },
-          submittedAt
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete SSE events
+          while (buffer.includes("\n\n")) {
+            const eventEnd = buffer.indexOf("\n\n");
+            const eventText = buffer.substring(0, eventEnd);
+            buffer = buffer.substring(eventEnd + 2);
+
+            // Parse SSE event - handle both formats
+            const lines = eventText.split("\n");
+            let eventType = "";
+            let eventData = "";
+
+            for (const line of lines) {
+              if (line.startsWith("event:")) {
+                eventType = line.substring(6).trim();
+              } else if (line.startsWith("data:")) {
+                eventData = line.substring(5).trim();
+              }
+            }
+
+            // If no explicit event type, try to extract from JSON data
+            if (!eventType && eventData) {
+              try {
+                const data = JSON.parse(eventData);
+                eventType = data.type;
+              } catch (parseError) {
+                console.log(
+                  "Could not parse event data to extract type:",
+                  parseError
+                );
+              }
+            }
+
+            // Skip keep-alive and empty events
+            if (eventData === "keep-alive" || !eventData) {
+              continue;
+            }
+
+            if (!eventType) {
+              continue;
+            }
+
+            try {
+              const data = JSON.parse(eventData);
+
+              switch (eventType) {
+                case "transcript":
+                  userTranscript = data.data;
+                  startTransition(() => {
+                    setChatState(prev => ({
+                      ...prev,
+                      input: userTranscript,
+                      streamPhase: "transcript"
+                    }));
+                  });
+                  break;
+
+                case "text":
+                  accumulatedText += data.data;
+                  startTypingAnimation();
+                  break;
+
+                case "audio":
+                  if (data.data) {
+                    // Decode base64 audio chunk
+                    const binaryString = atob(data.data);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let j = 0; j < binaryString.length; j++) {
+                      bytes[j] = binaryString.charCodeAt(j);
+                    }
+
+                    // Send to audio player
+                    player.playAudioChunk(bytes.buffer);
+
+                    startTransition(() => {
+                      setChatState(prev => ({
+                        ...prev,
+                        streamPhase: "audio"
+                      }));
+                    });
+                  }
+                  break;
+
+                case "status":
+                  // Handle status updates (optional UI feedback)
+                  console.log("Status update:", data.message);
+                  break;
+
+                case "complete":
+                  // Store the final complete text separately - don't update accumulatedText yet
+                  const finalCompleteText = data.fullText || accumulatedText;
+
+                  // Don't update accumulatedText here - let typing animation continue with current text
+                  // We'll use finalCompleteText only for the final message creation
+
+                  // We'll use finalCompleteText for the final message
+                  const finalLatency = Date.now() - submittedAt;
+
+                  // Wait for typing animation to complete naturally before finishing
+                  const waitForTypingAndComplete = async () => {
+                    // First wait for current accumulated text to finish typing
+                    while (
+                      isTyping ||
+                      displayedText.length < accumulatedText.length
+                    ) {
+                      await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+
+                    // If there's more text in the complete message, continue typing that too
+                    if (finalCompleteText.length > accumulatedText.length) {
+                      accumulatedText = finalCompleteText;
+                      if (!isTyping) {
+                        startTypingAnimation();
+                      }
+
+                      // Wait for the complete text to finish typing
+                      while (
+                        isTyping ||
+                        displayedText.length < accumulatedText.length
+                      ) {
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                      }
+                    }
+
+                    // Create messages
+                    const userMessage: Message = {
+                      role: "user",
+                      content: userTranscript || "Audio input"
+                    };
+
+                    const assistantMessage: Message = {
+                      role: "assistant",
+                      content: finalCompleteText,
+                      latency: finalLatency
+                    };
+
+                    // Clean up typing animation
+                    if (typingTimeoutId) {
+                      clearTimeout(typingTimeoutId);
+                      typingTimeoutId = null;
+                    }
+                    isTyping = false;
+
+                    // Small delay before showing completion
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                    // Reset state
+                    startTransition(() => {
+                      setChatState(prev => ({
+                        ...prev,
+                        isStreaming: false,
+                        message: "",
+                        streamPhase: "completed"
+                      }));
+                    });
+
+                    return [...prevMessages, userMessage, assistantMessage];
+                  };
+
+                  return await waitForTypingAndComplete();
+
+                case "error":
+                  throw new Error(data.message || "Stream error");
+              }
+            } catch (parseError) {
+              console.error("Error parsing SSE event:", parseError);
+            }
+          }
+        }
+
+        // If we get here without a complete event, handle as completion
+        const userMessage: Message = {
+          role: "user",
+          content: userTranscript || "Audio input"
+        };
+
+        const assistantMessage: Message = {
+          role: "assistant",
+          content: accumulatedText,
+          latency: Date.now() - submittedAt
+        };
+
+        // Clean up typing animation
+        if (typingTimeoutId) {
+          clearTimeout(typingTimeoutId);
+          typingTimeoutId = null;
+        }
+        isTyping = false;
+
+        setChatState(prev => ({
+          ...prev,
+          isStreaming: false,
+          message: "",
+          streamPhase: "completed"
+        }));
+
+        return [...prevMessages, userMessage, assistantMessage];
+      } catch (error) {
+        console.error(
+          "Error type:",
+          error instanceof Error ? error.constructor.name : typeof error
         );
-      });
+        console.error(
+          "Error message:",
+          error instanceof Error ? error.message : error
+        );
+        console.error(
+          "Error stack:",
+          error instanceof Error ? error.stack : "No stack trace"
+        );
+
+        // Clean up typing animation
+        if (typingTimeoutId) {
+          clearTimeout(typingTimeoutId);
+          typingTimeoutId = null;
+        }
+        isTyping = false;
+
+        startTransition(() => {
+          setChatState(prev => ({ ...prev, isStreaming: false }));
+        });
+        throw error;
+      }
     },
-    [streamingProcessor, handleTextUpdate, handleAudioChunk, handleStreamError]
+    [player]
   );
 
   // Stop current request - remove dependencies to prevent infinite loops
@@ -358,7 +520,6 @@ export function useVoiceChat({
     console.debug("VoiceChat: Stopping current request");
     requestManager.cancelCurrentRequest();
     player.stop();
-    streamingProcessor.stopTypingAnimation();
     setChatState(prev => ({ ...prev, isStreaming: false }));
   }, []); // Empty deps - using closure values
 

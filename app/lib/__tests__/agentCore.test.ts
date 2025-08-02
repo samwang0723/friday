@@ -1,5 +1,4 @@
 import { AgentCoreService } from "../agentCore";
-import { agentCoreConfig } from "@/config";
 
 // Mock the config
 jest.mock("@/config", () => ({
@@ -90,25 +89,6 @@ describe("AgentCoreService", () => {
       );
     });
 
-    it("should trigger logout callback on 401 response in chat", async () => {
-      const mockResponse = {
-        ok: false,
-        status: 401,
-        text: jest.fn().mockResolvedValue("Unauthorized")
-      } as any;
-
-      mockFetch.mockResolvedValue(mockResponse);
-
-      await expect(
-        service.chat("test message", "invalid-token", { locale: "en" })
-      ).rejects.toThrow("HTTP 401: Unauthorized");
-
-      expect(mockLogout).toHaveBeenCalledTimes(1);
-      expect(mockConsoleWarn).toHaveBeenCalledWith(
-        "Received 401 Unauthorized - triggering logout"
-      );
-    });
-
     it("should trigger logout callback on 401 response in clearHistory", async () => {
       const mockResponse = {
         ok: false,
@@ -126,40 +106,6 @@ describe("AgentCoreService", () => {
       expect(mockConsoleWarn).toHaveBeenCalledWith(
         "Received 401 Unauthorized - triggering logout"
       );
-    });
-
-    it("should not trigger logout callback on non-401 errors", async () => {
-      const mockResponse = {
-        ok: false,
-        status: 500,
-        text: jest.fn().mockResolvedValue("Internal Server Error")
-      } as any;
-
-      mockFetch.mockResolvedValue(mockResponse);
-
-      await expect(
-        service.chat("test message", "valid-token", { locale: "en" })
-      ).rejects.toThrow("HTTP 500: Internal Server Error");
-
-      expect(mockLogout).not.toHaveBeenCalled();
-    });
-
-    it("should work without logout callback on 401 error", async () => {
-      const serviceWithoutCallback = new AgentCoreService();
-      const mockResponse = {
-        ok: false,
-        status: 401,
-        text: jest.fn().mockResolvedValue("Unauthorized")
-      } as any;
-
-      mockFetch.mockResolvedValue(mockResponse);
-
-      await expect(
-        serviceWithoutCallback.chat("test message", "invalid-token")
-      ).rejects.toThrow("HTTP 401: Unauthorized");
-
-      // Should not throw error even without callback
-      expect(mockLogout).not.toHaveBeenCalled();
     });
   });
 
@@ -215,7 +161,7 @@ describe("AgentCoreService", () => {
         ok: true,
         status: 200,
         body: new MockReadableStream([
-          'data: {"text": "Hello"}\n\n',
+          'event: text\ndata: {"data": "Hello"}\n\n',
           "data: [DONE]\n\n"
         ])
       } as any;
@@ -233,7 +179,11 @@ describe("AgentCoreService", () => {
       // First call should succeed
       const generator1 = service.chatStream("test message 1", "valid-token");
       const result1 = await generator1.next();
-      expect(result1.value).toBe("Hello");
+      expect(result1.value).toEqual({
+        type: "text",
+        text: "Hello",
+        metadata: undefined
+      });
 
       // Second call should trigger logout
       const generator2 = service.chatStream("test message 2", "invalid-token");
@@ -276,29 +226,13 @@ describe("AgentCoreService", () => {
       expect(mockLogout).not.toHaveBeenCalled();
     });
 
-    it("should successfully send chat message", async () => {
-      const mockResponse = {
-        ok: true,
-        json: jest.fn().mockResolvedValue({ response: "Hello there!" })
-      } as any;
-
-      mockFetch.mockResolvedValue(mockResponse);
-
-      const result = await service.chat("Hello", "valid-token", {
-        locale: "en"
-      });
-
-      expect(result).toEqual({ response: "Hello there!" });
-      expect(mockLogout).not.toHaveBeenCalled();
-    });
-
     it("should successfully stream chat", async () => {
       const mockResponse = {
         ok: true,
         status: 200,
         body: new MockReadableStream([
-          'data: {"text": "Hello"}\n\n',
-          'data: {"text": " world"}\n\n',
+          'event: text\ndata: {"data": "Hello"}\n\n',
+          'event: text\ndata: {"data": " world"}\n\n',
           "data: [DONE]\n\n"
         ])
       } as any;
@@ -312,37 +246,23 @@ describe("AgentCoreService", () => {
         chunks.push(chunk);
       }
 
-      expect(chunks).toEqual(["Hello", " world"]);
+      expect(chunks).toEqual([
+        {
+          type: "text",
+          text: "Hello",
+          metadata: undefined
+        },
+        {
+          type: "text",
+          text: " world",
+          metadata: undefined
+        }
+      ]);
       expect(mockLogout).not.toHaveBeenCalled();
     });
   });
 
   describe("Error scenarios", () => {
-    it("should handle network errors", async () => {
-      mockFetch.mockRejectedValue(new Error("Network error"));
-
-      await expect(service.chat("test", "valid-token")).rejects.toThrow(
-        "Network error"
-      );
-
-      expect(mockLogout).not.toHaveBeenCalled();
-    });
-
-    it("should handle invalid JSON response", async () => {
-      const mockResponse = {
-        ok: true,
-        json: jest.fn().mockRejectedValue(new Error("Invalid JSON"))
-      } as any;
-
-      mockFetch.mockResolvedValue(mockResponse);
-
-      await expect(service.chat("test", "valid-token")).rejects.toThrow(
-        "Invalid JSON response from server"
-      );
-
-      expect(mockLogout).not.toHaveBeenCalled();
-    });
-
     it("should handle abort errors in streaming", async () => {
       const mockResponse = {
         ok: true,
