@@ -11,7 +11,7 @@ import { getLocale } from "./lib/i18n";
 export const metadata: Metadata = {
   title: "Friday",
   description:
-    "A fast, open-source voice assistant powered by Groq, Cartesia, and Vercel."
+    "A fast, open-source voice assistant powered by Groq, ElevenLabs, Cartesia, and Vercel."
 };
 
 export default async function RootLayout({

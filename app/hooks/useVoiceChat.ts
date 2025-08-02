@@ -174,59 +174,6 @@ export function useVoiceChat({
     }
   }, []);
 
-  // Memoize audio chunk handler to prevent recreation
-  const handleAudioChunk = useCallback(
-    (chunk: ArrayBuffer) => {
-      // Update stream phase to audio when first chunk arrives
-      setChatState(prev => ({
-        ...prev,
-        streamPhase:
-          prev.streamPhase === "transcript" || prev.streamPhase === "text"
-            ? "audio"
-            : prev.streamPhase
-      }));
-      player.playAudioChunk(chunk);
-    },
-    [player]
-  );
-
-  // Handle single response (with audio)
-  const handleSingleResponse = useCallback(
-    async (
-      response: Response,
-      userMessage: Message,
-      submittedAt: number
-    ): Promise<Message[]> => {
-      try {
-        const messages = await voiceChatService.handleSingleResponse(
-          response,
-          userMessage,
-          submittedAt,
-          handleAudioChunk
-        );
-
-        // Display response text immediately
-        setChatState(prev => ({ ...prev, message: messages[1].content }));
-
-        // Reset streaming state after a delay
-        setTimeout(() => {
-          setChatState(prev => ({
-            ...prev,
-            isStreaming: false,
-            message: ""
-          }));
-        }, 100);
-
-        return messages;
-      } catch (error) {
-        setChatState(prev => ({ ...prev, isStreaming: false }));
-        toast.error(t("errors.noResponse"));
-        throw error;
-      }
-    },
-    [voiceChatService, handleAudioChunk, t]
-  );
-
   // Handle text-only response
   const handleTextOnlyResponse = useCallback(
     async (
@@ -260,15 +207,6 @@ export function useVoiceChat({
     },
     [voiceChatService, t]
   );
-
-  // Simplified stream error handler
-  const handleStreamError = useCallback((error: Error) => {
-    setChatState(prev => ({ ...prev, isStreaming: false }));
-    // Don't show toast for intentional interruptions
-    if (error.message !== "Stream was interrupted") {
-      console.error("Stream error:", error);
-    }
-  }, []);
 
   // Handle streaming response - simplified direct implementation
   const handleStreamingResponse = useCallback(

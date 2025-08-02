@@ -112,8 +112,6 @@ export class SSEProcessor {
     try {
       const data = JSON.parse(event.eventData);
 
-      console.log("Event data:", data);
-
       // Capture first packet latency
       if (
         !this.state.firstPacketReceived &&
@@ -264,7 +262,7 @@ export class SSEProcessor {
   }
 
   private waitForTypingComplete(): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const checkTyping = () => {
         if (this.state.textQueue.length === 0 && !this.state.typingIntervalId) {
           // Typing is complete
@@ -293,9 +291,11 @@ export class SSEProcessor {
   }
 
   public isProcessing(): boolean {
-    return this.state.typingIntervalId !== null || 
-           this.state.textQueue.length > 0 ||
-           this.audioChunkMap.size > 0;
+    return (
+      this.state.typingIntervalId !== null ||
+      this.state.textQueue.length > 0 ||
+      this.audioChunkMap.size > 0
+    );
   }
 
   public getState(): StreamingState {

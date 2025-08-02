@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 export interface SettingsState {
   sttEngine: string;
   ttsEngine: string;
-  streaming: boolean;
   audioEnabled: boolean;
   vadSensitivity: "low" | "medium" | "high";
 }
@@ -13,7 +12,6 @@ export interface SettingsState {
 const DEFAULT_SETTINGS: SettingsState = {
   sttEngine: "groq",
   ttsEngine: "elevenlabs",
-  streaming: true,
   audioEnabled: true,
   vadSensitivity: "medium"
 };
@@ -43,10 +41,6 @@ export function useSettings() {
           const loadedSettings: SettingsState = {
             sttEngine: parsed.sttEngine || DEFAULT_SETTINGS.sttEngine,
             ttsEngine: parsed.ttsEngine || DEFAULT_SETTINGS.ttsEngine,
-            streaming:
-              parsed.streaming !== undefined
-                ? parsed.streaming
-                : DEFAULT_SETTINGS.streaming,
             audioEnabled:
               parsed.audioEnabled !== undefined
                 ? parsed.audioEnabled

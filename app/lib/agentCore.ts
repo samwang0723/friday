@@ -108,12 +108,7 @@ export class AgentCoreService {
       console.log("Original locale:", locale, "Mapped locale:", mappedLocale);
       if (mappedLocale) {
         headers["X-Locale"] = mappedLocale;
-        console.log("X-Locale header added:", mappedLocale);
-      } else {
-        console.log("No mapped locale, X-Locale header not added");
       }
-    } else {
-      console.log("No locale provided to getHeaders");
     }
 
     return headers;
@@ -156,42 +151,6 @@ export class AgentCoreService {
       console.info("Agent-core chat session initialized successfully");
     } catch (error) {
       console.error("Failed to initialize agent-core chat:", error);
-      throw error;
-    }
-  }
-
-  async chat(
-    message: string,
-    token: string,
-    context?: ClientContext
-  ): Promise<ChatResponse> {
-    try {
-      console.info("Sending message to agent-core chat");
-
-      const response = await fetch(`${this.baseURL}/chat`, {
-        method: "POST",
-        headers: this.getHeaders(
-          token,
-          context?.timezone,
-          context?.clientDatetime,
-          context?.locale
-        ),
-        body: JSON.stringify({
-          message: {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: message
-              }
-            ]
-          }
-        })
-      });
-
-      return await this.handleResponse<ChatResponse>(response);
-    } catch (error) {
-      console.error("Failed to send message to agent-core:", error);
       throw error;
     }
   }
@@ -365,7 +324,6 @@ export class AgentCoreService {
     externalAbort?: AbortSignal,
     settings?: {
       audioEnabled?: boolean;
-      streaming?: boolean;
       includeText?: boolean;
       textFormat?: string;
       includeMetadata?: boolean;

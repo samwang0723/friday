@@ -14,7 +14,6 @@ interface SettingsProps {
   settings: {
     sttEngine: string;
     ttsEngine: string;
-    streaming: boolean;
     audioEnabled: boolean;
     vadSensitivity: "low" | "medium" | "high";
   };
@@ -212,52 +211,6 @@ export default function Settings({
                 <option value="cartesiachinese">Cartesia</option>
               )}
             </select>
-          </div>
-
-          {/* Streaming Toggle */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <svg
-                className="h-5 w-5 text-green-400"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.5"
-                  d="M13 10V3L4 14h7v7l9-11h-7z"
-                />
-              </svg>
-              <div className="flex flex-col">
-                <span className="text-white text-sm">{t("streaming")}</span>
-                <span className="text-gray-400 text-xs">
-                  {t("streamingDescription")}
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={() => updateSetting("streaming", !settings.streaming)}
-              className={clsx(
-                "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
-                {
-                  "bg-blue-600": settings.streaming,
-                  "bg-gray-600": !settings.streaming
-                }
-              )}
-            >
-              <span
-                className={clsx(
-                  "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                  {
-                    "translate-x-5": settings.streaming,
-                    "translate-x-0": !settings.streaming
-                  }
-                )}
-              />
-            </button>
           </div>
 
           {/* Audio Toggle */}

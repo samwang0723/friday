@@ -83,8 +83,7 @@ const schema = zfd
         z.object({
           sttEngine: z.string(),
           ttsEngine: z.string(),
-          audioEnabled: z.boolean().optional(),
-          streaming: z.boolean().optional()
+          audioEnabled: z.boolean().optional()
         })
       )
       .optional()
@@ -144,8 +143,7 @@ export async function POST(request: Request) {
     const settings = data.settings || {
       sttEngine: "groq",
       ttsEngine: "elevenlabs",
-      audioEnabled: true,
-      streaming: true
+      audioEnabled: true
     };
 
     console.log("Using settings:", settings);
@@ -282,7 +280,10 @@ export async function POST(request: Request) {
         try {
           // Validate that we have file input for voice streaming
           if (!data.input || !(data.input instanceof File)) {
-            console.error("Voice streaming requires file input, but got:", typeof data.input);
+            console.error(
+              "Voice streaming requires file input, but got:",
+              typeof data.input
+            );
             const errorEvent = `event: error\ndata: ${JSON.stringify({
               message: "File input required for voice streaming"
             })}\n\n`;
@@ -292,9 +293,16 @@ export async function POST(request: Request) {
           }
 
           // Use AgentCore voice streaming
-          console.debug("Voice SSE: Creating voiceStream with settings:", settings);
-          console.debug("Voice SSE: Input file size:", data.input.size, "bytes");
-          
+          console.debug(
+            "Voice SSE: Creating voiceStream with settings:",
+            settings
+          );
+          console.debug(
+            "Voice SSE: Input file size:",
+            data.input.size,
+            "bytes"
+          );
+
           const voiceStream = agentCore.voiceStream(
             data.input,
             settings.ttsEngine as "cartesia" | "elevenlabs" | "minimax",
@@ -303,23 +311,26 @@ export async function POST(request: Request) {
             abortController.signal,
             {
               audioEnabled: settings.audioEnabled,
-              streaming: true,
               includeText: true,
               textFormat: "text",
               includeMetadata: true
             }
           );
-          
+
           console.debug("Voice SSE: voiceStream created successfully");
 
           // Process voice stream events
           console.debug("Voice SSE: Starting to iterate over voiceStream");
-          
+
           let eventCount = 0;
           for await (const event of voiceStream) {
             eventCount++;
-            console.debug(`Voice SSE: Received event #${eventCount}:`, event.type, event);
-            
+            console.debug(
+              `Voice SSE: Received event #${eventCount}:`,
+              event.type,
+              event
+            );
+
             if (abortController.signal.aborted || isControllerClosed) {
               console.debug(
                 "Voice SSE: Voice streaming interrupted - abort signal or controller closed"
@@ -399,12 +410,16 @@ export async function POST(request: Request) {
             }
           }
 
-          console.debug(`Voice SSE: Voice streaming completed after ${eventCount} events`);
+          console.debug(
+            `Voice SSE: Voice streaming completed after ${eventCount} events`
+          );
           if (eventCount === 0) {
-            console.error("Voice SSE: No events received from agentCore.voiceStream!");
+            console.error(
+              "Voice SSE: No events received from agentCore.voiceStream!"
+            );
           }
           safeClose();
-          
+
           // Clean up request tracking after stream completion
           cleanup();
         } catch (error) {

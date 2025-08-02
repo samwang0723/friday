@@ -36,10 +36,6 @@ import MessageDisplay from "@/components/MessageDisplay";
 import NotificationButton from "@/components/NotificationButton";
 import NotificationModal from "@/components/NotificationModal";
 import NotificationStatus from "@/components/NotificationStatus";
-import {
-  PerformanceMonitor,
-  useRenderTracking
-} from "@/components/PerformanceMonitor";
 import Settings from "@/components/Settings";
 import SettingsButton from "@/components/SettingsButton";
 import VoiceOrb from "@/components/VoiceOrb";
@@ -423,18 +419,8 @@ export default function Home() {
     // Removed function references that change on every render
   ]);
 
-  // Performance monitoring in development (after all hooks are defined)
-  // Only track stable properties to avoid re-renders from streaming message updates
-  useRenderTracking("HomePage", [
-    auth.isAuthenticated,
-    voiceChat.chatState.isStreaming, // Only track streaming state, not the changing message
-    settings.audioEnabled, // Only track relevant settings that affect rendering
-    debouncedVadState.userSpeaking // Use debounced VAD state
-  ]);
-
   return (
     <>
-      <PerformanceMonitor componentName="HomePage" />
       <div className="pb-4 min-h-28" />
 
       {!auth.isAuthenticated && <GoogleLoginButton disabled={auth.loading} />}
