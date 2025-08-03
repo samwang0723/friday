@@ -30,6 +30,7 @@ async *voiceRealtimeStream(
 ### 1.2 TypeScript Interfaces
 
 **Voice Metadata Structure:**
+
 ```typescript
 interface VoiceMetadata {
   sessionId?: string;
@@ -44,10 +45,17 @@ interface VoiceMetadata {
 ```
 
 **Realtime Voice Response:**
+
 ```typescript
 interface RealtimeVoiceResponse {
   type: "transcription" | "text" | "audio" | "control" | "error" | "complete";
-  data: VoiceTranscriptionData | VoiceTextData | VoiceAudioData | VoiceControlData | VoiceErrorData | VoiceCompleteData;
+  data:
+    | VoiceTranscriptionData
+    | VoiceTextData
+    | VoiceAudioData
+    | VoiceControlData
+    | VoiceErrorData
+    | VoiceCompleteData;
   timestamp: number;
   sessionId?: string;
 }
@@ -58,14 +66,16 @@ interface RealtimeVoiceResponse {
 ### 2.1 Event Types and Structure
 
 **Event Types:**
+
 - `transcription` - Real-time speech-to-text results
-- `text` - AI assistant text responses  
+- `text` - AI assistant text responses
 - `audio` - Audio chunks from TTS
 - `control` - Session management commands
 - `error` - Error handling
 - `complete` - Session completion
 
 **SSE Message Format:**
+
 ```
 event: transcription
 data: {"content": "Hello", "isFinal": false, "confidence": 0.95}
@@ -81,7 +91,7 @@ data: {"sessionId": "sess_123", "finalTranscript": "Complete message"}
 
 1. **Session Initialization**: Client opens SSE connection to `/voice/realtime`
 2. **Audio Upload**: Client sends audio chunks via `sendVoicePacket()`
-3. **Bidirectional Streaming**: 
+3. **Bidirectional Streaming**:
    - Transcription events stream user speech
    - Text events stream AI responses
    - Audio events stream TTS output
@@ -94,6 +104,7 @@ data: {"sessionId": "sess_123", "finalTranscript": "Complete message"}
 **Purpose**: Establish realtime voice streaming session
 
 **Request:**
+
 ```json
 {
   "sessionConfig": {
@@ -109,6 +120,7 @@ data: {"sessionId": "sess_123", "finalTranscript": "Complete message"}
 **Response**: SSE stream with event types listed above
 
 **Headers:**
+
 - `Authorization: Bearer <token>`
 - `Accept: text/event-stream`
 - `X-Client-Timezone: America/New_York`
@@ -119,6 +131,7 @@ data: {"sessionId": "sess_123", "finalTranscript": "Complete message"}
 **Purpose**: Send audio chunks for processing
 
 **Request**: Multipart form data
+
 - `audio`: Audio blob with appropriate MIME type
 - `metadata`: JSON metadata object
 
@@ -129,6 +142,7 @@ data: {"sessionId": "sess_123", "finalTranscript": "Complete message"}
 ### 4.1 Authentication Integration
 
 **Consistent with Existing Patterns:**
+
 - Bearer token authentication via `Authorization` header
 - Automatic logout on 401 responses
 - Context headers (`X-Client-Timezone`, `X-Locale`, `X-Client-Datetime`)
@@ -146,11 +160,13 @@ const headers = this.getHeaders(
 ### 4.2 Request Lifecycle Management
 
 **Timeout Management:**
+
 - Inherits `streamTimeout` from existing config
 - Uses same AbortController patterns
 - External abort signal support
 
 **Error Handling:**
+
 - Consistent with existing `handleResponse()` method
 - 401 triggers logout callback
 - AbortError handling for graceful cancellation
@@ -158,11 +174,13 @@ const headers = this.getHeaders(
 ### 4.3 Audio Format Support
 
 **Input Formats:**
+
 - WebM (existing pipeline compatibility)
 - WAV (standard format)
 - PCM (raw audio data)
 
 **Output Format:**
+
 - PCM S16LE at 24kHz (consistent with existing TTS)
 - Base64 encoded chunks for SSE transmission
 
@@ -171,6 +189,7 @@ const headers = this.getHeaders(
 ### 5.1 Code Organization
 
 **File Structure:**
+
 ```
 app/lib/agentCore.ts          # Extended with voice methods
 app/api/voice/
@@ -182,6 +201,7 @@ app/types/voiceRealtime.ts    # New voice interfaces
 ### 5.2 Error Handling Patterns
 
 **Follow Existing Conventions:**
+
 ```typescript
 // Network errors
 if (!response.ok) {
@@ -201,11 +221,13 @@ if (err.name === "AbortError") {
 ### 5.3 Testing Considerations
 
 **Unit Tests:**
+
 - Mock AgentCore voice methods
 - Test SSE event parsing
 - Validate audio packet handling
 
 **Integration Tests:**
+
 - End-to-end voice streaming
 - Session management
 - Error recovery scenarios
@@ -215,11 +237,13 @@ if (err.name === "AbortError") {
 ### 6.1 Audio Streaming
 
 **Buffering Strategy:**
+
 - 16KB audio chunks (consistent with existing pipeline)
 - Sequence numbering for ordered delivery
 - Base64 encoding for SSE compatibility
 
 **Memory Management:**
+
 - Stream processing to avoid large buffers
 - Proper cleanup of AbortControllers
 - Reader lock management
@@ -227,6 +251,7 @@ if (err.name === "AbortError") {
 ### 6.2 Network Efficiency
 
 **Connection Management:**
+
 - Keep-alive for SSE connections
 - Multipart uploads for audio efficiency
 - Compression for text events
@@ -236,6 +261,7 @@ if (err.name === "AbortError") {
 ### 7.1 Authentication
 
 **Token Validation:**
+
 - Bearer token required for all endpoints
 - Session-based access control
 - Token expiration handling
@@ -243,6 +269,7 @@ if (err.name === "AbortError") {
 ### 7.2 Audio Data Security
 
 **Transport Security:**
+
 - HTTPS required for audio transmission
 - Temporary audio data (no persistent storage)
 - Secure multipart handling
@@ -252,6 +279,7 @@ if (err.name === "AbortError") {
 ### 8.1 Existing API Preservation
 
 **No Breaking Changes:**
+
 - Existing `/api` endpoint unchanged
 - Current voice pipeline remains functional
 - Settings compatibility maintained
@@ -259,6 +287,7 @@ if (err.name === "AbortError") {
 ### 8.2 Progressive Enhancement
 
 **Gradual Adoption:**
+
 - New realtime features are additive
 - Fallback to existing pipeline if needed
 - Feature detection for client capabilities
@@ -316,6 +345,7 @@ await agentCore.sendVoicePacket(
 ### 10.1 Environment Variables
 
 **New Configuration:**
+
 ```env
 AGENT_CORE_VOICE_TIMEOUT=60000
 VOICE_BUFFER_SIZE=16384
@@ -325,6 +355,7 @@ MAX_VOICE_SESSION_DURATION=300000
 ### 10.2 Monitoring
 
 **Metrics to Track:**
+
 - Voice session duration
 - Audio packet loss rates
 - SSE connection stability

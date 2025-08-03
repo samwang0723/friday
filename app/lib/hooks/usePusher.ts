@@ -39,22 +39,53 @@ export function usePusher({
   );
 
   const handlePusherError = useCallback(() => {
-    if (connectionRetriesRef.current < MAX_RETRIES) {
+    // Don't retry if we're already at max retries or if there's a session issue
+    if (
+      connectionRetriesRef.current < MAX_RETRIES &&
+      status !== "sessionInvalid"
+    ) {
       connectionRetriesRef.current++;
       console.log(
         `Retrying Pusher connection (${connectionRetriesRef.current}/${MAX_RETRIES})...`
       );
       setTimeout(() => {
-        disconnectPusher();
+        // Clean up current connection
+        if (userChannelRef.current) {
+          userChannelRef.current.unbind_all();
+          if (pusherRef.current) {
+            pusherRef.current.unsubscribe(userChannelRef.current.name);
+          }
+          userChannelRef.current = null;
+        }
+
+        if (pusherRef.current) {
+          pusherRef.current.disconnect();
+          pusherRef.current = null;
+        }
+
+        updateStatus("disconnected", "disconnected");
+        isInitializingRef.current = false;
+
+        // Retry initialization if still authenticated
         if (isAuthenticated) {
-          initializePusher();
+          // Re-initialize without calling the functions directly
+          setTimeout(() => {
+            if (
+              isAuthenticated &&
+              !pusherRef.current &&
+              !isInitializingRef.current
+            ) {
+              // This will trigger the effect that calls initializePusher
+              setStatus("disconnected");
+            }
+          }, 100);
         }
       }, RETRY_DELAY * connectionRetriesRef.current);
     } else {
-      console.error("Max Pusher connection retries reached");
+      console.error("Max Pusher connection retries reached or session invalid");
       updateStatus("disconnected", "connectionFailed");
     }
-  }, [isAuthenticated, updateStatus]);
+  }, [isAuthenticated, updateStatus, status]);
 
   const disconnectPusher = useCallback(() => {
     if (userChannelRef.current) {
@@ -86,6 +117,11 @@ export function usePusher({
       });
 
       if (!response.ok) {
+        // Handle session expiry/invalid authentication
+        if (response.status === 401 || response.status === 403) {
+          console.log("Session invalid - API call unauthorized");
+          throw new Error("SESSION_INVALID");
+        }
         throw new Error(`API call failed: ${response.status}`);
       }
 
@@ -188,6 +224,16 @@ export function usePusher({
       userChannelRef.current.bind("chat_message", eventHandlers.onChatMessage);
     } catch (error) {
       console.error("Failed to initialize Pusher:", error);
+
+      // Handle session invalid errors specially
+      if (error instanceof Error && error.message === "SESSION_INVALID") {
+        console.log("Pusher: Session invalid, stopping retries");
+        updateStatus("sessionInvalid", "sessionInvalid");
+        isInitializingRef.current = false;
+        connectionRetriesRef.current = MAX_RETRIES; // Stop further retries
+        return;
+      }
+
       updateStatus("disconnected", "failedToConnect");
       isInitializingRef.current = false;
       handlePusherError();
@@ -197,8 +243,8 @@ export function usePusher({
     getToken,
     eventHandlers,
     updateStatus,
-    handlePusherError,
-    apiCall
+    apiCall,
+    handlePusherError
   ]);
 
   // Initialize Pusher when user is authenticated
