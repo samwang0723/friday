@@ -4,7 +4,10 @@ import type {
   EmailNotificationData,
   SystemNotificationData
 } from "@/lib/types/pusher";
-import type { NotificationHandlersHookReturn } from "@/types/voiceChat";
+import type {
+  ChatState,
+  NotificationHandlersHookReturn
+} from "@/types/voiceChat";
 import { useTranslations } from "next-intl";
 import { useCallback, useRef } from "react";
 import { toast } from "sonner";
@@ -14,7 +17,7 @@ interface UseNotificationHandlersProps {
     isAuthenticated: boolean;
   };
   addNotification: (notification: any) => void;
-  updateChatState?: (updates: { message: string }) => void;
+  updateChatState?: (updates: Partial<ChatState>) => void;
 }
 
 export function useNotificationHandlers({
@@ -133,7 +136,11 @@ export function useNotificationHandlers({
       // Display the proactive message directly in the chat interface
       if (updateChatState) {
         console.log("Displaying proactive message:", data.message);
-        updateChatState({ message: data.message });
+        updateChatState({
+          message: data.message,
+          isStreaming: false,
+          streamPhase: "completed"
+        });
       }
 
       // Wait before processing next message to allow reading time
