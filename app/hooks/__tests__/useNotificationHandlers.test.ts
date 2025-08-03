@@ -383,16 +383,16 @@ describe("useNotificationHandlers", () => {
         });
       });
 
-      // Advance timers to test the 3-second display duration
+      // Message should remain displayed (no auto-clearing)
       act(() => {
         jest.advanceTimersByTime(3000);
       });
 
-      await waitFor(() => {
-        expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: ""
-        });
+      // Should still show the message (no clearing)
+      expect(mockUpdateChatState).toHaveBeenCalledWith({
+        message: mockChatData.message
       });
+      expect(mockUpdateChatState).toHaveBeenCalledTimes(1);
     });
 
     it("should reject chat message when not authenticated", () => {
@@ -571,12 +571,12 @@ describe("useNotificationHandlers", () => {
 
       // Advance timers to complete processing
       act(() => {
-        jest.advanceTimersByTime(3000); // Complete 3s display time
+        jest.advanceTimersByTime(3000); // Wait for processing
       });
 
-      // Should have cleared the message
-      await waitFor(() => {
-        expect(mockUpdateChatState).toHaveBeenCalledWith({ message: "" });
+      // Should have displayed the message (no clearing)
+      expect(mockUpdateChatState).toHaveBeenCalledWith({ 
+        message: mockChatData.message 
       });
 
       // Try to process again - should not process anything since queue is empty
@@ -584,8 +584,8 @@ describe("useNotificationHandlers", () => {
         await result.current!.processMessageQueue();
       });
 
-      // Should have been called exactly 2 times: display + clear
-      expect(mockUpdateChatState).toHaveBeenCalledTimes(2);
+      // Should have been called exactly 1 time: display only (no clearing)
+      expect(mockUpdateChatState).toHaveBeenCalledTimes(1);
     });
 
     it("should wait between processing messages", async () => {
@@ -829,16 +829,14 @@ describe("useNotificationHandlers", () => {
         });
       });
 
-      // Advance time to test clearing
+      // Advance time for any processing
       act(() => {
         jest.advanceTimersByTime(3000);
       });
 
-      // Should clear the message
-      await waitFor(() => {
-        expect(localMockUpdateChatState).toHaveBeenCalledWith({
-          message: ""
-        });
+      // Should display the message (no clearing)
+      expect(localMockUpdateChatState).toHaveBeenCalledWith({
+        message: mockChatData.message
       });
     });
 
@@ -918,14 +916,13 @@ describe("useNotificationHandlers", () => {
         jest.advanceTimersByTime(3000);
       });
 
-      await waitFor(() => {
-        expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: ""
-        });
+      // Should display the message (no clearing)
+      expect(mockUpdateChatState).toHaveBeenCalledWith({
+        message: mockChatData.message
       });
 
-      // Verify queue is processed (display + clear = 2 calls)
-      expect(mockUpdateChatState).toHaveBeenCalledTimes(2);
+      // Verify queue is processed (display only = 1 call)
+      expect(mockUpdateChatState).toHaveBeenCalledTimes(1);
     });
 
     it("should handle edge cases in message processing", async () => {

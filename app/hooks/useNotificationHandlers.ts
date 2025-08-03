@@ -127,10 +127,6 @@ export function useNotificationHandlers({
       if (updateChatState) {
         console.log("Displaying proactive message:", data.message);
         updateChatState({ message: data.message });
-
-        // Show message for a few seconds, then clear it
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        updateChatState({ message: "" });
       }
 
       // Wait before processing next message to allow reading time
