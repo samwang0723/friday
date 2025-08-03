@@ -92,7 +92,7 @@ export default function Home() {
   const notificationHandlers = useNotificationHandlers({
     auth,
     addNotification,
-    submit: voiceChat.submit
+    updateChatState: voiceChat.updateChatState
   });
 
   // Initialize Agent Core service
@@ -451,7 +451,7 @@ export default function Home() {
         isLoading={debouncedVadState.loading}
         isErrored={debouncedVadState.errored}
         isUserSpeaking={debouncedVadState.userSpeaking}
-        hasMessage={!!voiceChat.chatState.message}
+        hasMessage={!!voiceChat.chatState.message} //FIXME: notification will keep the message but Orb state not reset
       />
 
       <SettingsButton onClick={() => setIsSettingsOpen(true)} />

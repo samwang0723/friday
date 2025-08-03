@@ -50,7 +50,7 @@ describe("SSEProcessor", () => {
       onError,
       Date.now(),
       undefined, // onTranscript callback
-      undefined  // onStatus callback
+      undefined // onStatus callback
     );
 
     // Mock atob for base64 decoding in this test (overrides global)

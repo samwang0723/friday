@@ -357,8 +357,6 @@ export async function POST(request: Request) {
 
           // Handle text input using chatStream
           if (typeof data.input === "string") {
-            console.debug("Text SSE: Processing text input:", data.input);
-
             // Use AgentCore chat streaming for text-only input
             const chatStream = agentCore.chatStream(
               data.input,
@@ -367,23 +365,11 @@ export async function POST(request: Request) {
               abortController.signal
             );
 
-            console.debug("Text SSE: chatStream created successfully");
-
             // Process chat stream events
             let eventCount = 0;
             for await (const event of chatStream) {
               eventCount++;
-
-              console.debug(
-                `Text SSE: Received chunk #${eventCount}:`,
-                event.type,
-                event
-              );
-
               if (abortController.signal.aborted || isControllerClosed) {
-                console.debug(
-                  "Text SSE: Text streaming interrupted - abort signal or controller closed"
-                );
                 break;
               }
 
@@ -391,9 +377,6 @@ export async function POST(request: Request) {
               const sseEvent = formatEventAsSSE(event);
 
               if (sseEvent && !safeEnqueue(encoder.encode(sseEvent))) {
-                console.debug(
-                  "Text SSE: Text streaming stopped - failed to enqueue"
-                );
                 break;
               }
 
@@ -402,9 +385,7 @@ export async function POST(request: Request) {
                 break;
               }
             }
-            console.debug(
-              `Text SSE: Text streaming completed after ${eventCount} chunks`
-            );
+
             if (eventCount === 0) {
               console.error(
                 "Text SSE: No chunks received from agentCore.chatStream!"
@@ -432,16 +413,6 @@ export async function POST(request: Request) {
           }
 
           // Use AgentCore voice streaming
-          console.debug(
-            "Voice SSE: Creating voiceStream with settings:",
-            settings
-          );
-          console.debug(
-            "Voice SSE: Input file size:",
-            data.input.size,
-            "bytes"
-          );
-
           const voiceStream = agentCore.voiceStream(
             data.input,
             settings.ttsEngine as "cartesia" | "elevenlabs" | "cartesiachinese",
@@ -455,24 +426,11 @@ export async function POST(request: Request) {
             }
           );
 
-          console.debug("Voice SSE: voiceStream created successfully");
-
-          // Process voice stream events
-          console.debug("Voice SSE: Starting to iterate over voiceStream");
-
           let eventCount = 0;
           for await (const event of voiceStream) {
             eventCount++;
-            console.debug(
-              `Voice SSE: Received event #${eventCount}:`,
-              event.type,
-              event
-            );
 
             if (abortController.signal.aborted || isControllerClosed) {
-              console.debug(
-                "Voice SSE: Voice streaming interrupted - abort signal or controller closed"
-              );
               break;
             }
 
@@ -480,9 +438,6 @@ export async function POST(request: Request) {
             const sseEvent = formatEventAsSSE(event);
 
             if (sseEvent && !safeEnqueue(encoder.encode(sseEvent))) {
-              console.debug(
-                "Voice SSE: Voice streaming stopped - failed to enqueue"
-              );
               break;
             }
 
@@ -492,9 +447,6 @@ export async function POST(request: Request) {
             }
           }
 
-          console.debug(
-            `Voice SSE: Voice streaming completed after ${eventCount} events`
-          );
           if (eventCount === 0) {
             console.error(
               "Voice SSE: No events received from agentCore.voiceStream!"

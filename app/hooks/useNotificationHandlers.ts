@@ -1,30 +1,29 @@
-import { useCallback, useRef } from "react";
-import { toast } from "sonner";
-import { startTransition } from "react";
-import { useTranslations } from "next-intl";
 import type {
-  EmailNotificationData,
   CalendarEventData,
-  SystemNotificationData,
-  ChatMessageData
+  ChatMessageData,
+  EmailNotificationData,
+  SystemNotificationData
 } from "@/lib/types/pusher";
 import type {
-  NotificationHandlersHookReturn,
-  ChatSubmissionData
+  ChatState,
+  NotificationHandlersHookReturn
 } from "@/types/voiceChat";
+import { useTranslations } from "next-intl";
+import { useCallback, useRef } from "react";
+import { toast } from "sonner";
 
 interface UseNotificationHandlersProps {
   auth: {
     isAuthenticated: boolean;
   };
   addNotification: (notification: any) => void;
-  submit: (data: ChatSubmissionData) => void;
+  updateChatState?: (updates: Partial<ChatState>) => void;
 }
 
 export function useNotificationHandlers({
   auth,
   addNotification,
-  submit
+  updateChatState
 }: UseNotificationHandlersProps): NotificationHandlersHookReturn {
   const t = useTranslations();
 
@@ -134,20 +133,22 @@ export function useNotificationHandlers({
         data
       });
 
-      console.log("Submitting transcript:", data.message);
-      startTransition(() => {
-        console.log("Inside transition, calling submit with:", {
-          transcript: data.message
+      // Display the proactive message directly in the chat interface
+      if (updateChatState) {
+        console.log("Displaying proactive message:", data.message);
+        updateChatState({
+          message: data.message,
+          isStreaming: false,
+          streamPhase: "completed"
         });
-        submit({ transcript: data.message });
-      });
+      }
 
-      // Wait before processing next message to allow TTS completion
-      await new Promise(resolve => setTimeout(resolve, 4000)); // 4 second delay
+      // Wait before processing next message to allow reading time
+      await new Promise(resolve => setTimeout(resolve, 4000));
     }
 
     isProcessingRef.current = false;
-  }, [submit, addNotification]);
+  }, [addNotification, updateChatState]);
 
   const handleChatMessage = useCallback(
     (data: ChatMessageData) => {

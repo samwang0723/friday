@@ -238,12 +238,7 @@ export class AgentCoreService {
         while (true) {
           const { done, value } = await reader.read();
           chunkCount++;
-          console.log(
-            `AgentCore: Read chunk #${chunkCount}, done: ${done}, valueLength: ${value?.length}`
-          );
-
           if (done) {
-            console.log(`AgentCore: Stream done after ${chunkCount} chunks`);
             if (timeoutId) {
               clearTimeout(timeoutId);
             }

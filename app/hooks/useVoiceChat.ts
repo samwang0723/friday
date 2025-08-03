@@ -174,40 +174,6 @@ export function useVoiceChat({
     }
   }, []);
 
-  // Handle text-only response
-  const handleTextOnlyResponse = useCallback(
-    async (
-      response: Response,
-      userMessage: Message,
-      submittedAt: number
-    ): Promise<Message[]> => {
-      try {
-        const messages = await voiceChatService.handleTextOnlyResponse(
-          response,
-          userMessage,
-          submittedAt
-        );
-
-        // Display response text immediately
-        setChatState(prev => ({ ...prev, message: messages[1].content }));
-
-        // Reset streaming state
-        setChatState(prev => ({
-          ...prev,
-          isStreaming: false,
-          message: ""
-        }));
-
-        return messages;
-      } catch (error) {
-        setChatState(prev => ({ ...prev, isStreaming: false }));
-        toast.error(t("errors.noResponse"));
-        throw error;
-      }
-    },
-    [voiceChatService, t]
-  );
-
   // Handle streaming response - simplified direct implementation
   const handleStreamingResponse = useCallback(
     async (
