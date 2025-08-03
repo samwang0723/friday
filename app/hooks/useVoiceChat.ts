@@ -235,6 +235,7 @@ export function useVoiceChat({
       let displayedText = "";
       let typingTimeoutId: NodeJS.Timeout | null = null;
       let isTyping = false;
+      let firstByteReceivedAt: number | null = null;
 
       // Typing animation function
       const startTypingAnimation = () => {
@@ -346,12 +347,20 @@ export function useVoiceChat({
                   break;
 
                 case "text":
+                  // Record first byte received timestamp on first data
+                  if (firstByteReceivedAt === null) {
+                    firstByteReceivedAt = Date.now();
+                  }
                   accumulatedText += data.data;
                   startTypingAnimation();
                   break;
 
                 case "audio":
                   if (data.data) {
+                    // Record first byte received timestamp on first data
+                    if (firstByteReceivedAt === null) {
+                      firstByteReceivedAt = Date.now();
+                    }
                     // Decode base64 audio chunk
                     const binaryString = atob(data.data);
                     const bytes = new Uint8Array(binaryString.length);
@@ -383,8 +392,10 @@ export function useVoiceChat({
                   // Don't update accumulatedText here - let typing animation continue with current text
                   // We'll use finalCompleteText only for the final message creation
 
-                  // We'll use finalCompleteText for the final message
-                  const finalLatency = Date.now() - submittedAt;
+                  // Calculate first byte latency instead of full latency
+                  const finalLatency = firstByteReceivedAt
+                    ? firstByteReceivedAt - submittedAt
+                    : Date.now() - submittedAt;
 
                   // Wait for typing animation to complete naturally before finishing
                   const waitForTypingAndComplete = async () => {
@@ -467,7 +478,9 @@ export function useVoiceChat({
         const assistantMessage: Message = {
           role: "assistant",
           content: accumulatedText,
-          latency: Date.now() - submittedAt
+          latency: firstByteReceivedAt
+            ? firstByteReceivedAt - submittedAt
+            : Date.now() - submittedAt
         };
 
         // Clean up typing animation
