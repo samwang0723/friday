@@ -1,30 +1,26 @@
+import type {
+  CalendarEventData,
+  ChatMessageData,
+  EmailNotificationData,
+  SystemNotificationData
+} from "@/lib/types/pusher";
+import type { NotificationHandlersHookReturn } from "@/types/voiceChat";
+import { useTranslations } from "next-intl";
 import { useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { startTransition } from "react";
-import { useTranslations } from "next-intl";
-import type {
-  EmailNotificationData,
-  CalendarEventData,
-  SystemNotificationData,
-  ChatMessageData
-} from "@/lib/types/pusher";
-import type {
-  NotificationHandlersHookReturn,
-  ChatSubmissionData
-} from "@/types/voiceChat";
 
 interface UseNotificationHandlersProps {
   auth: {
     isAuthenticated: boolean;
   };
   addNotification: (notification: any) => void;
-  submit: (data: ChatSubmissionData) => void;
+  updateChatState?: (updates: { message: string }) => void;
 }
 
 export function useNotificationHandlers({
   auth,
   addNotification,
-  submit
+  updateChatState
 }: UseNotificationHandlersProps): NotificationHandlersHookReturn {
   const t = useTranslations();
 
@@ -127,27 +123,22 @@ export function useNotificationHandlers({
     while (messageQueueRef.current.length > 0) {
       const data = messageQueueRef.current.shift()!;
 
-      addNotification({
-        type: "chat",
-        title: "Proactive Message",
-        message: data.message,
-        data
-      });
+      // Display the proactive message directly in the chat interface
+      if (updateChatState) {
+        console.log("Displaying proactive message:", data.message);
+        updateChatState({ message: data.message });
 
-      console.log("Submitting transcript:", data.message);
-      startTransition(() => {
-        console.log("Inside transition, calling submit with:", {
-          transcript: data.message
-        });
-        submit({ transcript: data.message });
-      });
+        // Show message for a few seconds, then clear it
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        updateChatState({ message: "" });
+      }
 
-      // Wait before processing next message to allow TTS completion
-      await new Promise(resolve => setTimeout(resolve, 4000)); // 4 second delay
+      // Wait before processing next message to allow reading time
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     isProcessingRef.current = false;
-  }, [submit, addNotification]);
+  }, [updateChatState]);
 
   const handleChatMessage = useCallback(
     (data: ChatMessageData) => {

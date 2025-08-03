@@ -45,7 +45,6 @@ const mockRequestManager = {
   isProcessing: false
 };
 
-
 const mockPlayer = {
   playAudioChunk: jest.fn(),
   stop: jest.fn(),
@@ -63,7 +62,6 @@ const mockVoiceChatService = {
 jest.mock("@/hooks/useRequestManager", () => ({
   useRequestManager: jest.fn(() => mockRequestManager)
 }));
-
 
 jest.mock("@/lib/hooks/useAudioPlayer", () => ({
   useAudioPlayer: jest.fn(() => mockPlayer)
@@ -104,15 +102,15 @@ describe("useVoiceChat", () => {
         return Promise.resolve({ done: true, value: undefined });
       })
     };
-    
+
     const mockResponse = new Response(null, { status: 200 });
-    Object.defineProperty(mockResponse, 'body', {
+    Object.defineProperty(mockResponse, "body", {
       value: {
         getReader: () => mockReader
       },
       writable: false
     });
-    
+
     return mockResponse;
   };
 
@@ -121,7 +119,7 @@ describe("useVoiceChat", () => {
     mockVoiceChatService.translateError.mockImplementation(
       (msg: string) => msg
     );
-    
+
     // Reset player mock
     mockPlayer.initAudioPlayer.mockClear();
     mockPlayer.playAudioChunk.mockClear();
@@ -179,7 +177,7 @@ describe("useVoiceChat", () => {
         'event: text\ndata: {"data": "Hi there!"}\n\n',
         'event: complete\ndata: {"fullText": "Hi there!"}\n\n'
       ];
-      
+
       const mockSSEResponse = createSSEMockResponse(sseEvents);
       mockVoiceChatService.submitChat.mockResolvedValue(mockSSEResponse);
 
@@ -203,22 +201,25 @@ describe("useVoiceChat", () => {
 
       // Should initialize audio player
       expect(mockPlayer.initAudioPlayer).toHaveBeenCalled();
-      
+
       // Wait for streaming to complete
-      await waitFor(() => {
-        expect(result.current.messages).toHaveLength(2);
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(result.current.messages).toHaveLength(2);
+        },
+        { timeout: 5000 }
+      );
     });
 
     it("should handle blob input submission with SSE streaming", async () => {
       const mockBlob = new Blob(["audio data"], { type: "audio/webm" });
-      
+
       const sseEvents = [
         'event: transcript\ndata: {"data": "Transcribed text"}\n\n',
         'event: text\ndata: {"data": "Response"}\n\n',
         'event: complete\ndata: {"fullText": "Response"}\n\n'
       ];
-      
+
       const mockSSEResponse = createSSEMockResponse(sseEvents);
       mockVoiceChatService.submitChat.mockResolvedValue(mockSSEResponse);
 
@@ -239,21 +240,24 @@ describe("useVoiceChat", () => {
           expect.any(Object)
         );
       });
-      
-      await waitFor(() => {
-        expect(result.current.messages).toHaveLength(2);
-      }, { timeout: 5000 });
+
+      await waitFor(
+        () => {
+          expect(result.current.messages).toHaveLength(2);
+        },
+        { timeout: 5000 }
+      );
     });
 
     it("should handle transcript object submission with SSE streaming", async () => {
       const mockTranscript = { transcript: "Hello from transcript" };
-      
+
       const sseEvents = [
         'event: transcript\ndata: {"data": "Hello from transcript"}\n\n',
         'event: text\ndata: {"data": "Response"}\n\n',
         'event: complete\ndata: {"fullText": "Response"}\n\n'
       ];
-      
+
       const mockSSEResponse = createSSEMockResponse(sseEvents);
       mockVoiceChatService.submitChat.mockResolvedValue(mockSSEResponse);
 
@@ -274,10 +278,13 @@ describe("useVoiceChat", () => {
           expect.any(Object)
         );
       });
-      
-      await waitFor(() => {
-        expect(result.current.messages).toHaveLength(2);
-      }, { timeout: 5000 });
+
+      await waitFor(
+        () => {
+          expect(result.current.messages).toHaveLength(2);
+        },
+        { timeout: 5000 }
+      );
     });
   });
 
@@ -287,10 +294,10 @@ describe("useVoiceChat", () => {
         'event: transcript\ndata: {"data": "Hello"}\n\n',
         'event: text\ndata: {"data": "Partial "}\n\n',
         'event: text\ndata: {"data": "response"}\n\n',
-        'event: audio\ndata: {"data": "' + btoa('audiodata') + '"}\n\n',
+        'event: audio\ndata: {"data": "' + btoa("audiodata") + '"}\n\n',
         'event: complete\ndata: {"fullText": "Partial response"}\n\n'
       ];
-      
+
       const mockSSEResponse = createSSEMockResponse(sseEvents);
       mockVoiceChatService.submitChat.mockResolvedValue(mockSSEResponse);
 
@@ -304,13 +311,16 @@ describe("useVoiceChat", () => {
 
       // Should initialize audio player
       expect(mockPlayer.initAudioPlayer).toHaveBeenCalled();
-      
+
       // Wait for SSE stream processing to complete
-      await waitFor(() => {
-        expect(result.current.messages).toHaveLength(2);
-        expect(result.current.messages[1].content).toBe("Partial response");
-      }, { timeout: 8000 });
-      
+      await waitFor(
+        () => {
+          expect(result.current.messages).toHaveLength(2);
+          expect(result.current.messages[1].content).toBe("Partial response");
+        },
+        { timeout: 8000 }
+      );
+
       // Audio should be played
       expect(mockPlayer.playAudioChunk).toHaveBeenCalled();
     });
@@ -322,7 +332,7 @@ describe("useVoiceChat", () => {
         'event: text\ndata: {"data": "Response text"}\n\n',
         'event: complete\ndata: {"fullText": "Response text"}\n\n'
       ];
-      
+
       const mockSSEResponse = createSSEMockResponse(sseEvents);
       mockVoiceChatService.submitChat.mockResolvedValue(mockSSEResponse);
 
@@ -334,30 +344,38 @@ describe("useVoiceChat", () => {
         });
       });
 
-      await waitFor(() => {
-        expect(result.current.messages).toHaveLength(2);
-        expect(result.current.messages[1].content).toBe("Response text");
-      }, { timeout: 8000 });
+      await waitFor(
+        () => {
+          expect(result.current.messages).toHaveLength(2);
+          expect(result.current.messages[1].content).toBe("Response text");
+        },
+        { timeout: 8000 }
+      );
     });
 
     it("should handle SSE stream errors", async () => {
       const mockSSEResponse = {
         body: {
           getReader: () => ({
-            read: jest.fn()
-              .mockResolvedValueOnce({ 
-                done: false, 
-                value: new TextEncoder().encode('event: transcript\ndata: {"data": "Hello"}\n\n')
+            read: jest
+              .fn()
+              .mockResolvedValueOnce({
+                done: false,
+                value: new TextEncoder().encode(
+                  'event: transcript\ndata: {"data": "Hello"}\n\n'
+                )
               })
-              .mockResolvedValueOnce({ 
-                done: false, 
-                value: new TextEncoder().encode('event: error\ndata: {"message": "Stream error occurred"}\n\n')
+              .mockResolvedValueOnce({
+                done: false,
+                value: new TextEncoder().encode(
+                  'event: error\ndata: {"message": "Stream error occurred"}\n\n'
+                )
               })
               .mockResolvedValueOnce({ done: true, value: undefined })
           })
         }
       };
-      
+
       mockVoiceChatService.submitChat.mockResolvedValue(mockSSEResponse as any);
 
       const { result } = renderHook(() => useVoiceChat(mockProps));
@@ -369,9 +387,12 @@ describe("useVoiceChat", () => {
       });
 
       // Should handle the error gracefully
-      await waitFor(() => {
-        expect(result.current.chatState.isStreaming).toBe(false);
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(result.current.chatState.isStreaming).toBe(false);
+        },
+        { timeout: 3000 }
+      );
     });
   });
 
@@ -459,12 +480,13 @@ describe("useVoiceChat", () => {
       const mockSSEResponse = {
         body: {
           getReader: () => ({
-            read: jest.fn()
+            read: jest
+              .fn()
               .mockRejectedValueOnce(new Error("Stream read error"))
           })
         }
       };
-      
+
       mockVoiceChatService.submitChat.mockResolvedValue(mockSSEResponse as any);
 
       const { result } = renderHook(() => useVoiceChat(mockProps));
@@ -571,7 +593,7 @@ describe("useVoiceChat", () => {
         'event: text\ndata: {"data": "response"}\n\n',
         'event: complete\ndata: {"fullText": "Partial response"}\n\n'
       ];
-      
+
       const mockSSEResponse = createSSEMockResponse(sseEvents);
       mockVoiceChatService.submitChat.mockResolvedValue(mockSSEResponse);
 
@@ -584,9 +606,12 @@ describe("useVoiceChat", () => {
       });
 
       // Wait for processing to complete
-      await waitFor(() => {
-        expect(result.current.messages).toHaveLength(2);
-      }, { timeout: 8000 });
+      await waitFor(
+        () => {
+          expect(result.current.messages).toHaveLength(2);
+        },
+        { timeout: 8000 }
+      );
 
       expect(result.current.messages[1].content).toBe("Partial response");
       expect(result.current.chatState.input).toBe("Hello");
@@ -606,10 +631,10 @@ describe("useVoiceChat", () => {
       const sseEvents = [
         'event: transcript\ndata: {"data": "Hello"}\n\n',
         'event: text\ndata: {"data": "Response"}\n\n',
-        'event: audio\ndata: {"data": "' + btoa('audio') + '"}\n\n',
+        'event: audio\ndata: {"data": "' + btoa("audio") + '"}\n\n',
         'event: complete\ndata: {"fullText": "Response"}\n\n'
       ];
-      
+
       const mockSSEResponse = createSSEMockResponse(sseEvents);
       mockVoiceChatService.submitChat.mockResolvedValue(mockSSEResponse);
 
@@ -622,12 +647,15 @@ describe("useVoiceChat", () => {
       });
 
       // Wait for final completion and verify we went through the phases
-      await waitFor(() => {
-        expect(result.current.chatState.streamPhase).toBe("completed");
-        expect(result.current.chatState.isStreaming).toBe(false);
-        expect(result.current.messages).toHaveLength(2);
-      }, { timeout: 8000 });
-      
+      await waitFor(
+        () => {
+          expect(result.current.chatState.streamPhase).toBe("completed");
+          expect(result.current.chatState.isStreaming).toBe(false);
+          expect(result.current.messages).toHaveLength(2);
+        },
+        { timeout: 8000 }
+      );
+
       // Verify input was set during the process
       expect(result.current.chatState.input).toBe("Hello");
     });
@@ -638,7 +666,7 @@ describe("useVoiceChat", () => {
         'event: text\ndata: {"data": "Hi there!"}\n\n',
         'event: complete\ndata: {"fullText": "Hi there!"}\n\n'
       ];
-      
+
       const mockSSEResponse = createSSEMockResponse(sseEvents);
       mockVoiceChatService.submitChat.mockResolvedValue(mockSSEResponse);
 
@@ -651,11 +679,14 @@ describe("useVoiceChat", () => {
       });
 
       // Wait for completion and state reset
-      await waitFor(() => {
-        expect(result.current.chatState.isStreaming).toBe(false);
-        expect(result.current.chatState.message).toBe("");
-        expect(result.current.chatState.streamPhase).toBe("completed");
-      }, { timeout: 8000 });
+      await waitFor(
+        () => {
+          expect(result.current.chatState.isStreaming).toBe(false);
+          expect(result.current.chatState.message).toBe("");
+          expect(result.current.chatState.streamPhase).toBe("completed");
+        },
+        { timeout: 8000 }
+      );
     });
   });
 
@@ -679,7 +710,7 @@ describe("useVoiceChat", () => {
         'event: text\ndata: {"data": "Response text"}\n\n'
         // No complete event - stream just ends
       ];
-      
+
       const mockSSEResponse = createSSEMockResponse(sseEvents);
       mockVoiceChatService.submitChat.mockResolvedValue(mockSSEResponse);
 
@@ -692,11 +723,14 @@ describe("useVoiceChat", () => {
       });
 
       // Should handle completion gracefully even without explicit complete event
-      await waitFor(() => {
-        expect(result.current.messages).toHaveLength(2);
-        expect(result.current.messages[1].content).toBe("Response text");
-        expect(result.current.chatState.isStreaming).toBe(false);
-      }, { timeout: 8000 });
+      await waitFor(
+        () => {
+          expect(result.current.messages).toHaveLength(2);
+          expect(result.current.messages[1].content).toBe("Response text");
+          expect(result.current.chatState.isStreaming).toBe(false);
+        },
+        { timeout: 8000 }
+      );
     });
   });
 });

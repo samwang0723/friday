@@ -90,7 +90,7 @@ describe("useStreamingProcessor", () => {
         onError,
         expect.any(Number), // submittedAt timestamp
         undefined, // onTranscript callback
-        undefined  // onStatus callback
+        undefined // onStatus callback
       );
 
       expect(mockProcessor.processStream).toHaveBeenCalledWith(mockResponse);
@@ -216,7 +216,9 @@ describe("useStreamingProcessor", () => {
         );
       });
 
-      expect(callbacks.onError).toHaveBeenCalledWith(new Error("STREAM_ABORTED"));
+      expect(callbacks.onError).toHaveBeenCalledWith(
+        new Error("STREAM_ABORTED")
+      );
 
       consoleSpy.mockRestore();
     });
@@ -250,7 +252,9 @@ describe("useStreamingProcessor", () => {
         );
       });
 
-      expect(callbacks.onError).toHaveBeenCalledWith(new Error("NETWORK_ERROR"));
+      expect(callbacks.onError).toHaveBeenCalledWith(
+        new Error("NETWORK_ERROR")
+      );
 
       consoleSpy.mockRestore();
     });
@@ -284,7 +288,9 @@ describe("useStreamingProcessor", () => {
         );
       });
 
-      expect(callbacks.onError).toHaveBeenCalledWith(new Error("STREAM_TIMEOUT"));
+      expect(callbacks.onError).toHaveBeenCalledWith(
+        new Error("STREAM_TIMEOUT")
+      );
 
       consoleSpy.mockRestore();
     });
@@ -396,7 +402,7 @@ describe("useStreamingProcessor", () => {
         callbacks.onError,
         expect.any(Number), // submittedAt timestamp
         undefined, // onTranscript callback
-        undefined  // onStatus callback
+        undefined // onStatus callback
       );
 
       const submittedAt = (MockedSSEProcessor as jest.Mock).mock.calls[0][4];
@@ -664,7 +670,9 @@ describe("useStreamingProcessor", () => {
 
       const mockState = { accumulatedText: "test", isProcessing: true };
       mockProcessor.getState.mockReturnValue(mockState);
-      mockProcessor.processStream.mockImplementation(() => new Promise(() => {})); // Never resolves
+      mockProcessor.processStream.mockImplementation(
+        () => new Promise(() => {})
+      ); // Never resolves
 
       const { result } = renderHook(() => useStreamingProcessor());
 
@@ -706,7 +714,9 @@ describe("useStreamingProcessor", () => {
       };
 
       mockProcessor.isProcessing.mockReturnValue(true);
-      mockProcessor.processStream.mockImplementation(() => new Promise(() => {})); // Never resolves
+      mockProcessor.processStream.mockImplementation(
+        () => new Promise(() => {})
+      ); // Never resolves
 
       const { result } = renderHook(() => useStreamingProcessor());
 

@@ -92,7 +92,7 @@ export default function Home() {
   const notificationHandlers = useNotificationHandlers({
     auth,
     addNotification,
-    submit: voiceChat.submit
+    updateChatState: voiceChat.updateChatState
   });
 
   // Initialize Agent Core service
