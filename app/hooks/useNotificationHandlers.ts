@@ -123,6 +123,13 @@ export function useNotificationHandlers({
     while (messageQueueRef.current.length > 0) {
       const data = messageQueueRef.current.shift()!;
 
+      addNotification({
+        type: "chat",
+        title: "Proactive Message",
+        message: data.message,
+        data
+      });
+
       // Display the proactive message directly in the chat interface
       if (updateChatState) {
         console.log("Displaying proactive message:", data.message);
@@ -130,11 +137,11 @@ export function useNotificationHandlers({
       }
 
       // Wait before processing next message to allow reading time
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 4000));
     }
 
     isProcessingRef.current = false;
-  }, [updateChatState]);
+  }, [addNotification, updateChatState]);
 
   const handleChatMessage = useCallback(
     (data: ChatMessageData) => {
