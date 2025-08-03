@@ -326,6 +326,14 @@ export default function Home() {
     }
   });
 
+  // Handle session invalid from Pusher
+  useEffect(() => {
+    if (pusher.status === "sessionInvalid") {
+      console.log("Pusher detected invalid session - logging out");
+      auth.logout();
+    }
+  }, [pusher.status, auth.logout]);
+
   // Global error handler for VAD worker errors
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {

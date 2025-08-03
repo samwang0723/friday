@@ -379,7 +379,9 @@ describe("useNotificationHandlers", () => {
       // Wait for async processing to complete
       await waitFor(() => {
         expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData.message
+          message: mockChatData.message,
+          isStreaming: false,
+          streamPhase: "completed"
         });
       });
 
@@ -390,7 +392,9 @@ describe("useNotificationHandlers", () => {
 
       // Should still show the message (no clearing)
       expect(mockUpdateChatState).toHaveBeenCalledWith({
-        message: mockChatData.message
+        message: mockChatData.message,
+        isStreaming: false,
+        streamPhase: "completed"
       });
       expect(mockUpdateChatState).toHaveBeenCalledTimes(1);
     });
@@ -443,27 +447,36 @@ describe("useNotificationHandlers", () => {
       // First message should be processed immediately
       await waitFor(() => {
         expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData1.message
+          message: mockChatData1.message,
+          isStreaming: false,
+          streamPhase: "completed"
         });
       });
 
       // Check that both messages were displayed at some point
       // We need to check toHaveBeenCalledWith for both messages individually
       expect(mockUpdateChatState).toHaveBeenCalledWith({
-        message: mockChatData1.message
+        message: mockChatData1.message,
+        isStreaming: false,
+        streamPhase: "completed"
       });
-      
+
       // Advance timers to allow processing
       act(() => {
         jest.advanceTimersByTime(5000); // Give enough time for both messages
       });
 
       // Wait for second message to be processed
-      await waitFor(() => {
-        expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData2.message
-        });
-      }, { timeout: 2000 });
+      await waitFor(
+        () => {
+          expect(mockUpdateChatState).toHaveBeenCalledWith({
+            message: mockChatData2.message,
+            isStreaming: false,
+            streamPhase: "completed"
+          });
+        },
+        { timeout: 2000 }
+      );
     });
 
     it("should not process queue concurrently", async () => {
@@ -488,7 +501,9 @@ describe("useNotificationHandlers", () => {
       // First message should start processing immediately
       await waitFor(() => {
         expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData1.message
+          message: mockChatData1.message,
+          isStreaming: false,
+          streamPhase: "completed"
         });
       });
 
@@ -503,11 +518,16 @@ describe("useNotificationHandlers", () => {
       });
 
       // Now second message should be processed
-      await waitFor(() => {
-        expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData2.message
-        });
-      }, { timeout: 2000 });
+      await waitFor(
+        () => {
+          expect(mockUpdateChatState).toHaveBeenCalledWith({
+            message: mockChatData2.message,
+            isStreaming: false,
+            streamPhase: "completed"
+          });
+        },
+        { timeout: 2000 }
+      );
     });
   });
 
@@ -542,7 +562,9 @@ describe("useNotificationHandlers", () => {
       // Wait for async processing to complete
       await waitFor(() => {
         expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData.message
+          message: mockChatData.message,
+          isStreaming: false,
+          streamPhase: "completed"
         });
       });
     });
@@ -565,7 +587,9 @@ describe("useNotificationHandlers", () => {
       // Wait for processing to start
       await waitFor(() => {
         expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData.message
+          message: mockChatData.message,
+          isStreaming: false,
+          streamPhase: "completed"
         });
       });
 
@@ -575,8 +599,10 @@ describe("useNotificationHandlers", () => {
       });
 
       // Should have displayed the message (no clearing)
-      expect(mockUpdateChatState).toHaveBeenCalledWith({ 
-        message: mockChatData.message 
+      expect(mockUpdateChatState).toHaveBeenCalledWith({
+        message: mockChatData.message,
+        isStreaming: false,
+        streamPhase: "completed"
       });
 
       // Try to process again - should not process anything since queue is empty
@@ -617,7 +643,9 @@ describe("useNotificationHandlers", () => {
       // First message should be processed immediately
       await waitFor(() => {
         expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData1.message
+          message: mockChatData1.message,
+          isStreaming: false,
+          streamPhase: "completed"
         });
       });
 
@@ -627,11 +655,16 @@ describe("useNotificationHandlers", () => {
       });
 
       // Second message should now be processed
-      await waitFor(() => {
-        expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData2.message
-        });
-      }, { timeout: 2000 });
+      await waitFor(
+        () => {
+          expect(mockUpdateChatState).toHaveBeenCalledWith({
+            message: mockChatData2.message,
+            isStreaming: false,
+            streamPhase: "completed"
+          });
+        },
+        { timeout: 2000 }
+      );
     });
   });
 
@@ -682,7 +715,9 @@ describe("useNotificationHandlers", () => {
       // First message should be processed immediately
       await waitFor(() => {
         expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData1.message
+          message: mockChatData1.message,
+          isStreaming: false,
+          streamPhase: "completed"
         });
       });
 
@@ -692,11 +727,16 @@ describe("useNotificationHandlers", () => {
       });
 
       // Second message should now be processed
-      await waitFor(() => {
-        expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData2.message
-        });
-      }, { timeout: 2000 });
+      await waitFor(
+        () => {
+          expect(mockUpdateChatState).toHaveBeenCalledWith({
+            message: mockChatData2.message,
+            isStreaming: false,
+            streamPhase: "completed"
+          });
+        },
+        { timeout: 2000 }
+      );
     });
 
     it("should handle message processing when queue is already being processed", async () => {
@@ -727,7 +767,9 @@ describe("useNotificationHandlers", () => {
       // First message should start processing immediately
       await waitFor(() => {
         expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData1.message
+          message: mockChatData1.message,
+          isStreaming: false,
+          streamPhase: "completed"
         });
       });
 
@@ -742,11 +784,16 @@ describe("useNotificationHandlers", () => {
       });
 
       // Now second message should be processed
-      await waitFor(() => {
-        expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData2.message
-        });
-      }, { timeout: 2000 });
+      await waitFor(
+        () => {
+          expect(mockUpdateChatState).toHaveBeenCalledWith({
+            message: mockChatData2.message,
+            isStreaming: false,
+            streamPhase: "completed"
+          });
+        },
+        { timeout: 2000 }
+      );
     });
 
     it("should not process messages if updateChatState is not available", async () => {
@@ -791,7 +838,9 @@ describe("useNotificationHandlers", () => {
 
       await waitFor(() => {
         expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData.message
+          message: mockChatData.message,
+          isStreaming: false,
+          streamPhase: "completed"
         });
       });
     });
@@ -825,7 +874,9 @@ describe("useNotificationHandlers", () => {
       // Should call updateChatState to display the message
       await waitFor(() => {
         expect(localMockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData.message
+          message: mockChatData.message,
+          isStreaming: false,
+          streamPhase: "completed"
         });
       });
 
@@ -836,14 +887,16 @@ describe("useNotificationHandlers", () => {
 
       // Should display the message (no clearing)
       expect(localMockUpdateChatState).toHaveBeenCalledWith({
-        message: mockChatData.message
+        message: mockChatData.message,
+        isStreaming: false,
+        streamPhase: "completed"
       });
     });
 
     it("should maintain message order during rapid submissions", async () => {
       // Use real timers for this test to handle async properly
       jest.useRealTimers();
-      
+
       const messages = [
         { message: "Message 1", timestamp: new Date().toISOString() },
         {
@@ -852,7 +905,9 @@ describe("useNotificationHandlers", () => {
         }
       ];
 
-      const { result } = renderHook(() => useNotificationHandlers(defaultProps));
+      const { result } = renderHook(() =>
+        useNotificationHandlers(defaultProps)
+      );
 
       // Ensure the hook rendered properly
       if (!result.current) {
@@ -869,17 +924,24 @@ describe("useNotificationHandlers", () => {
       // First message should be processed immediately
       await waitFor(() => {
         expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: "Message 1"
+          message: "Message 1",
+          isStreaming: false,
+          streamPhase: "completed"
         });
       });
 
       // Wait for second message to be processed (3s + 1s + buffer)
-      await waitFor(() => {
-        expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: "Message 2"
-        });
-      }, { timeout: 6000 });
-      
+      await waitFor(
+        () => {
+          expect(mockUpdateChatState).toHaveBeenCalledWith({
+            message: "Message 2",
+            isStreaming: false,
+            streamPhase: "completed"
+          });
+        },
+        { timeout: 6000 }
+      );
+
       // Restore fake timers for other tests
       jest.useFakeTimers();
     });
@@ -907,7 +969,9 @@ describe("useNotificationHandlers", () => {
       // Process the message
       await waitFor(() => {
         expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData.message
+          message: mockChatData.message,
+          isStreaming: false,
+          streamPhase: "completed"
         });
       });
 
@@ -918,7 +982,9 @@ describe("useNotificationHandlers", () => {
 
       // Should display the message (no clearing)
       expect(mockUpdateChatState).toHaveBeenCalledWith({
-        message: mockChatData.message
+        message: mockChatData.message,
+        isStreaming: false,
+        streamPhase: "completed"
       });
 
       // Verify queue is processed (display only = 1 call)
@@ -954,7 +1020,9 @@ describe("useNotificationHandlers", () => {
 
       await waitFor(() => {
         expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData.message
+          message: mockChatData.message,
+          isStreaming: false,
+          streamPhase: "completed"
         });
       });
     });
@@ -1006,7 +1074,11 @@ describe("useNotificationHandlers", () => {
 
       // Should still display empty message
       await waitFor(() => {
-        expect(mockUpdateChatState).toHaveBeenCalledWith({ message: "" });
+        expect(mockUpdateChatState).toHaveBeenCalledWith({ 
+          message: "",
+          isStreaming: false,
+          streamPhase: "completed"
+        });
       });
 
       // Advance time to test clearing
@@ -1016,14 +1088,18 @@ describe("useNotificationHandlers", () => {
 
       // Should clear the message again (will be same call)
       await waitFor(() => {
-        expect(mockUpdateChatState).toHaveBeenCalledWith({ message: "" });
+        expect(mockUpdateChatState).toHaveBeenCalledWith({ 
+          message: "",
+          isStreaming: false,
+          streamPhase: "completed"
+        });
       });
     });
 
     it("should handle very long message queue", async () => {
       // Use real timers for this test to handle async properly
       jest.useRealTimers();
-      
+
       const { result } = renderHook(() =>
         useNotificationHandlers(defaultProps)
       );
@@ -1049,16 +1125,23 @@ describe("useNotificationHandlers", () => {
       // Wait for first message to be displayed
       await waitFor(() => {
         expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: "Message 0"
+          message: "Message 0",
+          isStreaming: false,
+          streamPhase: "completed"
         });
       });
 
       // Wait for second message to be processed
-      await waitFor(() => {
-        expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: "Message 1"
-        });
-      }, { timeout: 6000 });
+      await waitFor(
+        () => {
+          expect(mockUpdateChatState).toHaveBeenCalledWith({
+            message: "Message 1",
+            isStreaming: false,
+            streamPhase: "completed"
+          });
+        },
+        { timeout: 6000 }
+      );
 
       // Restore fake timers for other tests
       jest.useFakeTimers();
@@ -1088,7 +1171,9 @@ describe("useNotificationHandlers", () => {
       // Wait for processing to start
       await waitFor(() => {
         expect(mockUpdateChatState).toHaveBeenCalledWith({
-          message: mockChatData.message
+          message: mockChatData.message,
+          isStreaming: false,
+          streamPhase: "completed"
         });
       });
 

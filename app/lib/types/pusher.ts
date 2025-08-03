@@ -11,6 +11,7 @@ export type ConnectionStatus =
   | "connecting"
   | "connected"
   | "disconnected"
+  | "sessionInvalid"
   | "error";
 
 export interface NotificationOptions {

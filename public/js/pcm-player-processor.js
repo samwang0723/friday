@@ -27,7 +27,10 @@ class PCMPlayerProcessor extends AudioWorkletProcessor {
         int16Samples = event.data;
       } else {
         // Invalid data type
-        console.error("PCMPlayerProcessor: Invalid audio data type:", typeof event.data);
+        console.error(
+          "PCMPlayerProcessor: Invalid audio data type:",
+          typeof event.data
+        );
         return;
       }
 

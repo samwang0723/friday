@@ -5,7 +5,7 @@ info:
   version: 1.0.0
   contact:
     name: AgentCore API Team
-    
+
 servers:
   - url: http://localhost:3030/api/v1
     description: Development server
@@ -81,7 +81,7 @@ paths:
             example: "en"
           description: Client locale for responses
       responses:
-        '200':
+        "200":
           description: Server-Sent Events stream with voice processing results
           content:
             text/event-stream:
@@ -89,7 +89,7 @@ paths:
                 type: string
                 description: |
                   SSE stream with the following event types:
-                  
+
                   - **transcript**: Initial transcription of the input audio
                   - **text**: AI response text chunks as they are generated  
                   - **audio**: Base64-encoded audio chunks of synthesized speech
@@ -101,25 +101,25 @@ paths:
                   value: |
                     event: transcript
                     data: {"content": "Hello, how are you?"}
-                    
+
                 text_event:
                   summary: Text response event
                   value: |
                     event: text
                     data: {"content": "I'm doing well, thank you for asking!"}
-                    
+
                 audio_event:
                   summary: Audio chunk event
                   value: |
                     event: audio
                     data: {"chunk": "UklGRiQAAABXQVZFZm10IBAAAA...", "index": 0}
-                    
+
                 complete_event:
                   summary: Completion event
                   value: |
                     event: complete
                     data: {"fullText": "I'm doing well, thank you for asking! How can I help you today?"}
-                    
+
                 error_event:
                   summary: Error event
                   value: |
@@ -134,12 +134,12 @@ paths:
               schema:
                 type: string
                 example: keep-alive
-        '400':
+        "400":
           description: Bad request - invalid audio file or missing parameters
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
               examples:
                 invalid_audio:
                   summary: Invalid audio file
@@ -151,21 +151,21 @@ paths:
                   value:
                     error: "Missing required parameter"
                     message: "ttsEngine parameter is required"
-        '401':
+        "401":
           description: Unauthorized - invalid or missing Bearer token
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
               example:
                 error: "Unauthorized"
                 message: "Valid Bearer token required"
-        '500':
+        "500":
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
               examples:
                 transcription_error:
                   summary: Transcription service error
@@ -185,7 +185,7 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: Bearer token for authentication
-      
+
   schemas:
     ErrorResponse:
       type: object
@@ -209,7 +209,7 @@ components:
         details:
           field: "audio"
           reason: "File size exceeds limit"
-          
+
     VoiceStreamEvent:
       type: object
       description: Server-Sent Event data structure
