@@ -61,18 +61,18 @@ export function getVADConfigForSensitivity(
       };
     case "medium":
       return {
-        positiveSpeechThreshold: 0.7, // Higher threshold for natural pauses
-        minSpeechFrames: 8, // More frames to avoid quick cuts
+        positiveSpeechThreshold: 0.5, // Higher threshold for natural pauses
+        minSpeechFrames: 9, // More frames to avoid quick cuts
         rmsEnergyThreshold: -35, // Slightly higher threshold
-        minSpeechDuration: 600, // Longer minimum to capture full thoughts
+        minSpeechDuration: 400, // Longer minimum to capture full thoughts
         spectralCentroidThreshold: 300
       };
     case "high":
       return {
-        positiveSpeechThreshold: 0.6, // Still sensitive but not too quick
+        positiveSpeechThreshold: 0.3, // Still sensitive but not too quick
         minSpeechFrames: 6, // Reasonable frame count
         rmsEnergyThreshold: -40, // Standard threshold
-        minSpeechDuration: 400, // Minimum to avoid cutting mid-sentence
+        minSpeechDuration: 100, // Minimum to avoid cutting mid-sentence
         spectralCentroidThreshold: 200
       };
     default:
@@ -370,7 +370,17 @@ export function useVADManager(
 
   // Initialize VAD with error handling
   const vad = useMicVAD({
-    startOnLoad: false,
+    startOnLoad: true,
+    model: "v5",
+    submitUserSpeechOnPause: false,
+    positiveSpeechThreshold: config.positiveSpeechThreshold || 0.5,
+    minSpeechFrames: config.minSpeechFrames || 9,
+    userSpeakingThreshold: 0.6,
+    negativeSpeechThreshold: 0.35, // Lower threshold to be less aggressive about ending
+    redemptionFrames: 24, // Increased to allow for natural pauses in speech
+    preSpeechPadFrames: 3, // More padding for natural starts
+    frameSamples: 512, // For the older (default) Silero model, this should probably be 1536. For the new, Silero version 5 model, it should be 512. default: 1536
+    stream: audioStream,
     onSpeechStart,
     onSpeechEnd,
     onVADMisfire: () => {
@@ -382,15 +392,7 @@ export function useVADManager(
         shouldShowOrb: false
       }));
       onVADMisfireCallback();
-    },
-    model: "v5",
-    positiveSpeechThreshold: config.positiveSpeechThreshold || 0.7,
-    minSpeechFrames: config.minSpeechFrames || 8,
-    negativeSpeechThreshold: 0.5, // Lower threshold to be less aggressive about ending
-    redemptionFrames: 8, // Increased to allow for natural pauses in speech
-    preSpeechPadFrames: 5, // More padding for natural starts
-    frameSamples: 512, // For the older (default) Silero model, this should probably be 1536. For the new, Silero version 5 model, it should be 512. default: 1536
-    stream: audioStream
+    }
   });
 
   // Enhanced error recovery with retry logic
