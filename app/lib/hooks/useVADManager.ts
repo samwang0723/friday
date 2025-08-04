@@ -1,5 +1,5 @@
 import { useMicVAD } from "@ricky0123/vad-react";
-import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // Calculate RMS energy in dBFS from audio samples
 function calculateRMSdBFS(audioData: Float32Array): number {
@@ -389,7 +389,7 @@ export function useVADManager(
     negativeSpeechThreshold: 0.5, // Lower threshold to be less aggressive about ending
     redemptionFrames: 8, // Increased to allow for natural pauses in speech
     preSpeechPadFrames: 5, // More padding for natural starts
-    // frameSamples: 480, // Aligned with RNNoise frame size
+    frameSamples: 512, // For the older (default) Silero model, this should probably be 1536. For the new, Silero version 5 model, it should be 512. default: 1536
     stream: audioStream
   });
 

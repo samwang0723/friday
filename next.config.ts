@@ -30,25 +30,6 @@ const nextConfig: NextConfig = {
         ]
       }
     ];
-  },
-  webpack: (config, { isServer }) => {
-    // Handle VAD worker files properly
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        net: false,
-        tls: false
-      };
-
-      // Add proper handling for worker files
-      config.module.rules.push({
-        test: /\.worker\.js$/,
-        use: { loader: "worker-loader" }
-      });
-    }
-
-    return config;
   }
 };
 
