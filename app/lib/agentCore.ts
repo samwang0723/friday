@@ -281,7 +281,6 @@ export class AgentCoreService {
 
             // Skip keep-alive and empty events
             if (data === "keep-alive" || !data) {
-              console.log("Skipping keep-alive or empty event");
               continue;
             }
 
@@ -519,7 +518,6 @@ export class AgentCoreService {
 
             // Skip keep-alive and empty events
             if (data === "keep-alive" || !data) {
-              console.log("Skipping keep-alive or empty event");
               continue;
             }
 
