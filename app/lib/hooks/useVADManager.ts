@@ -1,4 +1,4 @@
-import { useMicVAD } from "@ricky0123/vad-react";
+import { useMicVAD, utils } from "@ricky0123/vad-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // Calculate RMS energy in dBFS from audio samples
@@ -85,6 +85,9 @@ export interface VADCallbacks {
   onSpeechEnd?: (isValid: boolean, audio: Float32Array) => void;
   onVADMisfire?: () => void;
 }
+
+// Export VAD utils for use in components
+export { utils };
 
 export interface VADContext {
   isStreaming?: boolean;

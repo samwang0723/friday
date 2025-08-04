@@ -54,9 +54,9 @@ import { usePusher } from "@/lib/hooks/usePusher";
 import { useSettings } from "@/lib/hooks/useSettings";
 import {
   getVADConfigForSensitivity,
-  useVADManager
+  useVADManager,
+  utils
 } from "@/lib/hooks/useVADManager";
-import { useWebMRecorder } from "@/lib/hooks/useWebMRecorder";
 
 // Types
 
@@ -192,20 +192,12 @@ export default function Home() {
     }
   }, [settings.audioEnabled]); // Remove voiceChat.player dependency
 
-  // Refs for VAD and WebM recording
+  // Ref for VAD
   const vadManagerRef = useRef<any>(null);
-  const webmRecorderRef = useRef<any>(null);
 
   // VAD callbacks with performance optimization
   const onSpeechStart = useCallback(() => {
     if (!auth.isAuthenticated) return;
-
-    // Start WebM recording
-    const recorder = webmRecorderRef.current;
-    if (recorder?.state.isAvailable && !recorder.state.isRecording) {
-      console.log("Starting WebM recording");
-      recorder.startRecording();
-    }
 
     // Interrupt current stream when user starts speaking
     if (voiceChat.chatState.message || voiceChat.chatState.isStreaming) {
@@ -220,53 +212,26 @@ export default function Home() {
   ]);
 
   const onSpeechEnd = useCallback(
-    async (isValid: boolean, _audio: Float32Array) => {
-      if (!auth.isAuthenticated) return;
+    (isValid: boolean, audio: Float32Array) => {
+      if (!auth.isAuthenticated || !isValid) return;
 
-      try {
-        // Stop WebM recording and get the blob directly
-        const recorder = webmRecorderRef.current;
-        if (recorder?.state.isRecording) {
-          console.log("Stopping WebM recording");
-          const webmBlob = await recorder.stopRecording();
+      // Convert audio to WAV using VAD utils
+      const wavBuffer = utils.encodeWAV(audio);
+      const wavBlob = new Blob([wavBuffer], { type: "audio/wav" });
 
-          if (webmBlob && isValid) {
-            console.log("WebM recording completed, blob size:", webmBlob.size);
+      console.log("WAV audio encoded, size:", wavBuffer.byteLength);
 
-            // Submit the audio as WebM
-            startTransition(() => voiceChat.submit(webmBlob));
+      // Submit the audio as WAV Blob
+      startTransition(() => voiceChat.submit(wavBlob));
 
-            track("Speech input");
-          } else {
-            console.warn("No WebM blob received from recorder");
-          }
-        } else {
-          console.warn("WebM recorder was not recording when speech ended");
-        }
-      } catch (error) {
-        console.error("Error with WebM recording:", error);
-      }
+      track("Speech input");
     },
     [auth.isAuthenticated, voiceChat.submit]
   );
 
-  const onVADMisfire = useCallback(async () => {
-    // Stop the WebM recorder on a VAD misfire
+  const onVADMisfire = useCallback(() => {
     console.log("VAD misfire detected");
-    try {
-      // Stop WebM recording and get the blob directly
-      const recorder = webmRecorderRef.current;
-      if (recorder?.state.isRecording) {
-        console.log("Stopping WebM recording on VAD misfire and do nothing");
-        await recorder.stopRecording();
-      } else {
-        console.warn("WebM recorder was not recording when VAD misfire");
-      }
-
-      // No browser-specific VAD handling needed
-    } catch (error) {
-      console.error("Error with WebM recording:", error);
-    }
+    // No additional handling needed with WAV approach
   }, []);
 
   // Memoize VAD configuration to prevent unnecessary recalculations
@@ -304,14 +269,10 @@ export default function Home() {
   // Debounce VAD state updates to prevent excessive re-renders
   const debouncedVadState = useDebounce(vadState, 50);
 
-  // WebM Recorder setup - uses same audio stream as VAD
-  const webmRecorder = useWebMRecorder(vadManager.audioStream);
-
-  // Update refs
+  // Update ref
   React.useEffect(() => {
     vadManagerRef.current = vadManager;
-    webmRecorderRef.current = webmRecorder;
-  }, [vadManager, webmRecorder]);
+  }, [vadManager]);
 
   // Pusher integration with notification handlers
   const pusher = usePusher({

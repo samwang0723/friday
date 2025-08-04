@@ -66,7 +66,9 @@ export class VoiceChatService {
         formData.append("input", data);
       }
     } else if (data instanceof Blob) {
-      formData.append("input", data, "audio.webm");
+      // Determine filename based on blob type
+      const filename = data.type === "audio/wav" ? "audio.wav" : "audio.webm";
+      formData.append("input", data, filename);
     } else if (data && typeof data === "object" && "transcript" in data) {
       formData.append("transcript", data.transcript);
     } else {
