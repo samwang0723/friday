@@ -370,7 +370,7 @@ export function useVADManager(
 
   // Initialize VAD with error handling
   const vad = useMicVAD({
-    startOnLoad: true,
+    startOnLoad: false,
     model: "v5",
     submitUserSpeechOnPause: false,
     positiveSpeechThreshold: config.positiveSpeechThreshold || 0.5,
