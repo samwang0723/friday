@@ -383,7 +383,7 @@ export function useVADManager(
       }));
       onVADMisfireCallback();
     },
-    // model: "v5",
+    model: "v5",
     positiveSpeechThreshold: config.positiveSpeechThreshold || 0.7,
     minSpeechFrames: config.minSpeechFrames || 8,
     negativeSpeechThreshold: 0.5, // Lower threshold to be less aggressive about ending
