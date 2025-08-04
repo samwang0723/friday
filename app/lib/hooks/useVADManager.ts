@@ -370,6 +370,8 @@ export function useVADManager(
 
   // Initialize VAD with error handling
   const vad = useMicVAD({
+    baseAssetPath: "/",
+    onnxWASMBasePath: "/",
     startOnLoad: false,
     model: "v5",
     submitUserSpeechOnPause: false,
