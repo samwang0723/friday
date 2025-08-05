@@ -1,8 +1,8 @@
 import type {
-  Message,
   ChatSubmissionData,
-  SubmissionPayload,
   ErrorTranslationMap,
+  Message,
+  SubmissionPayload,
   VoiceChatServiceConfig
 } from "@/types/voiceChat";
 import { getCurrentLocale } from "@/utils/localeUtils";
@@ -75,10 +75,10 @@ export class VoiceChatService {
       throw new Error("Invalid data type for chat submission");
     }
 
-    // Add previous messages
-    for (const message of prevMessages) {
-      formData.append("message", JSON.stringify(message));
-    }
+    // Add previous messages (complete unnecessary as backend already handles the history)
+    // for (const message of prevMessages) {
+    //   formData.append("message", JSON.stringify(message));
+    // }
 
     // Add settings
     formData.append("settings", JSON.stringify(settings));
